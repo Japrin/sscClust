@@ -1,0 +1,272 @@
+---
+title: "Clustering using spearman correlation projection"
+author:
+- name: Xianwen Ren
+  affiliation: 
+  - &id BIOPIC, Peking University, Yiheyuan Road No. 5, Haidian District, Beijing, P. R. China
+- name: Liangtao Zheng
+  affiliation: *id
+  email: tao2013@gmail.com 
+  
+date: "`r Sys.Date()`"
+output: 
+  BiocStyle::html_document:
+    toc_float: true    
+  BiocStyle::pdf_document: default
+package: sscClust
+abstract: |
+  Instructions on how to perform clustering using spearman correlation projection.
+vignette: |
+  %\VignetteIndexEntry{Clustering using spearman correlation projection}
+  %\VignetteEngine{knitr::rmarkdown}
+  %\VignetteEncoding{UTF-8}  
+---
+
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+# Introduction
+
+Simpler single cell RNAseq data clustering (`sscClust`) is a package implement mutilple functionalities which are basic procedures in single cell RNAseq data analysis, including variable genes identification, dimension reduction, clustering on reduced data.
+
+Single cell RNAseq data is sparse and noisy, thus compromising the clustering accuracy and visualization effect. Particularly, for large single-cell RNA-seq data, subsampling is often needed to circumvent the huge computational complexity, further degrading the results. In this vignette, it is demonstrated how to use `sscClust`  to project data to a feature space using spearman correlation which make visualiaztion and clustering efficient, and cluster with subsampling and classfification which make it feasible to process thousands cells' data.
+
+# Quick Start
+First, we load needed packages, 
+```{r packages, message=FALSE}
+library("SingleCellExperiment")
+library("sscClust")
+set.seed(9975)
+```
+
+To demonstrate the basic usage of this package, We use data from the tumor infiltrating T cells' study as example. The example data only contains expression profile of about 500 signature genes of  randomly selected 100 CD8 T cells. In the original study, these cells were grouped into 5 major clusters. The gene expression data is contained in a .txt file with genes as rows and cells as columns. In addition, the first two columns are the gene id and gene symbol.
+```{r }
+exp.dat <- read.table(system.file("extdata/TCell.d100.sigG.exp.txt.gz",
+                                  package = "sscClust"),
+                      header = T,row.names = 1,stringsAsFactors = F,
+                      check.names = F,sep = "\t")
+cellInfo.dat <- read.table(system.file("extdata/TCell.d100.cellInfo.txt",
+                                  package = "sscClust"),
+                      header = T,row.names = 2,stringsAsFactors = F,
+                      check.names = F,sep = "\t")
+exp.dat[1:4,1:8]
+head(cellInfo.dat)
+```
+This example data was already normalied and individual effect on expression was removed by centering. Usually, normalization can be done by various R packages, for example `r Biocpkg("scran")`; and batch effect and unwanted variation correction can be done using packages such as `r Biocpkg("limma")` or `r Biocpkg("sva")`.
+
+Now we can create an object of `SingleCellExperiment` using exp.dat and cellInfo.dat. The exp.dat$geneSymbol is provided to `display.name`, so we can use more familier gene symbols when visualze the genes' expression.
+```{r }
+sce <- ssc.build(exp.dat[,-1], display.name = exp.dat$geneSymbol)
+colData(sce) <- DataFrame(cellInfo.dat)
+```
+
+Once the object created, we can run the clustering pipeline with this command for clustering using all data:
+```{r }
+sce.all <- ssc.run(sce, subsampling=F, k.batch=5)
+```
+or with this command for clustering with subsampling:
+```{r message=F,warning=F}
+sce.sub <- ssc.run(sce, subsampling=T, sub.frac = 0.8, k.batch=5)
+```
+The function `ssc.run` is a wrapper of multiple functions which can also be called separately as in the section \@ref(clustAll) and \@ref(clustSub)  showed. 
+
+Because we know that the data contains 5 different clusters, we set `k.batch` to 5. For dataset without prior knowledge of how many clusters exists, we can try to set `k.batch` to a serious of values and run the pipeline then select the best solution, for example, let `k.batch`=2:10.
+
+When the clustering finished, we can use marker genes' expression to check the accuracy:
+```{r fig.width=8,fig.height=10,fig.wide=T}
+ssc.plot.tsne(sce.all, 
+              gene = c("CCR7","CX3CR1","SLC4A10","LAYN","GZMK","HAVCR2"),
+              columns = NULL,
+              reduced.name = "iCor.tsne",p.ncol = 2)
+```
+
+we can also plot some metadata on the tSNE plot:
+```{r fig.width=12,fig.height=8,fig.wide=T}
+ssc.plot.tsne(sce.all, 
+              gene = NULL,
+              columns = c("loc","patient","majorCluster","iCor.kmeans.k5"),
+              reduced.name = "iCor.tsne",p.ncol = 2)
+```
+
+# clustering based on Spearman correlation {#clustAll}
+
+Here, we would use the Pollen dataset which is included in this package. This data set contains expression data of 249 cells by 6,982 gene,  with eleven clusters corresponding to skin cells, pluripotent stem cells, blood cells, neural cells, etc. To calculate the NMI index and record the excuting time of functions, we also load two packages, `r CRANpkg("igraph")` and `r CRANpkg("tictoc")`.
+```{r message=F}
+library("igraph")
+library("tictoc")
+data("sce.Pollen")
+sce.Pollen
+```
+
+We selected the top 1500 genes with higheast sd for clustering. There are many variable genes identification methods in the single cell RNAseq research community. For example, fit CV^2~mean relationship using a GLM model then the genes significantly higher than the fitted value are defined as highly variable genes. Here the sd method is sufficient.
+
+```{r }
+sce.Pollen <- ssc.variableGene(sce.Pollen,method="sd",sd.n=1500)
+```
+
+## visualization
+
+Before clustering, we can use tSNE to visualize the expression profile of the data. We also compare the visualization of the original data, data transformed by Spearman correlation and PCA.
+
+The visualization (tSNE) using original data:
+```{r fig.width=6,fig.height=5}
+sce.Pollen.ori <- sce.Pollen
+sce.Pollen.ori <- ssc.reduceDim(sce.Pollen.ori,method="tsne",tSNE.usePCA = F)
+ssc.plot.tsne(sce.Pollen.ori,columns = "true_labs",reduced.name = "tsne")
+```
+
+The visualization (tSNE) using PCA transformed data:
+```{r fig.width=6,fig.height=5}
+sce.Pollen.proj <- ssc.reduceDim(sce.Pollen,method="pca")
+ssc.plot.tsne(sce.Pollen.proj,columns = "true_labs",reduced.name = "pca.tsne")
+```
+
+The visualization (tSNE) using Spearman correlation transformed data:
+```{r fig.width=6,fig.height=5}
+sce.Pollen.proj <- ssc.reduceDim(sce.Pollen.proj,method="iCor")
+ssc.plot.tsne(sce.Pollen.proj,columns = "true_labs",reduced.name = "iCor.tsne")
+```
+
+Note, a SingleCellExperiment object can contain multile reduced dimension respresentation of the data, which are stored in the reducedDim slot under different names.
+
+Both Spearman correlation transformation and PCA transformation enhance the visualization, especially Spearman correlation transformation: for most clusters, the cells belong to the same cluster have smaller intra cluster distance, and different clusters have larger distance. This is evident by the average silhouette width.
+
+```{r message=F}
+sil.ori <- ssc.plot.silhouette(sce.Pollen.ori, cluster.label="true_labs", reducedDim.name = "tsne",do.plot = F)
+print(mean(sil.ori[,"sil_width"]))
+sil.pca <- ssc.plot.silhouette(sce.Pollen.proj, cluster.label="true_labs", reducedDim.name = "pca.tsne",do.plot = F)
+print(mean(sil.pca[,"sil_width"]))
+sil.iCor <- ssc.plot.silhouette(sce.Pollen.proj, cluster.label="true_labs", reducedDim.name = "iCor.tsne",do.plot = F)
+print(mean(sil.iCor[,"sil_width"]))
+```
+                    
+## clustering
+
+We will use kmeans algorithm (implemented in function `ssc.clust`) to cluster the cells into 11 groups, and use the labels from original analysis of the dataset as true labels. The parameters `method` and `k.batch` are set to `kmeans` and `11` respectively. To cluster original data (sce.Pollen.ori), no reduction should be performed, so the parameter `method.reduction` is set to `none`:
+```{r warning=F}
+tic("clustering (ori data)")
+sce.Pollen.ori <- ssc.clust(sce.Pollen.ori, method.reduction="none", method="kmeans", k.batch=11)
+toc()
+```
+
+Comparing the result with the true labels, we evaluate the consistency using the NMI index.
+```{r } 
+compare(as.factor(sce.Pollen.ori$true_labs),
+        as.factor(sce.Pollen.ori$none.kmeans.k11),
+        method="nmi")
+```
+
+<!-- The confusoin matrix show the details: -->
+<!-- ```{r } -->
+<!-- table(colData(sce.Pollen.ori)[,c("true_labs","none.kmeans.k11")] ) -->
+<!-- ``` -->
+
+
+To cluster data transformed by PCA (sce.Pollen.proj), the dimension reduction must be done as in the visualization section, and `method.reduction` of `ssc.clust` should be `pca`:
+```{r warning=F}
+tic("clustering (data projected by pca)")
+sce.Pollen.proj <- ssc.clust(sce.Pollen.proj, method.reduction="pca", method="kmeans", k.batch=11)
+toc()
+```
+
+Caculate NMI index:
+```{r }
+compare(as.factor(sce.Pollen.proj$true_labs),
+        as.factor(sce.Pollen.proj$pca.kmeans.k11),
+        method="nmi")
+```
+
+<!-- The confusoin matrix show the details: -->
+<!-- ```{r } -->
+<!-- table(colData(sce.Pollen.proj)[,c("true_labs","pca.kmeans.k11")]) -->
+<!-- ``` -->
+
+
+Similarly, to cluster data transformed by Spearman correlation (sce.Pollen.proj), parameter "method.reduction" of `ssc.clust` should be `iCor`:
+```{r warning=F}
+tic("clustering (data projected by iCor)")
+sce.Pollen.proj <- ssc.clust(sce.Pollen.proj, method.reduction="iCor", method="kmeans", k.batch=11)
+toc()
+```
+
+Caculate NMI index:
+```{r }
+compare(as.factor(sce.Pollen.proj$true_labs),
+        as.factor(sce.Pollen.proj$iCor.kmeans.k11),
+        method="nmi")
+```
+
+<!-- The confusoin matrix show the details: -->
+<!-- ```{r } -->
+<!-- table(colData(sce.Pollen.proj)[,c("true_labs","iCor.kmeans.k11")]) -->
+<!-- ``` -->
+
+
+# Subsampling, clustering & classification {#clustSub}
+
+For dataset contains thousands of cells (such as drop-seq data), do subsampling then clustering and training a classifier upon a fraction of cells followed by predicting of the unsampled cells can be an efficient method to discover the major cell types.  In such situation, `ssc.clustSubsampingClassification` can be used.
+
+We will subsample the cells to only the 20% of the total cells (frac=0.2), To use the original data:
+```{r message=F,warning=F}
+set.seed(996)
+tic("clustering with subsampling and classification, on original data (0.2)")
+sce.Pollen.sub.ori <- ssc.clustSubsamplingClassification(sce.Pollen, frac=0.2,
+                                              method.reduction = "none",
+                                              use.proj=F,k.batch = 11)
+toc()
+```
+Calculate the NMI index:
+```{r}
+compare(as.factor(sce.Pollen.sub.ori$true_labs),
+        as.factor(sce.Pollen.sub.ori$none.kmeans.k11),
+        method="nmi")
+```
+
+To project data to PCA space, we set `method.reduction` to `pca`, and also use top PCs for classification (`use.proj=T`):
+```{r message=F,warning=F}
+tic("clustering with subsampling and classification, on PCA space (0.2)")
+sce.Pollen.sub.pca <- ssc.clustSubsamplingClassification(sce.Pollen, frac=0.2,
+                                              method.reduction = "pca",pca.npc = NULL,
+                                              use.proj=T,k.batch = 11)
+toc()
+```
+The NMI index is 
+```{r}
+compare(as.factor(sce.Pollen.sub.pca$true_labs),
+        as.factor(sce.Pollen.sub.pca$pca.kmeans.k11),
+        method="nmi")
+```
+
+To project data to feature space based on spearman correlation, we set `method.reduction` to `iCor`, and also use the correlation for classification (`use.proj=T`):
+```{r message=F,warning=F,error=F}
+tic("clustering with subsampling and classification, on feature space (0.2)")
+sce.Pollen.sub <- ssc.clustSubsamplingClassification(sce.Pollen, frac=0.2,
+                                              method.reduction = "iCor",
+                                              use.proj=T,k.batch = 11)
+toc()
+```
+The NMI index is 
+```{r}
+compare(as.factor(sce.Pollen.sub$true_labs),
+        as.factor(sce.Pollen.sub$iCor.kmeans.k11),
+        method="nmi")
+```
+
+We can also use the subsampled cells to generate tSNE map, than embed the unsampled cells to the tSNE map.
+```{r fig.width=10.5,fig.height=4,fig.wide=T}
+ssc.plot.tsne(sce.Pollen.sub,columns = c("iCor.kmeans.k11","isTrainSet"),reduced.name = "iCor.tsne")
+```
+
+From the comparison, using original data or PCA transformed data, when subsampled to only 20%, the clustering accuracy decrease dramatically, but using data transformed by Spearman correlation still give us high clustering accuracy!
+
+
+# Session info {.unnumbered}
+
+```{r sessionInfo, echo=FALSE}
+sessionInfo()
+```
+
+

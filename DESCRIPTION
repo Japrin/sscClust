@@ -1,0 +1,16 @@
+Package: sscClust
+Type: Package
+Title: simpler single cell RNAseq data clustering
+Version: 0.1.0
+Author: Xianwen Ren, Liangtao Zheng
+Maintainer: Liangtao Zheng <tao2013@gmail.com>
+Description: A package implement mutilple functionalities which are commonly used in single cell RNAseq data analysis, 
+    including variable genes identification, dimension reduction, clustering on reduced data. Also some new ideas were proposed, such as 
+    projecting data to a feature space using spearman correlation which make visualiaztion and clustering more efficient, clustering with 
+    subsampling and classfification which make it feasible to process thousands cells' data. 
+License: GPL-3
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 6.0.1
+Depends: SingleCellExperiment
+Imports: RColorBrewer, Rtsne, class, factoextra, cowplot, data.table, ggplot2, varSelRF, cluster
