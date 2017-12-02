@@ -1,3 +1,4 @@
+[![Travis CI Build Status](https://travis-ci.org/Japrin/sscClust.svg?branch=master)](https://travis-ci.org/Japrin/sscClust)
 [![AppVeyor Build status](https://ci.appveyor.com/api/projects/status/bx9kcptlomn93auf/branch/master?svg=true)](https://ci.appveyor.com/project/Japrin/sscclust/branch/master)
 
 # sscClust
