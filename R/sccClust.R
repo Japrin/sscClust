@@ -405,11 +405,12 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' Perform clustering using reduced data
 #' @importFrom factoextra eclust
 #' @importFrom stats kmeans
+#' @importFrom ADPclust adpclust
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
 #' "iCor", "pca" and "none". (default: "iCor")
-#' @param method character; clustering method to be used, should be one of "kmeans" and "hclust". (default: "kmeans")
+#' @param method character; clustering method to be used, should be one of "kmeans", "hclust" an "adpclust". (default: "kmeans")
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
 #' @details If no dimension reduction performed or method is "none", expression data of variable genes,
@@ -438,11 +439,17 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
   for(k in k.batch){
     if(method=="kmeans"){
       clust.res <- kmeans(dat.transformed,k,iter.max=1000,nstart=50)
+      colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$cluster)
     }else if(method=="hclust"){
       clust.res <- factoextra::eclust(dat.transformed, "hclust", k = k, method = "complete", graph = FALSE)
+      colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$cluster)
+    }else if(method=="adpclust"){
+      clust.res <- ADPclust::adpclust(dat.transformed,nclust = k.batch)
+      k <- "auto"
+      colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
     }
     res.list[[as.character(k)]] <- clust.res
-    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$cluster)
+    if(method=="adpclust"){ break }
   }
   metadata(obj)$ssc$clust.res[[method]] <- res.list
   return(obj)
