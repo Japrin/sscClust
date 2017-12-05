@@ -32,6 +32,18 @@ auto.colSet <- function(n=2,name="Set1"){
   return(ret)
 }
 
+#' Determine point size automatically
+#' @param n number of points to plot
+#' @return points' cex
+auto.point.size <- function(n){
+  if(n<=100){
+    return(1.2)
+  }else if(n>=5000){
+    return(0.6)
+  }else{
+    return(-0.6*n/4900+1.212002)
+  }
+}
 
 #' Plot gene expression on tSNE map
 #'
@@ -45,11 +57,13 @@ auto.colSet <- function(n=2,name="Set1"){
 #' @param gene.to.show character; gene id to be showd on the tSNE map
 #' @param out.prefix character; output prefix (default: NULL)
 #' @param p.ncol integer; number of columns in the plot's layout (default: 3)
+#' @param width numeric; width of the plot (default: 9)
+#' @param height numeric; height of the plot (default: 8)
 #' @details For genes contained in both `Y` and `gene.to.show`, show their expression on the tSNE
 #' map provided as `dat.map`. One point in the map represent a cell; cells with higher expression
 #' also have darker color.
 #' @return a ggplot object
-ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3){
+ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,width=9,height=8){
   #suppressPackageStartupMessages(require("data.table"))
   #requireNamespace("ggplot2",quietly = T)
   #requireNamespace("RColorBrewer",quietly = T)
@@ -67,15 +81,42 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3){
   dat.plot <- cbind(dat.plot,dat.map,t(Y[gene.to.show,dat.plot$sample,drop=F]))
   colnames(dat.plot) <- c("sample","Dim1","Dim2",names(gene.to.show))
   dat.plot.melt <- data.table::melt(dat.plot,id.vars = c("sample","Dim1","Dim2"))
+  dat.plot.melt <- dat.plot.melt[order(dat.plot.melt$value,decreasing = F),]
+  npts <- nrow(dat.plot.melt)
   p <- ggplot2::ggplot(dat.plot.melt,aes(Dim1,Dim2)) +
-          geom_point(aes(colour=value)) +
+          geom_point(aes(colour=value),size=auto.point.size(npts)*1.1) +
           scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
           facet_wrap(~variable, ncol = p.ncol) +
           theme_bw()
   if(!is.null(out.prefix)){
-    ggplot2::ggsave(sprintf("%s.geneOntSNE.pdf",out.prefix),width = 9,height = 8)
+    ggplot2::ggsave(sprintf("%s.geneOntSNE.pdf",out.prefix),width = width,height = height)
   }
   return(p)
+}
+
+#' Find the knee point of the scree plot
+#'
+#' @param pcs principal component values sorted decreasingly
+#' @details Given sorted decreasingly PCs, find the knee point which have the largest distance to
+#' the line defined by the first point and the last point in the scree plot
+#' @return index of the knee plot
+findKneePoint <- function(pcs)
+{
+  npts <- length(pcs)
+  if(npts<=3){
+    return(npts)
+  }else{
+    P1 <- c(1,pcs[1])
+    P2 <- c(npts,pcs[npts])
+    v1 <- P1 - P2
+    dd <- sapply(2:(npts-1),function(i){
+      Pi <- c(i, pcs[i])
+      v2 <- Pi - P1
+      m <- cbind(v1,v2)
+      d <- abs(det(m))/sqrt(sum(v1*v1))
+    })
+    return(which.max(dd))
+  }
 }
 
 ####### classification functions
@@ -334,11 +375,11 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
     ### find elbow point and get number of components to be used
     pca.res$eigenv.prop <- pca.res$sdev/sum(pca.res$sdev)
     pca.res$eigengap <- sapply(seq_len(length(pca.res$eigenv.prop)-1),function(i){ pca.res$eigenv.prop[i]-pca.res$eigenv.prop[i+1] })
-    pca.res$eigengap.max <- which(pca.res$eigengap<1e-4)[1]
-    #print(pca.res$eigengap.max)
-    #print(head(pca.res$eigenv.prop,n=30))
-    #print(head(pca.res$eigengap,n=30))
-    if(is.null(pca.npc) && !is.na(pca.res$eigengap.max)){ pca.npc <- pca.res$eigengap.max
+    ### method 1
+    ######pca.res$kneePts <- which(pca.res$eigengap<1e-4)[1]
+    ### method 2 (max distance to the line defined by the first and last point in the scree plot)
+    pca.res$kneePts <- findKneePoint(head(pca.res$eigenv.prop,n=50))
+    if(is.null(pca.npc) && !is.na(pca.res$kneePts)){ pca.npc <- pca.res$kneePts
     }else{ pca.npc <- 30 }
     pca.npc <- min(pca.npc,ncol(pca.res$x))
     pca.res$npc <- pca.npc
@@ -603,8 +644,11 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param reduced.dim integer; which dimensions of the reduced data to be used. (default: c(1,2))
 #' @param out.prefix character; output prefix. (default: NULL)
 #' @param p.ncol integer; number of columns in the figure layout. (default: 3)
+#' @param width numeric; width of the plot, used for geneOnTSNE. (default: NA)
+#' @param height numeric; height of the plot, used for geneOnTSNE. (default: NA)
+#' @param base_aspect_ratio numeric; base_aspect_ratio, used for plotting metadata. (default 1.1)
 #' @importFrom SingleCellExperiment colData
-#' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string
+#' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend
 #' @importFrom cowplot save_plot plot_grid
 #' @importFrom utils read.table
 #' @details If `gene` is not NULL, expression of the specified genes will be plot on the tSNE map; if columns in not
@@ -615,7 +659,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @export
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, colSet=list(),
                           reduced.name="iCor.tsne",reduced.dim=c(1,2),
-                          out.prefix=NULL,p.ncol=3)
+                          out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1)
 {
   #requireNamespace("ggplot2")
   #requireNamespace("cowplot")
@@ -635,15 +679,19 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, colS
           dat.plot <- data.frame(sample=rownames(dat.map),stringsAsFactors = F)
           dat.plot <- as.data.frame(cbind(dat.plot,dat.map[,reduced.dim],colData(obj)[,cc,drop=F]))
           colnames(dat.plot) <- c("sample","Dim1","Dim2",cc)
+          npts <- nrow(dat.plot)
           p <- ggplot2::ggplot(dat.plot,aes(Dim1,Dim2)) +
-            geom_point(aes_string(colour=cc)) +
+            geom_point(aes_string(colour=cc),size=auto.point.size(npts)*1.1) +
             scale_colour_manual(values = colSet[[cc]]) +
-            theme_bw()
+            theme_bw() +
+            ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size=4)))
           return(p)
         })
         pp <- cowplot::plot_grid(plotlist=multi.p,ncol = if(length(columns)>1) 2 else 1,align = "hv")
         if(!is.null(out.prefix)){
-          cowplot::save_plot(sprintf("%s.columnsOntSNE.pdf",out.prefix),pp,ncol = 2)
+          cowplot::save_plot(sprintf("%s.columnsOntSNE.pdf",out.prefix),pp,
+                             ncol = if(length(columns)>1) 2 else 1,
+                             base_aspect_ratio=base_aspect_ratio)
         }else{
           print(pp)
         }
@@ -662,7 +710,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, colS
     }
     p <- ggGeneOnTSNE(assay(obj,assay.name),
                      reducedDim(obj,reduced.name)[,reduced.dim],
-                     gene,out.prefix,p.ncol=p.ncol)
+                     gene,out.prefix,p.ncol=p.ncol,width=width,height=height)
     if(is.null(out.prefix)){ print(p) }
   }
 }
@@ -678,10 +726,10 @@ ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2){
   eigenv <- metadata(obj)$ssc$pca.res$eigenv.prop
   dat.plot.eigenv <- data.frame(PC=seq_along(eigenv),
                                 eigenv=eigenv,
-                                gapMax=as.character(seq_along(eigenv)==metadata(obj)$ssc$pca.res$eigengap.max),
+                                isKneePts=as.character(seq_along(eigenv)==metadata(obj)$ssc$pca.res$kneePts),
                                 stringsAsFactors = F)
   p <- ggplot2::ggplot(head(dat.plot.eigenv,n=30),mapping = aes(PC,eigenv)) +
-    geom_point(aes(colour=gapMax),show.legend=F) +
+    geom_point(aes(colour=isKneePts),show.legend=F) +
     scale_colour_manual(values = c("TRUE"="#E41A1C","FALSE"="#377EB8")) +
     theme_bw()
   print(p)
