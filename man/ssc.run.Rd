@@ -7,7 +7,8 @@
 ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
   method.reduction = "iCor", method.clust = "kmeans",
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
-  subsampling = F, sub.frac = 0.4, sub.use.proj = T, k.batch = 2:6)
+  subsampling = F, sub.frac = 0.4, sub.use.proj = T, k.batch = 2:6,
+  refineGene = F, iterative = F)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -36,6 +37,11 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
 \item{sub.use.proj}{logical; whether use the projected data for classification. (default: T)}
 
 \item{k.batch}{integer; number of clusters to be evaluated. (default: 2:6)}
+
+\item{refineGene}{logical; whether perform second round demension reduction and clustering pipeline using the differential
+genes found by the first round cluster result. (default: F)}
+
+\item{iterative}{logical; whether perform iterative clustering in sub-cluster. (default: F)}
 }
 \value{
 an object of \code{SingleCellExperiment} class with cluster labels added.

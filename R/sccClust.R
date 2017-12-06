@@ -94,6 +94,31 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,width=9
   return(p)
 }
 
+#' Wrap for plotting 2D density
+#'
+#' @importFrom ks kde
+#' @importFrom fields image.plot
+#' @param x matrix or data.frame; map data, row for sample, column for dimension
+#' @details use ks::kde for density estimation
+#'
+plot.density2D <- function(x)
+{
+  .density <- ks::kde(x)
+  ##dev.new()
+  par(mar=c(5,4,5,6))
+  .zz <- c(10,20,30,40,50,60,70,80,90)
+  plot(.density,display="filled.contour2", cont=.zz,xlab="Dim1", ylab="Dim2")
+  fields::image.plot(zlim=c(0,.zz[length(.zz)]),legend.only=TRUE, col = c("transparent", rev(heat.colors(length(.zz)))),
+             axis.args=list( at=.zz, labels=sprintf("%s%%",100-.zz)), legend.width=2.0,legend.mar=4.5)
+  #plot(.density,display="filled.contour2", cont=.zz,xlab="Dim1", ylab="Dim2")
+  #points(dat.transformed[names(density.clust.res$peaks),,drop=F],pch=3,cex=2,col="black")
+  #image.plot(zlim=c(0,.zz[length(.zz)]),legend.only=TRUE, col = c("transparent", rev(heat.colors(length(.zz)))),
+  #           axis.args=list( at=.zz, labels=sprintf("%s%%",100-.zz)), legend.width=2.0,legend.mar=4.5)
+  ##pp <- recordPlot()
+  ##dev.off()
+  #pp
+}
+
 #' Find the knee point of the scree plot
 #'
 #' @param pcs principal component values sorted decreasingly
@@ -118,6 +143,129 @@ findKneePoint <- function(pcs)
     return(which.max(dd))
   }
 }
+
+
+####### differential expression
+#' differential expression analysis
+#'
+#' @importFrom plyr ldply
+#' @importFrom stats aov TukeyHSD
+#' @importFrom doParallel registerDoParallel
+#' @param xdata data frame or matrix; rows for genes and columns for samples
+#' @param xlabel factor; cluster label of the samples, with length equal to the number of columns in xdata
+#' @param out.prefix character; if not NULL, write the result to the file(s). (default: NULL)
+#' @param mod character;
+#' @param F.FDR.THRESHOLD numeric; threshold of the adjusted p value of F-test. (default: 0.01)
+#' @param HSD.FDR.THRESHOLD numeric; threshold of the adjusted p value of HSD-test (default: 0.01)
+#' @param HSD.FC.THRESHOLD numeric; threshold of the absoute diff of HSD-test (default: 1)
+#' @param verbose logical; whether output all genes' result. (default: F)
+#' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
+#' @return List with the following elements:
+#' \item{aov.out}{data.frame, test result of all genes (rownames of xdata)}
+#' \item{aov.out.sig}{format as aov.out, but only significant genes. }
+findDEGenesByAOV <- function(xdata,xlabel,out.prefix=NULL,mod=NULL,
+                    F.FDR.THRESHOLD=0.01,
+                    HSD.FDR.THRESHOLD=0.01,
+                    HSD.FC.THRESHOLD=1,
+                    verbose=F,n.cores=NULL,
+                    gid.mapping=NULL)
+{
+  clustNames <- unique(xlabel)
+  xdata <- as.matrix(xdata)
+  ### check rownames and colnames
+  if(is.null(rownames(xdata))){
+    stop("the xdata does not have rownames!!!")
+  }
+  if(!is.null(gid.mapping) && is.null(names(gid.mapping))) { names(gid.mapping)=gid.mapping }
+  ###
+  registerDoParallel(cores = n.cores)
+  ret <- ldply(rownames(xdata),function(v){
+    aov.out <- aov(y ~ g,data=data.frame(y=xdata[v,],g=xlabel))
+    aov.out.s <- summary(aov.out)
+    t.res.f <- unlist(aov.out.s[[1]]["g",c("F value","Pr(>F)")])
+    aov.out.hsd <- TukeyHSD(aov.out)
+    hsd.name <- rownames(aov.out.hsd$g)
+    t.res.hsd <- c(aov.out.hsd$g[,"diff"],aov.out.hsd$g[,"p adj"])
+    t.res.hsd.minP <- min(aov.out.hsd$g[,"p adj"])
+    j <- which.min(aov.out.hsd$g[,"p adj"])
+    t.res.hsd.minPDiff <- if(is.na(t.res.hsd.minP)) NaN else aov.out.hsd$g[j,"diff"]
+    t.res.hsd.minPCmp <- if(is.na(t.res.hsd.minP)) NaN else rownames(aov.out.hsd$g)[j]
+    ## whether cluster specific ?
+    t.res.spe  <-  sapply(clustNames,function(v){ all( aov.out.hsd$g[grepl(v,hsd.name,perl=T),"p adj"] < HSD.FDR.THRESHOLD )  })
+    ## wheter up across all comparison ?
+    is.up <- sapply(clustNames,function(v){  all( aov.out.hsd$g[grepl(paste0(v,"-"),hsd.name),"diff"]>0 ) & all( aov.out.hsd$g[grepl(paste0("-",v),hsd.name),"diff"]<0 ) })
+    is.down <- sapply(clustNames,function(v){  all( aov.out.hsd$g[grepl(paste0(v,"-"),hsd.name),"diff"]<0 ) & all( aov.out.hsd$g[grepl(paste0("-",v),hsd.name),"diff"]>0 ) })
+    is.clusterSpecific <- (sum(t.res.spe,na.rm = T) == 1)
+    if(is.clusterSpecific){
+      t.res.spe.lable <- names(which(t.res.spe))
+      if(is.up[t.res.spe.lable]) {
+        t.res.spe.direction <- "UP"
+      }else if(is.down[t.res.spe.lable]) {
+        t.res.spe.direction <- "DOWN"
+      }else{
+        t.res.spe.direction <- "INCONSISTANT"
+      }
+    }else{
+      t.res.spe.lable <- "NA"
+      t.res.spe.direction <- "NA"
+    }
+    if(!is.null(mod) && mod=="cluster.specific") {
+      structure(c(t.res.f,t.res.hsd,t.res.hsd.minP,t.res.hsd.minPDiff,t.res.hsd.minPCmp,
+                  t.res.spe,is.clusterSpecific,t.res.spe.lable,t.res.spe.direction),
+                names=c("F","F.pvalue",paste0("HSD.diff.",hsd.name),paste0("HSD.padj.",hsd.name),
+                        "HSD.padj.min","HSD.padj.min.diff","HSD.padj.min.cmp",
+                        paste0("cluster.specific.",clustNames),"is.clusterSpecific","cluster.lable","cluster.direction"))
+    }else{
+      structure(c(t.res.f,t.res.hsd,t.res.hsd.minP,t.res.hsd.minPDiff,t.res.hsd.minPCmp),
+                names=c("F","F.pvalue",paste0("HSD.diff.",hsd.name),paste0("HSD.padj.",hsd.name),
+                        "HSD.padj.min","HSD.padj.min.diff","HSD.padj.min.cmp"))
+    }
+  },.progress = "none",.parallel=T)
+  #print(str(ret))
+
+  if(!is.null(gid.mapping)){
+    cnames <- gid.mapping[rownames(xdata)]
+  }else{
+    cnames <- rownames(xdata)
+  }
+  f.cnames.na <- which(is.na(cnames))
+  cnames[f.cnames.na] <- rownames(xdata)[f.cnames.na]
+  ret.df <- data.frame(geneID=rownames(xdata),geneSymbol=cnames,stringsAsFactors=F)
+  ret.df <- cbind(ret.df,ret)
+  rownames(ret.df) <- rownames(xdata)
+  #print(str(ret.df))
+  ## type conversion
+  if(is.null(mod)){
+    i <- 3:(ncol(ret.df)-1)
+    ret.df[i]<-lapply(ret.df[i],as.numeric)
+  }else{
+    i <- 3:(ncol(ret.df)-(4+length(clustNames)))
+    ret.df[i]<-lapply(ret.df[i],as.numeric)
+    i <- (ncol(ret.df)-(length(clustNames)+2)):(ncol(ret.df)-2)
+    ret.df[i]<-lapply(ret.df[i],as.logical)
+  }
+  ## adjust F test's p value
+  ret.df$F.adjp <- 1
+  ret.df.1 <- subset(ret.df,!is.na(F.pvalue))
+  ret.df.1$F.adjp <- p.adjust(ret.df.1[,"F.pvalue"],method = "BH")
+  ret.df.2 <- subset(ret.df,is.na(F.pvalue))
+  ret.df <- rbind(ret.df.1,ret.df.2)
+  ret.df <- ret.df[order(ret.df$F.adjp,-ret.df$F,ret.df$HSD.padj.min),]
+  ### select
+  ret.df.sig <- subset(ret.df,F.adjp<F.FDR.THRESHOLD & HSD.padj.min<HSD.FDR.THRESHOLD & abs(HSD.padj.min.diff)>=HSD.FC.THRESHOLD)
+  ### output
+  if(!is.null(out.prefix)){
+    write.table(ret.df.sig,file = sprintf("%s.aov.sig.txt",out.prefix),quote = F,row.names = F,col.names = T,sep = "\t")
+    if(verbose){
+      write.table(ret.df,file = sprintf("%s.aov.txt",out.prefix),quote = F,row.names = F,col.names = T,sep = "\t")
+    }
+  }
+  #print(str(ret.df))
+  return(list(aov.out=ret.df,aov.out.sig=ret.df.sig))
+}
+
+
 
 ####### classification functions
 
@@ -589,6 +737,9 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param sub.frac numeric; subsample to frac of original samples. (default: 0.4)
 #' @param sub.use.proj logical; whether use the projected data for classification. (default: T)
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
+#' @param refineGene logical; whether perform second round demension reduction and clustering pipeline using the differential
+#' genes found by the first round cluster result. (default: F)
+#' @param iterative logical; whether perform iterative clustering in sub-cluster. (default: F)
 #' @details run the pipeline of variable gene identification, dimension reduction, clustering.
 #' @seealso \code{\link{ssc.variableGene}} for variable genes' identification, \code{\link{ssc.reduceDim}}
 #' for dimension reduction, \code{\link{ssc.clust}} for clustering using all data
@@ -606,7 +757,9 @@ ssc.run <- function(obj, assay.name="exprs",
                     subsampling=F,
                     sub.frac=0.4,
                     sub.use.proj=T,
-                    k.batch=2:6)
+                    k.batch=2:6,
+                    refineGene=F,
+                    iterative=F)
 {
   ### some checking
   if(is.null(colnames(obj))){
@@ -615,17 +768,44 @@ ssc.run <- function(obj, assay.name="exprs",
   if(is.null(rownames(obj))){
     stop("rownames of obj is NULL!!!")
   }
-
+  #rid <- "11"
   obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
   if(!subsampling){
-    obj <- ssc.reduceDim(obj,assay.name=assay.name,
-                              method=method.reduction,
-                              pca.npc = pca.npc,
-                              iCor.niter = iCor.niter,
-                              method.vgene=method.vgene)
-    obj <- ssc.clust(obj, assay.name=assay.name, method.reduction=method.reduction,
-                          method=method.clust, k.batch=k.batch,
-                          method.vgene=method.vgene)
+    runOneIter <- function(obj,rid){
+      obj <- ssc.reduceDim(obj,assay.name=assay.name,
+                                method=method.reduction,
+                                pca.npc = pca.npc,
+                                iCor.niter = iCor.niter,
+                                method.vgene=method.vgene)
+      obj <- ssc.clust(obj, assay.name=assay.name,
+                       method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
+                       method=method.clust, k.batch=k.batch,
+                       method.vgene=method.vgene)
+      if(refineGene && method.clust=="adpclust"){
+        ### adpclust automatically use tsne data
+        de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
+                                   xlabel = colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)],
+                                   gid.mapping = rowData(obj)[,"display.name"])
+        if(nrow(de.out$aov.out.sig)>30){
+          metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
+          metadata(obj)$ssc[["variable.gene"]][["refine.de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
+          obj <- ssc.reduceDim(obj,assay.name=assay.name,
+                       method=method.reduction,
+                       pca.npc = pca.npc,
+                       iCor.niter = iCor.niter,
+                       method.vgene="refine.de")
+          obj <- ssc.clust(obj, assay.name=assay.name,
+                           method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
+                           method=method.clust, k.batch=k.batch,
+                           method.vgene="refine.de")
+        }else{
+          warning("The number of DE genes is less than 30, NO second round clustering using DE genes will be performed!!")
+        }
+      }
+      return(obj)
+    }
+
+    obj <- runOneIter(obj,"11")
   }else{
     obj <- ssc.clustSubsamplingClassification(obj, assay.name=assay.name,
                                                    frac=sub.frac,
@@ -646,6 +826,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param assay.name character; which assay (default: "exprs")
 #' @param gene, character; genes to be showed. (default: NULL)
 #' @param columns character; columns in colData(obj) to be showd. (default: NULL)
+#' @param plotDensity logical; whether plot 2D density. (default F)
 #' @param colSet list; mapping iterms in the names to colors in the values. (default: list())
 #' @param reduced.name character; names in the reducedDimNames. (default: "iCor.tsne")
 #' @param reduced.dim integer; which dimensions of the reduced data to be used. (default: c(1,2))
@@ -664,7 +845,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' a color mapping for the responding iterm in the `column`; if not specifed, automatically generated color mapping will
 #' be used.
 #' @export
-ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, colSet=list(),
+ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plotDensity=F, colSet=list(),
                           reduced.name="iCor.tsne",reduced.dim=c(1,2),
                           out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1)
 {
@@ -719,6 +900,15 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, colS
                      reducedDim(obj,reduced.name)[,reduced.dim],
                      gene,out.prefix,p.ncol=p.ncol,width=width,height=height)
     if(is.null(out.prefix)){ print(p) }
+  }
+  if(plotDensity){
+    if(is.null(out.prefix)){
+      plot.density2D(reducedDim(obj,reduced.name))
+    }else{
+      pdf(sprintf("%s.density.pdf",out.prefix),width = 5,height = 5)
+      plot.density2D(reducedDim(obj,reduced.name))
+      dev.off()
+    }
   }
 }
 

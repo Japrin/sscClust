@@ -5,9 +5,9 @@
 \title{Plot on tSNE map}
 \usage{
 ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
-  colSet = list(), reduced.name = "iCor.tsne", reduced.dim = c(1, 2),
-  out.prefix = NULL, p.ncol = 3, width = NA, height = NA,
-  base_aspect_ratio = 1.1)
+  plotDensity = F, colSet = list(), reduced.name = "iCor.tsne",
+  reduced.dim = c(1, 2), out.prefix = NULL, p.ncol = 3, width = NA,
+  height = NA, base_aspect_ratio = 1.1)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -17,6 +17,8 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 \item{gene, }{character; genes to be showed. (default: NULL)}
 
 \item{columns}{character; columns in colData(obj) to be showd. (default: NULL)}
+
+\item{plotDensity}{logical; whether plot 2D density. (default F)}
 
 \item{colSet}{list; mapping iterms in the names to colors in the values. (default: list())}
 
