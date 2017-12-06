@@ -10,5 +10,16 @@ install.packages("devtools")
 devtools::install_github("Japrin/sscClust")
 ```
 
-# Tutorial
-Tutorial can be found in the vignettes (https://github.com/Japrin/sscClust/blob/master/vignettes/sscClust.html).
+# Example
+Run the clustering pipeline for clustering using all data:
+```
+data("sce.Pollen")
+sce.all <- ssc.run(sce.Pollen, subsampling=F, k.batch=5)
+```
+for clustering with subsampling:
+```
+data("sce.Pollen")
+sce.sub <- ssc.run(sce.Pollen, subsampling=T, sub.frac = 0.8, k.batch=5)
+```
+
+More information can be found in the vignettes (https://github.com/Japrin/sscClust/blob/master/vignettes/sscClust.html).

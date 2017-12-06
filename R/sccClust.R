@@ -739,7 +739,8 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param refineGene logical; whether perform second round demension reduction and clustering pipeline using the differential
 #' genes found by the first round cluster result. (default: F)
-#' @param iterative logical; whether perform iterative clustering in sub-cluster. (default: F)
+#' @param nIter integer; number of iterative clustering in sub-cluster. (default: 1)
+#' @param do.DE logical; perform DE analysis when clustering finished. (default: F)
 #' @details run the pipeline of variable gene identification, dimension reduction, clustering.
 #' @seealso \code{\link{ssc.variableGene}} for variable genes' identification, \code{\link{ssc.reduceDim}}
 #' for dimension reduction, \code{\link{ssc.clust}} for clustering using all data
@@ -759,7 +760,8 @@ ssc.run <- function(obj, assay.name="exprs",
                     sub.use.proj=T,
                     k.batch=2:6,
                     refineGene=F,
-                    iterative=F)
+                    nIter=1,
+                    do.DE=F)
 {
   ### some checking
   if(is.null(colnames(obj))){
@@ -769,9 +771,11 @@ ssc.run <- function(obj, assay.name="exprs",
     stop("rownames of obj is NULL!!!")
   }
   #rid <- "11"
-  obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
+  #obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
   if(!subsampling){
-    runOneIter <- function(obj,rid){
+    runOneIter <- function(obj,rid,k.batch,level=1){
+      print(k.batch)
+      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
       obj <- ssc.reduceDim(obj,assay.name=assay.name,
                                 method=method.reduction,
                                 pca.npc = pca.npc,
@@ -802,11 +806,37 @@ ssc.run <- function(obj, assay.name="exprs",
           warning("The number of DE genes is less than 30, NO second round clustering using DE genes will be performed!!")
         }
       }
+      if(level<nIter){
+        clustLabel <- if(method.clust=="adpclust") sprintf("%s.tsne.%s.kauto",method.reduction,method.clust) else sprintf("%s.%s.kauto",method.reduction,method.clust)
+        if(clustLabel %in% colnames(colData(obj))){
+          clusterNames <- sort(unique(colData(obj)[,clustLabel]))
+          for(cls in clusterNames){
+            f.cls <- colData(obj)[,clustLabel]==cls
+            obj.cls <- obj[,f.cls]
+            cls.rid <- sprintf("%s.L%s%s",rid,level+1,cls)
+            if(ncol(obj.cls)>10)
+            {
+              nsamples <- ncol(obj.cls)
+              obj.cls <- runOneIter(obj.cls,cls.rid,k.batch = k.batch[k.batch < nsamples],level+1)
+              # update cluster's label
+              colData(obj)[f.cls,clustLabel] <- sprintf("%s.L%s%s",cls.rid,level+1,
+                                                        colData(obj.cls)[,clustLabel])
+            }
+          }
+        }
+      }
       return(obj)
     }
-
-    obj <- runOneIter(obj,"11")
+    obj <- runOneIter(obj,"L1C1",k.batch = k.batch)
+    if(do.DE && method.clust=="adpclust"){
+      de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
+                                 xlabel = colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)],
+                                 gid.mapping = rowData(obj)[,"display.name"])
+      metadata(obj)$ssc[["de.res"]][["L1C1"]] <- de.out
+      metadata(obj)$ssc[["variable.gene"]][["de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
+    }
   }else{
+    obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
     obj <- ssc.clustSubsamplingClassification(obj, assay.name=assay.name,
                                                    frac=sub.frac,
                                                    method.vgene=method.vgene,
