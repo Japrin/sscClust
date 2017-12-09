@@ -99,6 +99,7 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,width=9
 #' @importFrom ks kde
 #' @importFrom fields image.plot
 #' @param x matrix or data.frame; map data, row for sample, column for dimension
+#' @usage plot.density2D(x)
 #' @details use ks::kde for density estimation
 #'
 plot.density2D <- function(x)
@@ -554,13 +555,16 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @importFrom factoextra eclust
 #' @importFrom stats kmeans
 #' @importFrom ADPclust adpclust
+#' @importFrom scran buildSNNGraph
+#' @importFrom igraph cluster_fast_greedy
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
 #' "iCor", "pca" and "none". (default: "iCor")
-#' @param method character; clustering method to be used, should be one of "kmeans", "hclust" an "adpclust". (default: "kmeans")
+#' @param method character; clustering method to be used, should be one of "kmeans", "hclust", "SNN" an "adpclust". (default: "kmeans")
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
+#' @param SNN.k integer; number of shared NN. (default: 10)
 #' @details If no dimension reduction performed or method is "none", expression data of variable genes,
 #' which can be speficed by method.vgene, will be used for clustering. Otherwise, the reduced data specified by
 #' method.reduction will be used. The cluster label will stored in the colData of the object
@@ -570,7 +574,8 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @export
 ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       method="kmeans", k.batch=2:6,
-                      method.vgene="sd")
+                      method.vgene="sd",
+                      SNN.k=10)
 {
   clust.res <- NULL
   res.list <- list()
@@ -595,9 +600,14 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       clust.res <- ADPclust::adpclust(dat.transformed,nclust = k.batch)
       k <- "auto"
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
+    }else if(method=="SNN"){
+      snn.gr <- scran::buildSNNGraph(dat.transformed, transposed=T, k=SNN.k,d=NA)
+      clust.res <- igraph::cluster_fast_greedy(snn.gr)
+      k <- "auto"
+      colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)
     }
     res.list[[as.character(k)]] <- clust.res
-    if(method=="adpclust"){ break }
+    if(method %in% c("adpclust","SNN")){ break }
   }
   metadata(obj)$ssc$clust.res[[method]] <- res.list
   return(obj)
@@ -729,7 +739,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param sd.n top number of genes (default 1500)
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
 #' "iCor", "pca" and "none". (default: "iCor")
-#' @param method.clust character; clustering method to be used, should be one of "kmeans" and "hclust". (default: "kmeans")
+#' @param method.clust character; clustering method to be used, should be one of "kmeans", "hclust", "SNN" and "adpclust". (default: "kmeans")
 #' @param method.classify character; method used for classification, one of "knn" and "RF". (default: "knn")
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
@@ -774,7 +784,7 @@ ssc.run <- function(obj, assay.name="exprs",
   #obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
   if(!subsampling){
     runOneIter <- function(obj,rid,k.batch,level=1){
-      print(k.batch)
+      #print(k.batch)
       obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
       obj <- ssc.reduceDim(obj,assay.name=assay.name,
                                 method=method.reduction,
@@ -785,10 +795,17 @@ ssc.run <- function(obj, assay.name="exprs",
                        method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
                        method=method.clust, k.batch=k.batch,
                        method.vgene=method.vgene)
-      if(refineGene && method.clust=="adpclust"){
+      ### other method need determine the best k. not implemented yet.
+      if(refineGene && method.clust %in% c("adpclust","SNN")){
+        .xlabel <- NULL
+        if(method.clust=="adpclust"){
+          .xlabel <- colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)]
+        }else if(method.clust=="SNN"){
+          .xlabel <- colData(obj)[,sprintf("%s.%s.kauto",method.reduction,method.clust)]
+        }
         ### adpclust automatically use tsne data
         de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
-                                   xlabel = colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)],
+                                   xlabel = .xlabel,
                                    gid.mapping = rowData(obj)[,"display.name"])
         if(nrow(de.out$aov.out.sig)>30){
           metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
@@ -828,9 +845,15 @@ ssc.run <- function(obj, assay.name="exprs",
       return(obj)
     }
     obj <- runOneIter(obj,"L1C1",k.batch = k.batch)
-    if(do.DE && method.clust=="adpclust"){
+    if(do.DE && method.clust %in% c("adpclust","SNN")){
+      .xlabel <- NULL
+      if(method.clust=="adpclust"){
+        .xlabel <- colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)]
+      }else if(method.clust=="SNN"){
+        .xlabel <- colData(obj)[,sprintf("%s.%s.kauto",method.reduction,method.clust)]
+      }
       de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
-                                 xlabel = colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)],
+                                 xlabel = .xlabel,
                                  gid.mapping = rowData(obj)[,"display.name"])
       metadata(obj)$ssc[["de.res"]][["L1C1"]] <- de.out
       metadata(obj)$ssc[["variable.gene"]][["de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)

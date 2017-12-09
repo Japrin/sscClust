@@ -4,7 +4,7 @@
 \alias{plot.density2D}
 \title{Wrap for plotting 2D density}
 \usage{
-\method{plot}{density2D}(x)
+plot.density2D(x)
 }
 \arguments{
 \item{x}{matrix or data.frame; map data, row for sample, column for dimension}
