@@ -560,7 +560,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @importFrom stats kmeans
 #' @importFrom ADPclust adpclust
 #' @importFrom scran buildSNNGraph
-#' @importFrom igraph cluster_fast_greedy
+#' @importFrom igraph cluster_fast_greedy cluster_leading_eigen E
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
@@ -611,7 +611,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
         clust.res <- igraph::cluster_fast_greedy(snn.gr)
       }else if(SNN.method=="eigen"){
         ##clust.res <- igraph::cluster_leading_eigen(snn.gr)
-        clust.res <- igraph::cluster_leading_eigen(snn.gr,weights = E(snn.gr)$weight)
+        clust.res <- igraph::cluster_leading_eigen(snn.gr,weights = igraph::E(snn.gr)$weight)
       }
       k <- "auto"
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)
