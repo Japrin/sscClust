@@ -5,7 +5,8 @@
 \title{Perform clustering using reduced data}
 \usage{
 ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
-  method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10)
+  method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10,
+  SNN.method = "eigen")
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -22,6 +23,8 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{method.vgene}{character; variable gene identification method used. (default: "sd")}
 
 \item{SNN.k}{integer; number of shared NN. (default: 10)}
+
+\item{SNN.method}{character; cluster method applied on SNN， one of "greedy", "eigen". (default: "eigen")}
 }
 \value{
 an object of \code{SingleCellExperiment} class with cluster labels added.

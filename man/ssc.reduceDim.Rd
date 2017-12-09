@@ -6,7 +6,7 @@
 \usage{
 ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
   method.vgene = "sd", pca.npc = NULL, tSNE.usePCA = T,
-  tSNE.perplexity = 30, autoTSNE = T, iCor.niter = 1,
+  tSNE.perplexity = 30, autoTSNE = T, dim.name = NULL, iCor.niter = 1,
   iCor.method = "spearman")
 }
 \arguments{
@@ -25,6 +25,9 @@ ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
 \item{tSNE.perplexity}{logical; perplexity parameter. Used in all Rtsne() calling. (default: 30)}
 
 \item{autoTSNE}{logical; Wheter generate automatically a tSNE map when reduction method is "pca" or "iCor". (default: T)}
+
+\item{dim.name}{character; store the reduced data under the name in the obj's reducedDim SimpleList. If i
+it is NULL, infer from method. (default: NULL)}
 
 \item{iCor.niter}{integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)}
 

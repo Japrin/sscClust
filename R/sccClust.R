@@ -482,6 +482,8 @@ ssc.displayName2id <- function(obj,display.name)
 #' @param tSNE.usePCA logical; whether use PCA before tSNE. Only for reduction method "tsne". (default: T)
 #' @param tSNE.perplexity logical; perplexity parameter. Used in all Rtsne() calling. (default: 30)
 #' @param autoTSNE logical; Wheter generate automatically a tSNE map when reduction method is "pca" or "iCor". (default: T)
+#' @param dim.name character; store the reduced data under the name in the obj's reducedDim SimpleList. If i
+#' it is NULL, infer from method. (default: NULL)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
 #' @param iCor.method character; method to calculate correlation between samples,
 #' should be one of "spearman" and "pearson". (default "spearman")
@@ -505,6 +507,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
                           tSNE.usePCA=T,
                           tSNE.perplexity=30,
                           autoTSNE=T,
+                          dim.name=NULL,
                           iCor.niter=1,iCor.method="spearman")
 {
   row.sd <- apply(assay(obj,assay.name),1,sd)
@@ -518,6 +521,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
   if(!method.vgene %in% names(metadata(obj)$ssc[["variable.gene"]])){
     stop(sprintf("No variable genes identified by method %s !",method.vgene))
   }
+  if(is.null(dim.name)){ dim.name <- method }
   vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
   if(method=="pca"){
     pca.res <- prcomp(t(assay(obj[vgene,],assay.name)))
@@ -535,7 +539,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
     ### save to object
     metadata(obj)$ssc$pca.res <- pca.res
     proj_data <- pca.res$x[,1:pca.npc,drop=F]
-    if(autoTSNE){ reducedDim(obj,"pca.tsne") <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
+    if(autoTSNE){ reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
   }else if(method=="tsne"){
     proj_data <- run.tSNE(t(assay(obj[vgene,],assay.name)),tSNE.usePCA,tSNE.perplexity)
   }else if(method=="iCor"){
@@ -544,9 +548,9 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
       proj_data <- cor(proj_data,method=iCor.method)
       iCor.niter <- iCor.niter-1
     }
-    if(autoTSNE) { reducedDim(obj,"iCor.tsne") <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
+    if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
   }
-  reducedDim(obj,method) <- proj_data
+  reducedDim(obj,dim.name) <- proj_data
   return(obj)
 }
 
@@ -565,6 +569,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
 #' @param SNN.k integer; number of shared NN. (default: 10)
+#' @param SNN.method character; cluster method applied on SNN， one of "greedy", "eigen". (default: "eigen")
 #' @details If no dimension reduction performed or method is "none", expression data of variable genes,
 #' which can be speficed by method.vgene, will be used for clustering. Otherwise, the reduced data specified by
 #' method.reduction will be used. The cluster label will stored in the colData of the object
@@ -575,7 +580,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       method="kmeans", k.batch=2:6,
                       method.vgene="sd",
-                      SNN.k=10)
+                      SNN.k=10,SNN.method="eigen")
 {
   clust.res <- NULL
   res.list <- list()
@@ -602,7 +607,12 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
     }else if(method=="SNN"){
       snn.gr <- scran::buildSNNGraph(dat.transformed, transposed=T, k=SNN.k,d=NA)
-      clust.res <- igraph::cluster_fast_greedy(snn.gr)
+      if(SNN.method=="greedy"){
+        clust.res <- igraph::cluster_fast_greedy(snn.gr)
+      }else if(SNN.method=="eigen"){
+        ##clust.res <- igraph::cluster_leading_eigen(snn.gr)
+        clust.res <- igraph::cluster_leading_eigen(snn.gr,weights = E(snn.gr)$weight)
+      }
       k <- "auto"
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)
     }
@@ -751,6 +761,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' genes found by the first round cluster result. (default: F)
 #' @param nIter integer; number of iterative clustering in sub-cluster. (default: 1)
 #' @param do.DE logical; perform DE analysis when clustering finished. (default: F)
+#' @param ... parameters pass to clustering methods
 #' @details run the pipeline of variable gene identification, dimension reduction, clustering.
 #' @seealso \code{\link{ssc.variableGene}} for variable genes' identification, \code{\link{ssc.reduceDim}}
 #' for dimension reduction, \code{\link{ssc.clust}} for clustering using all data
@@ -771,7 +782,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     k.batch=2:6,
                     refineGene=F,
                     nIter=1,
-                    do.DE=F)
+                    do.DE=F,...)
 {
   ### some checking
   if(is.null(colnames(obj))){
@@ -794,7 +805,7 @@ ssc.run <- function(obj, assay.name="exprs",
       obj <- ssc.clust(obj, assay.name=assay.name,
                        method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
                        method=method.clust, k.batch=k.batch,
-                       method.vgene=method.vgene)
+                       method.vgene=method.vgene, ...)
       ### other method need determine the best k. not implemented yet.
       if(refineGene && method.clust %in% c("adpclust","SNN")){
         .xlabel <- NULL
@@ -818,7 +829,7 @@ ssc.run <- function(obj, assay.name="exprs",
           obj <- ssc.clust(obj, assay.name=assay.name,
                            method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
                            method=method.clust, k.batch=k.batch,
-                           method.vgene="refine.de")
+                           method.vgene="refine.de", ...)
         }else{
           warning("The number of DE genes is less than 30, NO second round clustering using DE genes will be performed!!")
         }
@@ -857,6 +868,11 @@ ssc.run <- function(obj, assay.name="exprs",
                                  gid.mapping = rowData(obj)[,"display.name"])
       metadata(obj)$ssc[["de.res"]][["L1C1"]] <- de.out
       metadata(obj)$ssc[["variable.gene"]][["de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
+      obj <- ssc.reduceDim(obj,assay.name=assay.name,
+                           method=method.reduction,
+                           pca.npc = pca.npc,
+                           iCor.niter = iCor.niter,
+                           method.vgene="de",dim.name = sprintf("%s.de",method.reduction))
     }
   }else{
     obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
