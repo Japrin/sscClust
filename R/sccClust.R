@@ -606,7 +606,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       k <- "auto"
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
     }else if(method=="SNN"){
-      snn.gr <- scran::buildSNNGraph(dat.transformed, transposed=T, k=SNN.k,d=NA)
+      snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
       if(SNN.method=="greedy"){
         clust.res <- igraph::cluster_fast_greedy(snn.gr)
       }else if(SNN.method=="eigen"){
