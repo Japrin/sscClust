@@ -884,14 +884,21 @@ ssc.run <- function(obj, assay.name="exprs",
                        method=method.clust, k.batch=k.batch,
                        out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,rid),
                        method.vgene=method.vgene, parlist = parlist.rid, ...)
+
+      .xlabel <- NULL
+      if(method.clust %in% c("adpclust","dpclust")){
+        .xlabel <- colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)]
+      }else if(method.clust=="SNN"){
+        .xlabel <- colData(obj)[,sprintf("%s.%s.kauto",method.reduction,method.clust)]
+      }
+      if(!is.null(out.prefix) && !is.null(.xlabel)){
+        ssc.plot.tsne(obj,columns = c(.xlabel),
+                      reduced.name = if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
+                      out.prefix = sprintf("%s.%s",out.prefix,rid),
+                      base_aspect_ratio = 1.4)
+      }
       ### other method need determine the best k. not implemented yet.
       if(refineGene && method.clust %in% c("adpclust","dpclust","SNN")){
-        .xlabel <- NULL
-        if(method.clust %in% c("adpclust","dpclust")){
-          .xlabel <- colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)]
-        }else if(method.clust=="SNN"){
-          .xlabel <- colData(obj)[,sprintf("%s.%s.kauto",method.reduction,method.clust)]
-        }
         ### adpclust automatically use tsne data
         de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
                                    xlabel = .xlabel,
@@ -909,6 +916,12 @@ ssc.run <- function(obj, assay.name="exprs",
                            method=method.clust, k.batch=k.batch,
                            out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s.refineG",out.prefix,rid),
                            method.vgene="refine.de", parlist = parlist.rid, ...)
+          if(!is.null(out.prefix) && !is.null(.xlabel)){
+            ssc.plot.tsne(obj,columns = c(.xlabel),
+                          reduced.name = if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
+                          out.prefix = sprintf("%s.%s.refineG",out.prefix,rid),
+                          base_aspect_ratio = 1.4)
+          }
         }else{
           warning("The number of DE genes is less than 30, NO second round clustering using DE genes will be performed!!")
         }
