@@ -181,6 +181,10 @@ findDEGenesByAOV <- function(xdata,xlabel,out.prefix=NULL,mod=NULL,
   if(is.null(rownames(xdata))){
     stop("the xdata does not have rownames!!!")
   }
+  if(length(table(xlabel))<2){
+    return(NULL)
+    #return(list(aov.out=ret.df,aov.out.sig=ret.df.sig))
+  }
   if(!is.null(gid.mapping) && is.null(names(gid.mapping))) { names(gid.mapping)=gid.mapping }
   ###
   registerDoParallel(cores = n.cores)
@@ -892,7 +896,7 @@ ssc.run <- function(obj, assay.name="exprs",
         de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
                                    xlabel = .xlabel,
                                    gid.mapping = rowData(obj)[,"display.name"])
-        if(nrow(de.out$aov.out.sig)>30){
+        if(!is.null(de.out) && nrow(de.out$aov.out.sig)>30){
           metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
           metadata(obj)$ssc[["variable.gene"]][["refine.de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
           obj <- ssc.reduceDim(obj,assay.name=assay.name,
