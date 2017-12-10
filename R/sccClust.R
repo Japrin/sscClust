@@ -612,11 +612,11 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       if(!is.null(out.prefix)){
         dir.create(dirname(out.prefix),showWarnings = F,recursive = T)
         pdf(sprintf("%s.adpclust.diagnostic.pdf",out.prefix),width=11,height = 5)
-        plot(metadata(obj)$ssc$clust.res$adpclust$auto)
+        plot(clust.res)
         dev.off()
-        ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s.tsne",method.reduction),
-                      peaks = metadata(obj)$ssc$clust.res$adpclust$auto$centers,
-                      out.prefix = sprintf("%s.aadpclust.density",out.prefix),base_aspect_ratio = 1.4)
+        ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
+                      peaks = clust.res$centers,
+                      out.prefix = sprintf("%s.aadpclust",out.prefix),base_aspect_ratio = 1.4)
       }
     }else if(method=="SNN"){
       snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
@@ -810,13 +810,15 @@ ssc.run <- function(obj, assay.name="exprs",
   #obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
   if(!subsampling){
     runOneIter <- function(obj,rid,k.batch,level=1){
-      #print(k.batch)
+      print(sprintf("select variable genes ... (%s)",rid))
       obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
+      print(sprintf("reduce dimensions ... (%s)",rid))
       obj <- ssc.reduceDim(obj,assay.name=assay.name,
                                 method=method.reduction,
                                 pca.npc = pca.npc,
                                 iCor.niter = iCor.niter,
                                 method.vgene=method.vgene)
+      print(sprintf("clustering ... (%s)",rid))
       obj <- ssc.clust(obj, assay.name=assay.name,
                        method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
                        method=method.clust, k.batch=k.batch,
