@@ -4,10 +4,12 @@
 \alias{plot.density2D}
 \title{Wrap for plotting 2D density}
 \usage{
-plot.density2D(x)
+plot.density2D(x, peaks)
 }
 \arguments{
 \item{x}{matrix or data.frame; map data, row for sample, column for dimension}
+
+\item{peaks}{integer or character; index or names of the peaks. (default: NULL)}
 }
 \description{
 Wrap for plotting 2D density

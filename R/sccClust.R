@@ -99,10 +99,11 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,width=9
 #' @importFrom ks kde
 #' @importFrom fields image.plot
 #' @param x matrix or data.frame; map data, row for sample, column for dimension
-#' @usage plot.density2D(x)
+#' @param peaks integer or character; index or names of the peaks. (default: NULL)
+#' @usage plot.density2D(x, peaks)
 #' @details use ks::kde for density estimation
 #'
-plot.density2D <- function(x)
+plot.density2D <- function(x,peaks=NULL)
 {
   .density <- ks::kde(x)
   ##dev.new()
@@ -111,10 +112,12 @@ plot.density2D <- function(x)
   plot(.density,display="filled.contour2", cont=.zz,xlab="Dim1", ylab="Dim2")
   fields::image.plot(zlim=c(0,.zz[length(.zz)]),legend.only=TRUE, col = c("transparent", rev(heat.colors(length(.zz)))),
              axis.args=list( at=.zz, labels=sprintf("%s%%",100-.zz)), legend.width=2.0,legend.mar=4.5)
-  #plot(.density,display="filled.contour2", cont=.zz,xlab="Dim1", ylab="Dim2")
-  #points(dat.transformed[names(density.clust.res$peaks),,drop=F],pch=3,cex=2,col="black")
-  #image.plot(zlim=c(0,.zz[length(.zz)]),legend.only=TRUE, col = c("transparent", rev(heat.colors(length(.zz)))),
-  #           axis.args=list( at=.zz, labels=sprintf("%s%%",100-.zz)), legend.width=2.0,legend.mar=4.5)
+  if(!is.null(peaks)){
+    plot(.density,display="filled.contour2", cont=.zz,xlab="Dim1", ylab="Dim2")
+    points(x[peaks,,drop=F],pch=3,cex=2,col="black")
+    fields::image.plot(zlim=c(0,.zz[length(.zz)]),legend.only=TRUE, col = c("transparent", rev(heat.colors(length(.zz)))),
+               axis.args=list( at=.zz, labels=sprintf("%s%%",100-.zz)), legend.width=2.0,legend.mar=4.5)
+  }
   ##pp <- recordPlot()
   ##dev.off()
   #pp
@@ -570,6 +573,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
 #' @param SNN.k integer; number of shared NN. (default: 10)
 #' @param SNN.method character; cluster method applied on SNN， one of "greedy", "eigen". (default: "eigen")
+#' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
 #' @details If no dimension reduction performed or method is "none", expression data of variable genes,
 #' which can be speficed by method.vgene, will be used for clustering. Otherwise, the reduced data specified by
 #' method.reduction will be used. The cluster label will stored in the colData of the object
@@ -580,7 +584,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       method="kmeans", k.batch=2:6,
                       method.vgene="sd",
-                      SNN.k=10,SNN.method="eigen")
+                      SNN.k=10,SNN.method="eigen",out.prefix=NULL)
 {
   clust.res <- NULL
   res.list <- list()
@@ -605,6 +609,15 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       clust.res <- ADPclust::adpclust(dat.transformed,nclust = k.batch)
       k <- "auto"
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
+      if(!is.null(out.prefix)){
+        dir.create(dirname(out.prefix),showWarnings = F,recursive = T)
+        pdf(sprintf("%s.adpclust.diagnostic.pdf",out.prefix),width=11,height = 5)
+        plot(metadata(obj)$ssc$clust.res$adpclust$auto)
+        dev.off()
+        ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s.tsne",method.reduction),
+                      peaks = metadata(obj)$ssc$clust.res$adpclust$auto$centers,
+                      out.prefix = sprintf("%s.aadpclust.density",out.prefix),base_aspect_ratio = 1.4)
+      }
     }else if(method=="SNN"){
       snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
       if(SNN.method=="greedy"){
@@ -761,6 +774,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' genes found by the first round cluster result. (default: F)
 #' @param nIter integer; number of iterative clustering in sub-cluster. (default: 1)
 #' @param do.DE logical; perform DE analysis when clustering finished. (default: F)
+#' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
 #' @param ... parameters pass to clustering methods
 #' @details run the pipeline of variable gene identification, dimension reduction, clustering.
 #' @seealso \code{\link{ssc.variableGene}} for variable genes' identification, \code{\link{ssc.reduceDim}}
@@ -782,6 +796,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     k.batch=2:6,
                     refineGene=F,
                     nIter=1,
+                    out.prefix=NULL,
                     do.DE=F,...)
 {
   ### some checking
@@ -805,6 +820,7 @@ ssc.run <- function(obj, assay.name="exprs",
       obj <- ssc.clust(obj, assay.name=assay.name,
                        method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
                        method=method.clust, k.batch=k.batch,
+                       out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,rid),
                        method.vgene=method.vgene, ...)
       ### other method need determine the best k. not implemented yet.
       if(refineGene && method.clust %in% c("adpclust","SNN")){
@@ -829,6 +845,7 @@ ssc.run <- function(obj, assay.name="exprs",
           obj <- ssc.clust(obj, assay.name=assay.name,
                            method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
                            method=method.clust, k.batch=k.batch,
+                           out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s.refineG",out.prefix,rid),
                            method.vgene="refine.de", ...)
         }else{
           warning("The number of DE genes is less than 30, NO second round clustering using DE genes will be performed!!")
@@ -904,6 +921,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param width numeric; width of the plot, used for geneOnTSNE. (default: NA)
 #' @param height numeric; height of the plot, used for geneOnTSNE. (default: NA)
 #' @param base_aspect_ratio numeric; base_aspect_ratio, used for plotting metadata. (default 1.1)
+#' @param peaks integer or character; index or names of the peaks. (default: NULL)
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend
 #' @importFrom cowplot save_plot plot_grid
@@ -916,7 +934,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @export
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plotDensity=F, colSet=list(),
                           reduced.name="iCor.tsne",reduced.dim=c(1,2),
-                          out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1)
+                          out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
   #requireNamespace("ggplot2")
   #requireNamespace("cowplot")
@@ -972,10 +990,10 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
   }
   if(plotDensity){
     if(is.null(out.prefix)){
-      plot.density2D(reducedDim(obj,reduced.name))
+      plot.density2D(reducedDim(obj,reduced.name),peaks = peaks)
     }else{
       pdf(sprintf("%s.density.pdf",out.prefix),width = 5,height = 5)
-      plot.density2D(reducedDim(obj,reduced.name))
+      plot.density2D(reducedDim(obj,reduced.name),peaks = peaks)
       dev.off()
     }
   }

@@ -6,7 +6,7 @@
 \usage{
 ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
   method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10,
-  SNN.method = "eigen")
+  SNN.method = "eigen", out.prefix = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -25,6 +25,8 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{SNN.k}{integer; number of shared NN. (default: 10)}
 
 \item{SNN.method}{character; cluster method applied on SNN， one of "greedy", "eigen". (default: "eigen")}
+
+\item{out.prefix}{character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)}
 }
 \value{
 an object of \code{SingleCellExperiment} class with cluster labels added.

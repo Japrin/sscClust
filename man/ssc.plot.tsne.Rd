@@ -7,7 +7,7 @@
 ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
   plotDensity = F, colSet = list(), reduced.name = "iCor.tsne",
   reduced.dim = c(1, 2), out.prefix = NULL, p.ncol = 3, width = NA,
-  height = NA, base_aspect_ratio = 1.1)
+  height = NA, base_aspect_ratio = 1.1, peaks = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -35,6 +35,8 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 \item{height}{numeric; height of the plot, used for geneOnTSNE. (default: NA)}
 
 \item{base_aspect_ratio}{numeric; base_aspect_ratio, used for plotting metadata. (default 1.1)}
+
+\item{peaks}{integer or character; index or names of the peaks. (default: NULL)}
 }
 \description{
 Plot on tSNE map
