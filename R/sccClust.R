@@ -887,9 +887,9 @@ ssc.run <- function(obj, assay.name="exprs",
 
       .xlabel <- NULL
       if(method.clust %in% c("adpclust","dpclust")){
-        .xlabel <- colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)]
+        .xlabel <- sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)
       }else if(method.clust=="SNN"){
-        .xlabel <- colData(obj)[,sprintf("%s.%s.kauto",method.reduction,method.clust)]
+        .xlabel <- sprintf("%s.%s.kauto",method.reduction,method.clust)
       }
       if(!is.null(out.prefix) && !is.null(.xlabel)){
         ssc.plot.tsne(obj,columns = c(.xlabel),
@@ -901,7 +901,7 @@ ssc.run <- function(obj, assay.name="exprs",
       if(refineGene && method.clust %in% c("adpclust","dpclust","SNN")){
         ### adpclust automatically use tsne data
         de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
-                                   xlabel = .xlabel,
+                                   xlabel = colData(obj)[,.xlabel],
                                    gid.mapping = rowData(obj)[,"display.name"])
         if(!is.null(de.out) && nrow(de.out$aov.out.sig)>30){
           metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
