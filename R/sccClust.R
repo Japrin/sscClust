@@ -881,7 +881,7 @@ ssc.run <- function(obj, assay.name="exprs",
                        out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,rid),
                        method.vgene=method.vgene, parlist = parlist.rid, ...)
       ### other method need determine the best k. not implemented yet.
-      if(refineGene && method.clust %in% c("adpclust","SNN")){
+      if(refineGene && method.clust %in% c("adpclust","dpclust","SNN")){
         .xlabel <- NULL
         if(method.clust %in% c("adpclust","dpclust")){
           .xlabel <- colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)]
