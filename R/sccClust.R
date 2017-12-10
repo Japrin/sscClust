@@ -560,8 +560,9 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 
 #' Perform clustering using reduced data
 #' @importFrom factoextra eclust
-#' @importFrom stats kmeans
+#' @importFrom stats kmeans dist
 #' @importFrom ADPclust adpclust
+#' @importFrom densityClust densityClust findClusters
 #' @importFrom scran buildSNNGraph
 #' @importFrom igraph cluster_fast_greedy cluster_leading_eigen E
 #' @param obj object of \code{singleCellExperiment} class
@@ -573,7 +574,10 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
 #' @param SNN.k integer; number of shared NN. (default: 10)
 #' @param SNN.method character; cluster method applied on SNN， one of "greedy", "eigen". (default: "eigen")
+#' @param dpclust.rho numberic; cuttoff of rho, if it is NULL, infer frome the data (default: NULL)
+#' @param dpclust.delta numberic; cuttoff of delta, if it is NULL, infer frome the data (default: NULL)
 #' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
+#' @param parlist list; if not NULL, use th parameters in it. (default: NULL)
 #' @details If no dimension reduction performed or method is "none", expression data of variable genes,
 #' which can be speficed by method.vgene, will be used for clustering. Otherwise, the reduced data specified by
 #' method.reduction will be used. The cluster label will stored in the colData of the object
@@ -584,7 +588,10 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       method="kmeans", k.batch=2:6,
                       method.vgene="sd",
-                      SNN.k=10,SNN.method="eigen",out.prefix=NULL)
+                      SNN.k=10,SNN.method="eigen",
+                      dpclust.rho=NULL,dpclust.delta=NULL,
+                      parlist=NULL,
+                      out.prefix=NULL)
 {
   clust.res <- NULL
   res.list <- list()
@@ -618,6 +625,37 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       peaks = clust.res$centers,
                       out.prefix = sprintf("%s.aadpclust",out.prefix),base_aspect_ratio = 1.4)
       }
+    }else if(method=="dpclust"){
+      dist.obj <- stats::dist(dat.transformed)
+      clust.res <- densityClust::densityClust(dist.obj, gaussian = T)
+      if(is.null(dpclust.rho)){ dpclust.rho <- quantile(clust.res$rho, probs = 0.90) }
+      if(is.null(dpclust.delta)){ dpclust.delta <- quantile(clust.res$delta, probs = 0.95) }
+      ## overwritet the parameter using those in parlist
+      if(!is.null(parlist)){
+        if("rho" %in% names(parlist)){ dpclust.rho <- parlist[["rho"]] }
+        if("delta" %in% names(parlist)){ dpclust.delta <- parlist[["delta"]] }
+      }
+      cat(sprintf("dpclust.rho: %4.2f\n",dpclust.rho))
+      cat(sprintf("dpclust.delta: %4.2f\n",dpclust.delta))
+      if(!is.null(out.prefix)){
+        pdf(sprintf("%s.decision.pdf",out.prefix),width = 5,height = 5)
+        clust.res <- densityClust::findClusters(clust.res,
+                                                        rho = dpclust.rho,
+                                                        delta = dpclust.delta,plot=T)
+        abline(v=dpclust.rho,lty=2)
+        abline(h=dpclust.delta,lty=2)
+        plot(sort(clust.res$rho * clust.res$delta,decreasing = T),ylab="rho * delta")
+        dev.off()
+        ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
+                      peaks = clust.res$peaks,
+                      out.prefix = sprintf("%s.dpclust",out.prefix),base_aspect_ratio = 1.4)
+      }else{
+        clust.res <- densityClust::findClusters(clust.res,rho = dpclust.rho,
+                                                delta = dpclust.delta,
+                                                plot=F)
+      }
+      k <- "auto"
+      colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
     }else if(method=="SNN"){
       snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
       if(SNN.method=="greedy"){
@@ -630,7 +668,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)
     }
     res.list[[as.character(k)]] <- clust.res
-    if(method %in% c("adpclust","SNN")){ break }
+    if(method %in% c("adpclust","dpclust","SNN")){ break }
   }
   metadata(obj)$ssc$clust.res[[method]] <- res.list
   return(obj)
@@ -775,6 +813,8 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param nIter integer; number of iterative clustering in sub-cluster. (default: 1)
 #' @param do.DE logical; perform DE analysis when clustering finished. (default: F)
 #' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
+#' @param parfile character; parameter files, if not NULL, will use the settings. must contain a list named
+#' `parlist`. (default: NULL)
 #' @param ... parameters pass to clustering methods
 #' @details run the pipeline of variable gene identification, dimension reduction, clustering.
 #' @seealso \code{\link{ssc.variableGene}} for variable genes' identification, \code{\link{ssc.reduceDim}}
@@ -797,6 +837,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     refineGene=F,
                     nIter=1,
                     out.prefix=NULL,
+                    parfile=NULL,
                     do.DE=F,...)
 {
   ### some checking
@@ -809,7 +850,22 @@ ssc.run <- function(obj, assay.name="exprs",
   #rid <- "11"
   #obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
   if(!subsampling){
+    if(!is.null(parfile) && file.exists(parfile)){
+      source(parfile)
+      cat(sprintf("parfile: %s\n",parfile))
+      print(parlist)
+    }else{
+      parlist <- NULL
+    }
     runOneIter <- function(obj,rid,k.batch,level=1){
+      if(!is.null(parlist) && rid %in% names(parlist)){
+        parlist.rid <- parlist[[rid]]
+        if("k" %in% names(parlist.rid) && parlist.rid[[k]]==1){
+          return(obj)
+        }
+      }else{
+        parlist.rid <- NULL
+      }
       print(sprintf("select variable genes ... (%s)",rid))
       obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
       print(sprintf("reduce dimensions ... (%s)",rid))
@@ -820,14 +876,14 @@ ssc.run <- function(obj, assay.name="exprs",
                                 method.vgene=method.vgene)
       print(sprintf("clustering ... (%s)",rid))
       obj <- ssc.clust(obj, assay.name=assay.name,
-                       method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
+                       method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
                        method=method.clust, k.batch=k.batch,
                        out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,rid),
-                       method.vgene=method.vgene, ...)
+                       method.vgene=method.vgene, parlist = parlist.rid, ...)
       ### other method need determine the best k. not implemented yet.
       if(refineGene && method.clust %in% c("adpclust","SNN")){
         .xlabel <- NULL
-        if(method.clust=="adpclust"){
+        if(method.clust %in% c("adpclust","dpclust")){
           .xlabel <- colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)]
         }else if(method.clust=="SNN"){
           .xlabel <- colData(obj)[,sprintf("%s.%s.kauto",method.reduction,method.clust)]
@@ -845,16 +901,16 @@ ssc.run <- function(obj, assay.name="exprs",
                        iCor.niter = iCor.niter,
                        method.vgene="refine.de")
           obj <- ssc.clust(obj, assay.name=assay.name,
-                           method.reduction=if(method.clust=="adpclust") sprintf("%s.tsne",method.reduction) else method.reduction,
+                           method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
                            method=method.clust, k.batch=k.batch,
                            out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s.refineG",out.prefix,rid),
-                           method.vgene="refine.de", ...)
+                           method.vgene="refine.de", parlist = parlist.rid, ...)
         }else{
           warning("The number of DE genes is less than 30, NO second round clustering using DE genes will be performed!!")
         }
       }
       if(level<nIter){
-        clustLabel <- if(method.clust=="adpclust") sprintf("%s.tsne.%s.kauto",method.reduction,method.clust) else sprintf("%s.%s.kauto",method.reduction,method.clust)
+        clustLabel <- if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne.%s.kauto",method.reduction,method.clust) else sprintf("%s.%s.kauto",method.reduction,method.clust)
         if(clustLabel %in% colnames(colData(obj))){
           clusterNames <- sort(unique(colData(obj)[,clustLabel]))
           for(cls in clusterNames){
@@ -875,9 +931,9 @@ ssc.run <- function(obj, assay.name="exprs",
       return(obj)
     }
     obj <- runOneIter(obj,"L1C1",k.batch = k.batch)
-    if(do.DE && method.clust %in% c("adpclust","SNN")){
+    if(do.DE && method.clust %in% c("adpclust","dpclust","SNN")){
       .xlabel <- NULL
-      if(method.clust=="adpclust"){
+      if(method.clust %in% c("adpclust","dpclust")){
         .xlabel <- colData(obj)[,sprintf("%s.tsne.%s.kauto",method.reduction,method.clust)]
       }else if(method.clust=="SNN"){
         .xlabel <- colData(obj)[,sprintf("%s.%s.kauto",method.reduction,method.clust)]
@@ -992,10 +1048,10 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
   }
   if(plotDensity){
     if(is.null(out.prefix)){
-      plot.density2D(reducedDim(obj,reduced.name),peaks = peaks)
+      plot.density2D(reducedDim(obj,reduced.name)[,reduced.dim],peaks = peaks)
     }else{
       pdf(sprintf("%s.density.pdf",out.prefix),width = 5,height = 5)
-      plot.density2D(reducedDim(obj,reduced.name),peaks = peaks)
+      plot.density2D(reducedDim(obj,reduced.name)[,reduced.dim],peaks = peaks)
       dev.off()
     }
   }

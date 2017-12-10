@@ -6,7 +6,8 @@
 \usage{
 ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
   method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10,
-  SNN.method = "eigen", out.prefix = NULL)
+  SNN.method = "eigen", dpclust.rho = NULL, dpclust.delta = NULL,
+  parlist = NULL, out.prefix = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -25,6 +26,12 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{SNN.k}{integer; number of shared NN. (default: 10)}
 
 \item{SNN.method}{character; cluster method applied on SNN， one of "greedy", "eigen". (default: "eigen")}
+
+\item{dpclust.rho}{numberic; cuttoff of rho, if it is NULL, infer frome the data (default: NULL)}
+
+\item{dpclust.delta}{numberic; cuttoff of delta, if it is NULL, infer frome the data (default: NULL)}
+
+\item{parlist}{list; if not NULL, use th parameters in it. (default: NULL)}
 
 \item{out.prefix}{character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)}
 }

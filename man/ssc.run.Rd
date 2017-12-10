@@ -8,7 +8,8 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
   method.reduction = "iCor", method.clust = "kmeans",
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
   subsampling = F, sub.frac = 0.4, sub.use.proj = T, k.batch = 2:6,
-  refineGene = F, nIter = 1, out.prefix = NULL, do.DE = F, ...)
+  refineGene = F, nIter = 1, out.prefix = NULL, parfile = NULL,
+  do.DE = F, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -44,6 +45,9 @@ genes found by the first round cluster result. (default: F)}
 \item{nIter}{integer; number of iterative clustering in sub-cluster. (default: 1)}
 
 \item{out.prefix}{character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)}
+
+\item{parfile}{character; parameter files, if not NULL, will use the settings. must contain a list named
+`parlist`. (default: NULL)}
 
 \item{do.DE}{logical; perform DE analysis when clustering finished. (default: F)}
 
