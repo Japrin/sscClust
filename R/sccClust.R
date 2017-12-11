@@ -899,6 +899,11 @@ ssc.run <- function(obj, assay.name="exprs",
       }
       ### other method need determine the best k. not implemented yet.
       if(refineGene && method.clust %in% c("adpclust","dpclust","SNN")){
+        if(!is.null(parlist) && sprintf("%s.de",rid) %in% names(parlist)){
+          parlist.rid <- parlist[[sprintf("%s.de",rid)]]
+        }else{
+          parlist.rid <- NULL
+        }
         ### adpclust automatically use tsne data
         de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
                                    xlabel = colData(obj)[,.xlabel],
