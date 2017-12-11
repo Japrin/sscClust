@@ -864,7 +864,7 @@ ssc.run <- function(obj, assay.name="exprs",
     runOneIter <- function(obj,rid,k.batch,level=1){
       if(!is.null(parlist) && rid %in% names(parlist)){
         parlist.rid <- parlist[[rid]]
-        if("k" %in% names(parlist.rid) && parlist.rid[[k]]==1){
+        if("k" %in% names(parlist.rid) && parlist.rid[["k"]]==1){
           return(obj)
         }
       }else{
