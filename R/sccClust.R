@@ -641,11 +641,18 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       }
       cat(sprintf("dpclust.rho: %4.2f\n",dpclust.rho))
       cat(sprintf("dpclust.delta: %4.2f\n",dpclust.delta))
+      clust.res <- densityClust::findClusters(clust.res,rho = dpclust.rho,
+                                              delta = dpclust.delta,plot=F)
+      k <- "auto"
+      colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
       if(!is.null(out.prefix)){
         pdf(sprintf("%s.decision.pdf",out.prefix),width = 5,height = 5)
-        clust.res <- densityClust::findClusters(clust.res,
-                                                        rho = dpclust.rho,
-                                                        delta = dpclust.delta,plot=T)
+        plot(clust.res$rho, clust.res$delta, main = 'Decision graph', xlab = expression(rho),
+             ylab = expression(delta))
+        if (!is.na(clust.res$peaks[1])) {
+          points(clust.res$rho[clust.res$peaks], clust.res$delta[clust.res$peaks],
+                 col = 2:(1 + length(clust.res$peaks)),pch = 19)
+        }
         abline(v=dpclust.rho,lty=2)
         abline(h=dpclust.delta,lty=2)
         plot(sort(clust.res$rho * clust.res$delta,decreasing = T),ylab="rho * delta")
@@ -653,13 +660,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
         ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
                       peaks = clust.res$peaks,
                       out.prefix = sprintf("%s.dpclust",out.prefix),base_aspect_ratio = 1.4)
-      }else{
-        clust.res <- densityClust::findClusters(clust.res,rho = dpclust.rho,
-                                                delta = dpclust.delta,
-                                                plot=F)
       }
-      k <- "auto"
-      colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
     }else if(method=="SNN"){
       snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
       if(SNN.method=="greedy"){
@@ -898,37 +899,46 @@ ssc.run <- function(obj, assay.name="exprs",
                       base_aspect_ratio = 1.4)
       }
       ### other method need determine the best k. not implemented yet.
+      do.secondRun <- F
       if(refineGene && method.clust %in% c("adpclust","dpclust","SNN")){
         if(!is.null(parlist) && sprintf("%s.de",rid) %in% names(parlist)){
           parlist.rid <- parlist[[sprintf("%s.de",rid)]]
+          if("k" %in% names(parlist.rid) && parlist.rid[["k"]]==1){
+            do.secondRun <- F
+          }else{
+            do.secondRun <- T
+          }
         }else{
           parlist.rid <- NULL
         }
-        ### adpclust automatically use tsne data
-        de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
-                                   xlabel = colData(obj)[,.xlabel],
-                                   gid.mapping = rowData(obj)[,"display.name"])
-        if(!is.null(de.out) && nrow(de.out$aov.out.sig)>30){
-          metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
-          metadata(obj)$ssc[["variable.gene"]][["refine.de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
-          obj <- ssc.reduceDim(obj,assay.name=assay.name,
-                       method=method.reduction,
-                       pca.npc = pca.npc,
-                       iCor.niter = iCor.niter,
-                       method.vgene="refine.de")
-          obj <- ssc.clust(obj, assay.name=assay.name,
-                           method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
-                           method=method.clust, k.batch=k.batch,
-                           out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s.refineG",out.prefix,rid),
-                           method.vgene="refine.de", parlist = parlist.rid, ...)
-          if(!is.null(out.prefix) && !is.null(.xlabel)){
-            ssc.plot.tsne(obj,columns = c(.xlabel),
-                          reduced.name = if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
-                          out.prefix = sprintf("%s.%s.refineG",out.prefix,rid),
-                          base_aspect_ratio = 1.4)
+        if(do.secondRun)
+        {
+          ### adpclust automatically use tsne data
+          de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
+                                     xlabel = colData(obj)[,.xlabel],
+                                     gid.mapping = rowData(obj)[,"display.name"])
+          if(!is.null(de.out) && nrow(de.out$aov.out.sig)>30){
+            metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
+            metadata(obj)$ssc[["variable.gene"]][["refine.de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
+            obj <- ssc.reduceDim(obj,assay.name=assay.name,
+                         method=method.reduction,
+                         pca.npc = pca.npc,
+                         iCor.niter = iCor.niter,
+                         method.vgene="refine.de")
+            obj <- ssc.clust(obj, assay.name=assay.name,
+                             method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
+                             method=method.clust, k.batch=k.batch,
+                             out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s.refineG",out.prefix,rid),
+                             method.vgene="refine.de", parlist = parlist.rid, ...)
+            if(!is.null(out.prefix) && !is.null(.xlabel)){
+              ssc.plot.tsne(obj,columns = c(.xlabel),
+                            reduced.name = if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
+                            out.prefix = sprintf("%s.%s.refineG",out.prefix,rid),
+                            base_aspect_ratio = 1.4)
+            }
+          }else{
+            warning("The number of DE genes is less than 30, NO second round clustering using DE genes will be performed!!")
           }
-        }else{
-          warning("The number of DE genes is less than 30, NO second round clustering using DE genes will be performed!!")
         }
       }
       if(level<nIter){
