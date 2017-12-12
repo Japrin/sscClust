@@ -899,14 +899,12 @@ ssc.run <- function(obj, assay.name="exprs",
                       base_aspect_ratio = 1.4)
       }
       ### other method need determine the best k. not implemented yet.
-      do.secondRun <- F
       if(refineGene && method.clust %in% c("adpclust","dpclust","SNN")){
+        do.secondRun <- T
         if(!is.null(parlist) && sprintf("%s.de",rid) %in% names(parlist)){
           parlist.rid <- parlist[[sprintf("%s.de",rid)]]
           if("k" %in% names(parlist.rid) && parlist.rid[["k"]]==1){
             do.secondRun <- F
-          }else{
-            do.secondRun <- T
           }
         }else{
           parlist.rid <- NULL
