@@ -633,7 +633,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       dist.obj <- stats::dist(dat.transformed)
       clust.res <- densityClust::densityClust(dist.obj, gaussian = T)
       if(is.null(dpclust.rho)){ dpclust.rho <- quantile(clust.res$rho, probs = 0.90) }
-      if(is.null(dpclust.delta)){ dpclust.delta <- quantile(clust.res$delta, probs = 0.95) }
+      if(is.null(dpclust.delta)){ dpclust.delta <- quantile(clust.res$delta, probs = 0.99) }
       ## overwritet the parameter using those in parlist
       if(!is.null(parlist)){
         if("rho" %in% names(parlist)){ dpclust.rho <- parlist[["rho"]] }
