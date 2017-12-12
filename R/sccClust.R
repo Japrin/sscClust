@@ -345,7 +345,7 @@ run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30){
   if(is.null(ret)){
     tryCatch({
       ret <- Rtsne::Rtsne(idata, pca = tSNE.usePCA, perplexity = 5)$Y
-    },error=function(e){ print("Error occur when using perplexity 5"); e })
+    },error=function(e){ print("Error occur when using perplexity 5"); print(e); e })
   }
   return(ret)
 }
@@ -600,12 +600,32 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
   clust.res <- NULL
   res.list <- list()
   ### check transformed data
-  if(method.reduction=="none" || (!method.reduction %in% reducedDimNames(obj)) ){
+  if(method.reduction=="none"){
     warning(sprintf("The dimention reduction should be performed!"))
     vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
     dat.transformed <- t(assay(obj[vgene,],assay.name))
+  }else if( (!method.reduction %in% reducedDimNames(obj)) ){
+    dat.transformed <- NULL
   }else{
     dat.transformed <- reducedDim(obj,method.reduction)
+  }
+  # print("TEST")
+  # print(obj)
+  # print(str(dat.transformed))
+  if(is.null(dat.transformed)){
+    warning("dat.transformed is null !!")
+    metadata(obj)$ssc$clust.res[[method]] <- NULL
+    if(method %in% c("adpclust","dpclust","SNN")){
+      k <- "auto"
+      ##print(sprintf("%s.%s.k%s",method.reduction,method,k))
+      colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",rep(0,ncol(obj)))
+    }else{
+      for(k in k.batch){
+        colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",rep(0,ncol(obj)))
+      }
+    }
+    ##print(obj)
+    return(obj)
   }
   ### check method
 
@@ -633,7 +653,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       dist.obj <- stats::dist(dat.transformed)
       clust.res <- densityClust::densityClust(dist.obj, gaussian = T)
       if(is.null(dpclust.rho)){ dpclust.rho <- quantile(clust.res$rho, probs = 0.90) }
-      if(is.null(dpclust.delta)){ dpclust.delta <- quantile(clust.res$delta, probs = 0.99) }
+      if(is.null(dpclust.delta)){ dpclust.delta <- quantile(clust.res$delta, probs = 0.95) }
       ## overwritet the parameter using those in parlist
       if(!is.null(parlist)){
         if("rho" %in% names(parlist)){ dpclust.rho <- parlist[["rho"]] }
@@ -641,8 +661,13 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       }
       cat(sprintf("dpclust.rho: %4.2f\n",dpclust.rho))
       cat(sprintf("dpclust.delta: %4.2f\n",dpclust.delta))
-      clust.res <- densityClust::findClusters(clust.res,rho = dpclust.rho,
-                                              delta = dpclust.delta,plot=F)
+      if(sum(clust.res$rho >= dpclust.rho & clust.res$delta >= dpclust.delta)<2){
+        clust.res$clusters <- rep(1,length(clust.res$rho))
+        clust.res$peaks <- NA
+      }else{
+        clust.res <- densityClust::findClusters(clust.res,rho = dpclust.rho,
+                                                delta = dpclust.delta,plot=F)
+      }
       k <- "auto"
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
       if(!is.null(out.prefix)){
@@ -658,7 +683,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
         plot(sort(clust.res$rho * clust.res$delta,decreasing = T),ylab="rho * delta")
         dev.off()
         ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
-                      peaks = clust.res$peaks,
+                      peaks = if(!is.na(clust.res$peaks)) clust.res$peaks else NULL,
                       out.prefix = sprintf("%s.dpclust",out.prefix),base_aspect_ratio = 1.4)
       }
     }else if(method=="SNN"){
@@ -809,6 +834,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param method.classify character; method used for classification, one of "knn" and "RF". (default: "knn")
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
+#' @param iCor.method character; correlation method, one of "spearman", "pearson" (default: "spearman")
 #' @param subsampling logical; whether cluster using the subsampling->cluster->classification method. (default: F)
 #' @param sub.frac numeric; subsample to frac of original samples. (default: 0.4)
 #' @param sub.use.proj logical; whether use the projected data for classification. (default: T)
@@ -835,6 +861,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     method.classify="knn",
                     pca.npc=NULL,
                     iCor.niter=1,
+                    iCor.method="spearman",
                     subsampling=F,
                     sub.frac=0.4,
                     sub.use.proj=T,
@@ -878,6 +905,7 @@ ssc.run <- function(obj, assay.name="exprs",
                                 method=method.reduction,
                                 pca.npc = pca.npc,
                                 iCor.niter = iCor.niter,
+                                iCor.method = iCor.method,
                                 method.vgene=method.vgene)
       print(sprintf("clustering ... (%s)",rid))
       obj <- ssc.clust(obj, assay.name=assay.name,
@@ -922,6 +950,7 @@ ssc.run <- function(obj, assay.name="exprs",
                          method=method.reduction,
                          pca.npc = pca.npc,
                          iCor.niter = iCor.niter,
+                         iCor.method = iCor.method,
                          method.vgene="refine.de")
             obj <- ssc.clust(obj, assay.name=assay.name,
                              method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
@@ -952,8 +981,11 @@ ssc.run <- function(obj, assay.name="exprs",
               nsamples <- ncol(obj.cls)
               obj.cls <- runOneIter(obj.cls,cls.rid,k.batch = k.batch[k.batch < nsamples],level+1)
               # update cluster's label
-              colData(obj)[f.cls,clustLabel] <- sprintf("%s.L%s%s",cls.rid,level+1,
+              colData(obj)[f.cls,clustLabel] <- sprintf("%s.L%s%s",cls.rid,level+2,
                                                         colData(obj.cls)[,clustLabel])
+            }else{
+              # update cluster's label
+              colData(obj)[f.cls,clustLabel] <- sprintf("%s.L%s%s",cls.rid,level+2,"C1")
             }
           }
         }
@@ -1026,13 +1058,18 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
 {
   #requireNamespace("ggplot2")
   #requireNamespace("cowplot")
-  if(length(reduced.dim)!=2){ stop(sprintf("Wrong parameter, reduced.dim!!"))}
+  if(length(reduced.dim)!=2){ warning(sprintf("Wrong parameter, reduced.dim!!")); return(); }
+  if(is.null(reducedDim(obj,reduced.name))){
+    warning(sprintf("No reducedDim: %s\n",reduced.name))
+    return()
+  }
+  dat.map <- reducedDim(obj,reduced.name)[,reduced.dim]
   if(!is.null(columns))
   {
     if(all(columns %in% colnames(colData(obj))))
     {
       if(is.list(colSet)){
-        dat.map <- reducedDim(obj,reduced.name)
+        #dat.map <- reducedDim(obj,reduced.name)
         multi.p <- lapply(columns,function(cc){
           if(is.null(colSet[[cc]])){
             cc.values <- sort(unique(colData(obj)[,cc]))
@@ -1040,7 +1077,8 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
                                       names=cc.values)
           }
           dat.plot <- data.frame(sample=rownames(dat.map),stringsAsFactors = F)
-          dat.plot <- as.data.frame(cbind(dat.plot,dat.map[,reduced.dim],colData(obj)[,cc,drop=F]))
+          dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,cc,drop=F]))
+          #dat.plot <- as.data.frame(cbind(dat.plot,dat.map[,reduced.dim],colData(obj)[,cc,drop=F]))
           colnames(dat.plot) <- c("sample","Dim1","Dim2",cc)
           npts <- nrow(dat.plot)
           p <- ggplot2::ggplot(dat.plot,aes(Dim1,Dim2)) +
@@ -1059,7 +1097,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
           print(pp)
         }
       }else{
-        stop(sprintf("invalidate parameter: colSet. Please check that!"))
+        warning(sprintf("invalidate parameter: colSet. Please check that!"))
       }
     }else{
       warning(sprintf("some columns not in the data. Not plot be produced!"))
@@ -1072,16 +1110,19 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
       gene <- ssc.displayName2id(obj,display.name = gene)
     }
     p <- ggGeneOnTSNE(assay(obj,assay.name),
-                     reducedDim(obj,reduced.name)[,reduced.dim],
+                     dat.map,
+                     ##reducedDim(obj,reduced.name)[,reduced.dim],
                      gene,out.prefix,p.ncol=p.ncol,width=width,height=height)
     if(is.null(out.prefix)){ print(p) }
   }
   if(plotDensity){
     if(is.null(out.prefix)){
-      plot.density2D(reducedDim(obj,reduced.name)[,reduced.dim],peaks = peaks)
+      plot.density2D(dat.map,peaks = peaks)
+      #plot.density2D(reducedDim(obj,reduced.name)[,reduced.dim],peaks = peaks)
     }else{
       pdf(sprintf("%s.density.pdf",out.prefix),width = 5,height = 5)
-      plot.density2D(reducedDim(obj,reduced.name)[,reduced.dim],peaks = peaks)
+      plot.density2D(dat.map,peaks = peaks)
+      #plot.density2D(reducedDim(obj,reduced.name)[,reduced.dim],peaks = peaks)
       dev.off()
     }
   }
