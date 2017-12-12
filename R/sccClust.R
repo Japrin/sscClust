@@ -68,7 +68,7 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,width=9
   #requireNamespace("ggplot2",quietly = T)
   #requireNamespace("RColorBrewer",quietly = T)
   if(!is.null(out.prefix)){
-    dir.create(sprintf("%s.perGene.tSNE",out.prefix),showWarnings = F,recursive = T)
+    dir.create(dirname(out.prefix),showWarnings = F,recursive = T)
   }
   f.g <- gene.to.show %in% rownames(Y)
   if(sum(!f.g)>0){
