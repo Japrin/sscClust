@@ -7,9 +7,9 @@
 ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
   method.reduction = "iCor", method.clust = "kmeans",
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
-  subsampling = F, sub.frac = 0.4, sub.use.proj = T, k.batch = 2:6,
-  refineGene = F, nIter = 1, out.prefix = NULL, parfile = NULL,
-  do.DE = F, ...)
+  iCor.method = "spearman", subsampling = F, sub.frac = 0.4,
+  sub.use.proj = T, k.batch = 2:6, refineGene = F, nIter = 1,
+  out.prefix = NULL, parfile = NULL, do.DE = F, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -30,6 +30,8 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
 \item{pca.npc}{integer; number of pc be used. Only for reduction method "pca". (default: NULL)}
 
 \item{iCor.niter}{integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)}
+
+\item{iCor.method}{character; correlation method, one of "spearman", "pearson" (default: "spearman")}
 
 \item{subsampling}{logical; whether cluster using the subsampling->cluster->classification method. (default: F)}
 
