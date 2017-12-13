@@ -419,23 +419,28 @@ ssc.build <- function(x,display.name=NULL)
 #' @param method method to be used, can be one of "sd" (default),
 #' @param sd.n top number of genes (default 1500)
 #' @param assay.name which assay to be used (default "exprs")
+#' @param reuse logical; don't calculate if the query is already available. (default: F)
 #' @details Method "sd", calculate the standard deviation of each gene and sort decreasingly, the top `sd.n` genes are the
 #' variable genes.
 #' @return an object of \code{SingleCellExperiment} class
 #' @export
-ssc.variableGene <- function(obj,method="sd",sd.n=1500,assay.name="exprs")
+ssc.variableGene <- function(obj,method="sd",sd.n=1500,assay.name="exprs",reuse=F)
 {
   if(method=="sd")
   {
-    row.sd <- apply(assay(obj,assay.name),1,sd)
-    metadata(obj)$ssc[["variable.gene"]][["sd"]] <- names(head(row.sd[order(row.sd,decreasing = T)],n=sd.n))
+    if(!reuse || is.null(metadata(obj)$ssc[["variable.gene"]][["sd"]])){
+      row.sd <- apply(assay(obj,assay.name),1,sd)
+      metadata(obj)$ssc[["variable.gene"]][["sd"]] <- names(head(row.sd[order(row.sd,decreasing = T)],n=sd.n))
+    }
   }else if(method=="mean.sd")
   {
-    row.sd <- apply(assay(obj,assay.name),1,sd)
-    row.mean <- apply(assay(obj,assay.name),1,mean)
-    info.gene.sd <- row.sd[row.sd>1 & row.mean>1]
-    info.gene.sd <- sort(info.gene.sd,decreasing = T)
-    metadata(obj)$ssc[["variable.gene"]][["mean.sd"]] <- names(head(info.gene.sd,n=sd.n))
+    if(!reuse || is.null(metadata(obj)$ssc[["variable.gene"]][["mean.sd"]])){
+      row.sd <- apply(assay(obj,assay.name),1,sd)
+      row.mean <- apply(assay(obj,assay.name),1,mean)
+      info.gene.sd <- row.sd[row.sd>1 & row.mean>1]
+      info.gene.sd <- sort(info.gene.sd,decreasing = T)
+      metadata(obj)$ssc[["variable.gene"]][["mean.sd"]] <- names(head(info.gene.sd,n=sd.n))
+    }
   }
   return(obj)
 }
@@ -494,6 +499,7 @@ ssc.displayName2id <- function(obj,display.name)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
 #' @param iCor.method character; method to calculate correlation between samples,
 #' should be one of "spearman" and "pearson". (default "spearman")
+#' @param reuse logical; don't calculate if the query is already available. (default: F)
 #' @details If the reduction method is "pca", the function will call prcomp() and estimate the number of top PC should be used
 #' in downstream analysis using and "elbow" based method, then the samples coordinates in the space spaned by the top PC would
 #' stored in the reducedDim slot of the return value with the reducedDimName "pca".If autoTSNE is `true`, a tSNE map based on
@@ -515,7 +521,8 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
                           tSNE.perplexity=30,
                           autoTSNE=T,
                           dim.name=NULL,
-                          iCor.niter=1,iCor.method="spearman")
+                          iCor.niter=1,iCor.method="spearman",
+                          reuse=F)
 {
   row.sd <- apply(assay(obj,assay.name),1,sd)
   col.sd <- apply(assay(obj,assay.name),2,sd)
@@ -530,34 +537,36 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
   }
   if(is.null(dim.name)){ dim.name <- method }
   vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
-  if(method=="pca"){
-    pca.res <- prcomp(t(assay(obj[vgene,],assay.name)))
-    ### find elbow point and get number of components to be used
-    pca.res$eigenv.prop <- pca.res$sdev/sum(pca.res$sdev)
-    pca.res$eigengap <- sapply(seq_len(length(pca.res$eigenv.prop)-1),function(i){ pca.res$eigenv.prop[i]-pca.res$eigenv.prop[i+1] })
-    ### method 1
-    ######pca.res$kneePts <- which(pca.res$eigengap<1e-4)[1]
-    ### method 2 (max distance to the line defined by the first and last point in the scree plot)
-    pca.res$kneePts <- findKneePoint(head(pca.res$eigenv.prop,n=50))
-    if(is.null(pca.npc) && !is.na(pca.res$kneePts)){ pca.npc <- pca.res$kneePts
-    }else{ pca.npc <- 30 }
-    pca.npc <- min(pca.npc,ncol(pca.res$x))
-    pca.res$npc <- pca.npc
-    ### save to object
-    metadata(obj)$ssc$pca.res <- pca.res
-    proj_data <- pca.res$x[,1:pca.npc,drop=F]
-    if(autoTSNE){ reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
-  }else if(method=="tsne"){
-    proj_data <- run.tSNE(t(assay(obj[vgene,],assay.name)),tSNE.usePCA,tSNE.perplexity)
-  }else if(method=="iCor"){
-    proj_data <- assay(obj[vgene,],assay.name)
-    while(iCor.niter>0){
-      proj_data <- cor(proj_data,method=iCor.method)
-      iCor.niter <- iCor.niter-1
+  if(!reuse || !(dim.name %in% reducedDimNames(obj)) ){
+    if(method=="pca"){
+        pca.res <- prcomp(t(assay(obj[vgene,],assay.name)))
+        ### find elbow point and get number of components to be used
+        pca.res$eigenv.prop <- pca.res$sdev/sum(pca.res$sdev)
+        pca.res$eigengap <- sapply(seq_len(length(pca.res$eigenv.prop)-1),function(i){ pca.res$eigenv.prop[i]-pca.res$eigenv.prop[i+1] })
+        ### method 1
+        ######pca.res$kneePts <- which(pca.res$eigengap<1e-4)[1]
+        ### method 2 (max distance to the line defined by the first and last point in the scree plot)
+        pca.res$kneePts <- findKneePoint(head(pca.res$eigenv.prop,n=50))
+        if(is.null(pca.npc) && !is.na(pca.res$kneePts)){ pca.npc <- pca.res$kneePts
+        }else{ pca.npc <- 30 }
+        pca.npc <- min(pca.npc,ncol(pca.res$x))
+        pca.res$npc <- pca.npc
+        ### save to object
+        metadata(obj)$ssc$pca.res <- pca.res
+        proj_data <- pca.res$x[,1:pca.npc,drop=F]
+        if(autoTSNE){ reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
+    }else if(method=="tsne"){
+      proj_data <- run.tSNE(t(assay(obj[vgene,],assay.name)),tSNE.usePCA,tSNE.perplexity)
+    }else if(method=="iCor"){
+      proj_data <- assay(obj[vgene,],assay.name)
+      while(iCor.niter>0){
+        proj_data <- cor(proj_data,method=iCor.method)
+        iCor.niter <- iCor.niter-1
+      }
+      if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
     }
-    if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
+    reducedDim(obj,dim.name) <- proj_data
   }
-  reducedDim(obj,dim.name) <- proj_data
   return(obj)
 }
 
@@ -609,15 +618,11 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
   }else{
     dat.transformed <- reducedDim(obj,method.reduction)
   }
-  # print("TEST")
-  # print(obj)
-  # print(str(dat.transformed))
   if(is.null(dat.transformed)){
     warning("dat.transformed is null !!")
     metadata(obj)$ssc$clust.res[[method]] <- NULL
     if(method %in% c("adpclust","dpclust","SNN")){
       k <- "auto"
-      ##print(sprintf("%s.%s.k%s",method.reduction,method,k))
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",rep(0,ncol(obj)))
     }else{
       for(k in k.batch){
@@ -846,6 +851,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
 #' @param parfile character; parameter files, if not NULL, will use the settings. must contain a list named
 #' `parlist`. (default: NULL)
+#' @param reuse logical; don't calculate if the query is already available. (default: F)
 #' @param ... parameters pass to clustering methods
 #' @details run the pipeline of variable gene identification, dimension reduction, clustering.
 #' @seealso \code{\link{ssc.variableGene}} for variable genes' identification, \code{\link{ssc.reduceDim}}
@@ -870,6 +876,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     nIter=1,
                     out.prefix=NULL,
                     parfile=NULL,
+                    reuse=F,
                     do.DE=F,...)
 {
   ### some checking
@@ -899,14 +906,15 @@ ssc.run <- function(obj, assay.name="exprs",
         parlist.rid <- NULL
       }
       print(sprintf("select variable genes ... (%s)",rid))
-      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
+      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name,reuse = reuse)
       print(sprintf("reduce dimensions ... (%s)",rid))
       obj <- ssc.reduceDim(obj,assay.name=assay.name,
-                                method=method.reduction,
-                                pca.npc = pca.npc,
-                                iCor.niter = iCor.niter,
-                                iCor.method = iCor.method,
-                                method.vgene=method.vgene)
+                           method=method.reduction,
+                           pca.npc = pca.npc,
+                           iCor.niter = iCor.niter,
+                           iCor.method = iCor.method,
+                           method.vgene=method.vgene,
+                           reuse = reuse)
       print(sprintf("clustering ... (%s)",rid))
       obj <- ssc.clust(obj, assay.name=assay.name,
                        method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
@@ -951,7 +959,7 @@ ssc.run <- function(obj, assay.name="exprs",
                          pca.npc = pca.npc,
                          iCor.niter = iCor.niter,
                          iCor.method = iCor.method,
-                         method.vgene="refine.de")
+                         method.vgene="refine.de",reuse = reuse)
             obj <- ssc.clust(obj, assay.name=assay.name,
                              method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
                              method=method.clust, k.batch=k.batch,

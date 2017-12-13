@@ -4,7 +4,8 @@
 \alias{ssc.variableGene}
 \title{Identify variable genes}
 \usage{
-ssc.variableGene(obj, method = "sd", sd.n = 1500, assay.name = "exprs")
+ssc.variableGene(obj, method = "sd", sd.n = 1500, assay.name = "exprs",
+  reuse = F)
 }
 \arguments{
 \item{obj}{object of SingleCellExperiment}
@@ -14,6 +15,8 @@ ssc.variableGene(obj, method = "sd", sd.n = 1500, assay.name = "exprs")
 \item{sd.n}{top number of genes (default 1500)}
 
 \item{assay.name}{which assay to be used (default "exprs")}
+
+\item{reuse}{logical; don't calculate if the query is already available. (default: F)}
 }
 \value{
 an object of \code{SingleCellExperiment} class

@@ -9,7 +9,7 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
   iCor.method = "spearman", subsampling = F, sub.frac = 0.4,
   sub.use.proj = T, k.batch = 2:6, refineGene = F, nIter = 1,
-  out.prefix = NULL, parfile = NULL, do.DE = F, ...)
+  out.prefix = NULL, parfile = NULL, reuse = F, do.DE = F, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -50,6 +50,8 @@ genes found by the first round cluster result. (default: F)}
 
 \item{parfile}{character; parameter files, if not NULL, will use the settings. must contain a list named
 `parlist`. (default: NULL)}
+
+\item{reuse}{logical; don't calculate if the query is already available. (default: F)}
 
 \item{do.DE}{logical; perform DE analysis when clustering finished. (default: F)}
 

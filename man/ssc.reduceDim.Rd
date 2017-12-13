@@ -7,7 +7,7 @@
 ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
   method.vgene = "sd", pca.npc = NULL, tSNE.usePCA = T,
   tSNE.perplexity = 30, autoTSNE = T, dim.name = NULL, iCor.niter = 1,
-  iCor.method = "spearman")
+  iCor.method = "spearman", reuse = F)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -33,6 +33,8 @@ it is NULL, infer from method. (default: NULL)}
 
 \item{iCor.method}{character; method to calculate correlation between samples,
 should be one of "spearman" and "pearson". (default "spearman")}
+
+\item{reuse}{logical; don't calculate if the query is already available. (default: F)}
 }
 \value{
 an object of \code{SingleCellExperiment} class with reduced data added to the reducedDim slot.
