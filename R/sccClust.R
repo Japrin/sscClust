@@ -7,6 +7,37 @@
 #' Expression data contained in a \code{SingleCellExperiment} object
 NULL
 
+#' Correlation calculation. use BLAS and data.table to speed up.
+#'
+#' @importFrom data.table frank
+#' @param x matrix; input data, rows for variable (genes), columns for observations (cells).
+#' @param method character; method used. (default: "pearson")
+#' @details calcualte the correlation among variables(rows)
+#' @return correlation coefficient matrix among rows
+cor.BLAS <- function(x,method="pearson")
+{
+  cor.pearson <- function(x)
+  {
+    x = x - rowMeans(x)
+    x = x / sqrt(rowSums(x^2))
+    x.cor = tcrossprod(x)
+    return(x.cor)
+  }
+  x <- as.matrix(x)
+  if(!is.matrix(x)){
+    warning("x is not like a matrix")
+    return(NULL)
+  }
+  if(method=="pearson"){
+    return(cor.pearson(x))
+  }else if(method=="spearman"){
+    return(cor.pearson(t(apply(x, 1, data.table::frank, na.last="keep"))))
+  }else{
+    warning("method must be pearson or spearman")
+    return(NULL)
+  }
+}
+
 #' dispaly message with time stamp
 #' @param msg characters; message to display
 loginfo <- function(msg) {
@@ -560,7 +591,8 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
     }else if(method=="iCor"){
       proj_data <- assay(obj[vgene,],assay.name)
       while(iCor.niter>0){
-        proj_data <- cor(proj_data,method=iCor.method)
+        ##proj_data <- cor(proj_data,method=iCor.method)
+        proj_data <- cor.BLAS(t(proj_data),method=iCor.method)
         iCor.niter <- iCor.niter-1
       }
       if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
@@ -772,6 +804,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 
     if(method.reduction=="iCor"){
       #### for (tsne) visualization
+      ###
       A <- cor((assay(obj.pred[vgene,],assay.name)),assay(obj.train[vgene,],assay.name),method = "spearman")
       S <- cor(assay(obj.train[vgene,],assay.name),method = "spearman")
       #S <- reducedDim(obj.train,sprintf("%s",method.reduction))
