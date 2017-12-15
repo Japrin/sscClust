@@ -696,8 +696,8 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
         if("rho" %in% names(parlist)){ dpclust.rho <- parlist[["rho"]] }
         if("delta" %in% names(parlist)){ dpclust.delta <- parlist[["delta"]] }
       }
-      cat(sprintf("dpclust.rho: %4.2f\n",dpclust.rho))
-      cat(sprintf("dpclust.delta: %4.2f\n",dpclust.delta))
+      cat(sprintf("(dpclust.rho: %4.2f)\n",dpclust.rho))
+      cat(sprintf("(dpclust.delta: %4.2f)\n",dpclust.delta))
       if(sum(clust.res$rho >= dpclust.rho & clust.res$delta >= dpclust.delta)<2){
         clust.res$clusters <- rep(1,length(clust.res$rho))
         clust.res$peaks <- NA
@@ -938,9 +938,9 @@ ssc.run <- function(obj, assay.name="exprs",
       }else{
         parlist.rid <- NULL
       }
-      print(sprintf("select variable genes ... (%s)",rid))
+      loginfo(sprintf("select variable genes ... (%s)",rid))
       obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name,reuse = reuse)
-      print(sprintf("reduce dimensions ... (%s)",rid))
+      loginfo(sprintf("reduce dimensions ... (%s)",rid))
       obj <- ssc.reduceDim(obj,assay.name=assay.name,
                            method=method.reduction,
                            pca.npc = pca.npc,
@@ -948,7 +948,7 @@ ssc.run <- function(obj, assay.name="exprs",
                            iCor.method = iCor.method,
                            method.vgene=method.vgene,
                            reuse = reuse)
-      print(sprintf("clustering ... (%s)",rid))
+      loginfo(sprintf("clustering ... (%s)",rid))
       obj <- ssc.clust(obj, assay.name=assay.name,
                        method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
                        method=method.clust, k.batch=k.batch,
@@ -981,18 +981,21 @@ ssc.run <- function(obj, assay.name="exprs",
         if(do.secondRun)
         {
           ### adpclust automatically use tsne data
+          loginfo(sprintf("find DE genes ... (%s)",rid))
           de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
                                      xlabel = colData(obj)[,.xlabel],
                                      gid.mapping = rowData(obj)[,"display.name"])
           if(!is.null(de.out) && nrow(de.out$aov.out.sig)>30){
             metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
             metadata(obj)$ssc[["variable.gene"]][["refine.de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
+            loginfo(sprintf("reduce dimensions using DE genes ... (%s)",rid))
             obj <- ssc.reduceDim(obj,assay.name=assay.name,
                          method=method.reduction,
                          pca.npc = pca.npc,
                          iCor.niter = iCor.niter,
                          iCor.method = iCor.method,
                          method.vgene="refine.de",reuse = reuse)
+            loginfo(sprintf("clust using DE genes ... (%s)",rid))
             obj <- ssc.clust(obj, assay.name=assay.name,
                              method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
                              method=method.clust, k.batch=k.batch,
