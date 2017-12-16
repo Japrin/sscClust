@@ -10,12 +10,21 @@ NULL
 #' Correlation calculation. use BLAS and data.table to speed up.
 #'
 #' @importFrom data.table frank
+#' @importFrom RhpcBLASctl omp_get_num_procs omp_set_num_threads
 #' @param x matrix; input data, rows for variable (genes), columns for observations (cells).
 #' @param method character; method used. (default: "pearson")
+#' @param nthreads integer; number of threads to use. if NULL, automatically detect the number. (default: NULL)
 #' @details calcualte the correlation among variables(rows)
 #' @return correlation coefficient matrix among rows
-cor.BLAS <- function(x,method="pearson")
+cor.BLAS <- function(x,method="pearson",nthreads=NULL)
 {
+  if(is.null(nthreads))
+  {
+    nprocs <- RhpcBLASctl::omp_get_num_procs()
+    RhpcBLASctl::omp_set_num_threads(max(nprocs-1,1))
+  }else{
+    RhpcBLASctl::omp_set_num_threads(nthreads)
+  }
   cor.pearson <- function(x)
   {
     x = x - rowMeans(x)
@@ -185,6 +194,7 @@ findKneePoint <- function(pcs)
 #'
 #' @importFrom plyr ldply
 #' @importFrom stats aov TukeyHSD
+#' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom doParallel registerDoParallel
 #' @param xdata data frame or matrix; rows for genes and columns for samples
 #' @param xlabel factor; cluster label of the samples, with length equal to the number of columns in xdata
@@ -218,6 +228,8 @@ findDEGenesByAOV <- function(xdata,xlabel,out.prefix=NULL,mod=NULL,
   }
   if(!is.null(gid.mapping) && is.null(names(gid.mapping))) { names(gid.mapping)=gid.mapping }
   ###
+  ## avoid conflict between threaded BLAs and foreach
+  RhpcBLASctl::omp_set_num_threads(1)
   registerDoParallel(cores = n.cores)
   ret <- ldply(rownames(xdata),function(v){
     aov.out <- aov(y ~ g,data=data.frame(y=xdata[v,],g=xlabel))
@@ -531,6 +543,7 @@ ssc.displayName2id <- function(obj,display.name)
 #' @param iCor.method character; method to calculate correlation between samples,
 #' should be one of "spearman" and "pearson". (default "spearman")
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
+#' @param ncore integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)
 #' @details If the reduction method is "pca", the function will call prcomp() and estimate the number of top PC should be used
 #' in downstream analysis using and "elbow" based method, then the samples coordinates in the space spaned by the top PC would
 #' stored in the reducedDim slot of the return value with the reducedDimName "pca".If autoTSNE is `true`, a tSNE map based on
@@ -553,7 +566,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
                           autoTSNE=T,
                           dim.name=NULL,
                           iCor.niter=1,iCor.method="spearman",
-                          reuse=F)
+                          reuse=F,ncore=NULL)
 {
   row.sd <- apply(assay(obj,assay.name),1,sd)
   col.sd <- apply(assay(obj,assay.name),2,sd)
@@ -592,7 +605,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
       proj_data <- assay(obj[vgene,],assay.name)
       while(iCor.niter>0){
         ##proj_data <- cor(proj_data,method=iCor.method)
-        proj_data <- cor.BLAS(t(proj_data),method=iCor.method)
+        proj_data <- cor.BLAS(t(proj_data),method=iCor.method,nthreads = ncore)
         iCor.niter <- iCor.niter-1
       }
       if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
@@ -884,6 +897,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
 #' @param parfile character; parameter files, if not NULL, will use the settings. must contain a list named
 #' `parlist`. (default: NULL)
+#' @param ncore integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
 #' @param ... parameters pass to clustering methods
 #' @details run the pipeline of variable gene identification, dimension reduction, clustering.
@@ -910,6 +924,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     out.prefix=NULL,
                     parfile=NULL,
                     reuse=F,
+                    ncore=NULL,
                     do.DE=F,...)
 {
   ### some checking
@@ -947,6 +962,7 @@ ssc.run <- function(obj, assay.name="exprs",
                            iCor.niter = iCor.niter,
                            iCor.method = iCor.method,
                            method.vgene=method.vgene,
+                           ncore = ncore,
                            reuse = reuse)
       loginfo(sprintf("clustering ... (%s)",rid))
       obj <- ssc.clust(obj, assay.name=assay.name,
@@ -984,6 +1000,7 @@ ssc.run <- function(obj, assay.name="exprs",
           loginfo(sprintf("find DE genes ... (%s)",rid))
           de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
                                      xlabel = colData(obj)[,.xlabel],
+                                     n.cores = ncore,
                                      gid.mapping = rowData(obj)[,"display.name"])
           if(!is.null(de.out) && nrow(de.out$aov.out.sig)>30){
             metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
@@ -994,6 +1011,7 @@ ssc.run <- function(obj, assay.name="exprs",
                          pca.npc = pca.npc,
                          iCor.niter = iCor.niter,
                          iCor.method = iCor.method,
+                         ncore = ncore,
                          method.vgene="refine.de",reuse = reuse)
             loginfo(sprintf("clust using DE genes ... (%s)",rid))
             obj <- ssc.clust(obj, assay.name=assay.name,

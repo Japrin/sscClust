@@ -14,4 +14,4 @@ LazyData: true
 RoxygenNote: 6.0.1
 Depends: R (>= 3.4), SingleCellExperiment, scran
 Imports: RColorBrewer, Rtsne, class, factoextra, cowplot, data.table, ggplot2, 
-    varSelRF, cluster, ADPclust, ks, fields, doParallel, plyr, igraph, densityClust
+    varSelRF, cluster, ADPclust, ks, fields, doParallel, plyr, igraph, densityClust, RhpcBLASctl
