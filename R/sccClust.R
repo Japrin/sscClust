@@ -1012,16 +1012,18 @@ ssc.run <- function(obj, assay.name="exprs",
                          iCor.niter = iCor.niter,
                          iCor.method = iCor.method,
                          ncore = ncore,
+                         dim.name = sprintf("de.%s",method.reduction),
                          method.vgene="refine.de",reuse = reuse)
             loginfo(sprintf("clust using DE genes ... (%s)",rid))
             obj <- ssc.clust(obj, assay.name=assay.name,
-                             method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
+                             method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("de.%s.tsne",method.reduction) else sprintf("de.%s",method.reduction),
+                             ##method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
                              method=method.clust, k.batch=k.batch,
                              out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s.refineG",out.prefix,rid),
                              method.vgene="refine.de", parlist = parlist.rid, ...)
             if(!is.null(out.prefix) && !is.null(.xlabel)){
               ssc.plot.tsne(obj,columns = c(.xlabel),
-                            reduced.name = if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
+                            reduced.name = if(method.clust %in% c("adpclust","dpclust")) sprintf("de.%s.tsne",method.reduction) else sprintf("de.%s",method.reduction),
                             out.prefix = sprintf("%s.%s.refineG",out.prefix,rid),
                             base_aspect_ratio = 1.4)
             }
@@ -1067,11 +1069,9 @@ ssc.run <- function(obj, assay.name="exprs",
                                  gid.mapping = rowData(obj)[,"display.name"])
       metadata(obj)$ssc[["de.res"]][["L1C1"]] <- de.out
       metadata(obj)$ssc[["variable.gene"]][["de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
-      obj <- ssc.reduceDim(obj,assay.name=assay.name,
-                           method=method.reduction,
-                           pca.npc = pca.npc,
-                           iCor.niter = iCor.niter,
-                           method.vgene="de",dim.name = sprintf("%s.de",method.reduction))
+      ### for general visualization
+      obj <- ssc.reduceDim(obj,assay.name=assay.name, method="tsne",
+                           method.vgene="de",dim.name = sprintf("vis.tsne"))
     }
   }else{
     obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name)
