@@ -1021,6 +1021,12 @@ ssc.run <- function(obj, assay.name="exprs",
                              method=method.clust, k.batch=k.batch,
                              out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s.refineG",out.prefix,rid),
                              method.vgene="refine.de", parlist = parlist.rid, ...)
+            .xlabel <- NULL
+            if(method.clust %in% c("adpclust","dpclust")){
+              .xlabel <- sprintf("de.%s.tsne.%s.kauto",method.reduction,method.clust)
+            }else if(method.clust=="SNN"){
+              .xlabel <- sprintf("de.%s.%s.kauto",method.reduction,method.clust)
+            }
             if(!is.null(out.prefix) && !is.null(.xlabel)){
               ssc.plot.tsne(obj,columns = c(.xlabel),
                             reduced.name = if(method.clust %in% c("adpclust","dpclust")) sprintf("de.%s.tsne",method.reduction) else sprintf("de.%s",method.reduction),
