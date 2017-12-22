@@ -7,7 +7,7 @@
 ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
   method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10,
   SNN.method = "eigen", dpclust.rho = NULL, dpclust.delta = NULL,
-  parlist = NULL, out.prefix = NULL)
+  parlist = NULL, out.prefix = NULL, seed = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -34,6 +34,8 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{parlist}{list; if not NULL, use th parameters in it. (default: NULL)}
 
 \item{out.prefix}{character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)}
+
+\item{seed}{integer; seed of random number generation. (default: NULL)}
 }
 \value{
 an object of \code{SingleCellExperiment} class with cluster labels added.

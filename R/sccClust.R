@@ -543,6 +543,7 @@ ssc.displayName2id <- function(obj,display.name)
 #' @param iCor.method character; method to calculate correlation between samples,
 #' should be one of "spearman" and "pearson". (default "spearman")
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
+#' @param seed integer; seed of random number generation. (default: NULL)
 #' @param ncore integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)
 #' @details If the reduction method is "pca", the function will call prcomp() and estimate the number of top PC should be used
 #' in downstream analysis using and "elbow" based method, then the samples coordinates in the space spaned by the top PC would
@@ -566,7 +567,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
                           autoTSNE=T,
                           dim.name=NULL,
                           iCor.niter=1,iCor.method="spearman",
-                          reuse=F,ncore=NULL)
+                          reuse=F,ncore=NULL,seed=NULL)
 {
   row.sd <- apply(assay(obj,assay.name),1,sd)
   col.sd <- apply(assay(obj,assay.name),2,sd)
@@ -582,6 +583,14 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
   if(is.null(dim.name)){ dim.name <- method }
   vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
   if(!reuse || !(dim.name %in% reducedDimNames(obj)) ){
+    if(is.null(seed)){
+      myseed <- as.integer(Sys.time())
+    }else{
+      myseed <- seed
+    }
+    loginfo(sprintf("set.seed(%s) for ssc.reduceDim\n",as.character(myseed)))
+    set.seed(myseed)
+
     if(method=="pca"){
         pca.res <- prcomp(t(assay(obj[vgene,],assay.name)))
         ### find elbow point and get number of components to be used
@@ -636,6 +645,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @param dpclust.delta numberic; cuttoff of delta, if it is NULL, infer frome the data (default: NULL)
 #' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
 #' @param parlist list; if not NULL, use th parameters in it. (default: NULL)
+#' @param seed integer; seed of random number generation. (default: NULL)
 #' @details If no dimension reduction performed or method is "none", expression data of variable genes,
 #' which can be speficed by method.vgene, will be used for clustering. Otherwise, the reduced data specified by
 #' method.reduction will be used. The cluster label will stored in the colData of the object
@@ -649,7 +659,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       SNN.k=10,SNN.method="eigen",
                       dpclust.rho=NULL,dpclust.delta=NULL,
                       parlist=NULL,
-                      out.prefix=NULL)
+                      out.prefix=NULL,seed=NULL)
 {
   clust.res <- NULL
   res.list <- list()
@@ -678,6 +688,15 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     return(obj)
   }
   ### check method
+
+  ###
+  if(is.null(seed)){
+    myseed <- as.integer(Sys.time())
+  }else{
+    myseed <- seed
+  }
+  loginfo(sprintf("set.seed(%s) for ssc.clust\n",as.character(myseed)))
+  set.seed(myseed)
 
   for(k in k.batch){
     if(method=="kmeans"){
@@ -899,6 +918,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' `parlist`. (default: NULL)
 #' @param ncore integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
+#' @param seed integer; seed of random number generation. (default: NULL)
 #' @param ... parameters pass to clustering methods
 #' @details run the pipeline of variable gene identification, dimension reduction, clustering.
 #' @seealso \code{\link{ssc.variableGene}} for variable genes' identification, \code{\link{ssc.reduceDim}}
@@ -925,6 +945,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     parfile=NULL,
                     reuse=F,
                     ncore=NULL,
+                    seed=NULL,
                     do.DE=F,...)
 {
   ### some checking
@@ -963,12 +984,14 @@ ssc.run <- function(obj, assay.name="exprs",
                            iCor.method = iCor.method,
                            method.vgene=method.vgene,
                            ncore = ncore,
+                           seed = seed,
                            reuse = reuse)
       loginfo(sprintf("clustering ... (%s)",rid))
       obj <- ssc.clust(obj, assay.name=assay.name,
                        method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
                        method=method.clust, k.batch=k.batch,
                        out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,rid),
+                       seed = seed,
                        method.vgene=method.vgene, parlist = parlist.rid, ...)
 
       .xlabel <- NULL
@@ -1012,6 +1035,7 @@ ssc.run <- function(obj, assay.name="exprs",
                          iCor.niter = iCor.niter,
                          iCor.method = iCor.method,
                          ncore = ncore,
+                         seed = seed,
                          dim.name = sprintf("de.%s",method.reduction),
                          method.vgene="refine.de",reuse = reuse)
             loginfo(sprintf("clust using DE genes ... (%s)",rid))
@@ -1019,6 +1043,7 @@ ssc.run <- function(obj, assay.name="exprs",
                              method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("de.%s.tsne",method.reduction) else sprintf("de.%s",method.reduction),
                              ##method.reduction=if(method.clust %in% c("adpclust","dpclust")) sprintf("%s.tsne",method.reduction) else method.reduction,
                              method=method.clust, k.batch=k.batch,
+                             seed = seed,
                              out.prefix = if(is.null(out.prefix)) NULL else sprintf("%s.%s.refineG",out.prefix,rid),
                              method.vgene="refine.de", parlist = parlist.rid, ...)
 
