@@ -393,6 +393,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
 #' @param use.proj logical; whether use the projected data for classification. (default: T)
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
+#' @param seed integer; seed of random number generation. (default: NULL)
 #' @details The function first subsmaple the samples to the specified fraction (such 40%), and perform clustering. The clustering will
 #' make labels for the subsampled samples. Using the labels, original data or projected data via the method specified in
 #' "method.reduction" will be used for trainning a classifier. Then the classifier will predict the labels of the samples not subsampled,
@@ -410,7 +411,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
                                                pca.npc=NULL,
                                                iCor.niter=1,
                                                use.proj=T,
-                                               k.batch=2:6)
+                                               k.batch=2:6,seed=NULL)
 {
   #### subsampling
   n.sub <- floor(ncol(obj)*frac)
@@ -432,7 +433,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
   }else if(method.reduction %in% c("pca","iCor")){
     obj.train <- ssc.reduceDim(obj.train,method=method.reduction,
                               method.vgene=method.vgene,
-                              pca.npc=pca.npc,autoTSNE = T,
+                              pca.npc=pca.npc,autoTSNE = T,seed = seed,
                               iCor.niter=iCor.niter,iCor.method="spearman")
     if(!all(rownames(obj.train)==rownames(obj.pred))){
       stop("The genes of obj.train and obj.pred are different!")
@@ -463,7 +464,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
   }
   #### clustering
   obj.train <- ssc.clust(obj.train, method.reduction=method.reduction,
-                         method=method.clust, k.batch=k.batch)
+                         method=method.clust, k.batch=k.batch,seed = seed)
   colData(obj)[,"isTrainSet"] <- F
   colData(obj)[colnames(obj.train),"isTrainSet"] <- T
   #### data for classification
@@ -828,13 +829,68 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
   }
 }
 
+
+#' Plot violin
+#' @param obj object of \code{singleCellExperiment} class
+#' @param assay.name character; which assay (default: "exprs")
+#' @param gene character; genes to be showed. (default: NULL)
+#' @param columns character; columns in colData(obj) to be showd. (default: NULL)
+#' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
+#' @param out.prefix character; output prefix. (default: NULL)
+#' @param p.ncol integer; number of columns in the figure layout. (default: 3)
+#' @param base_aspect_ratio numeric; base_aspect_ratio, used for plotting metadata. (default 1.1)
+#' @importFrom SingleCellExperiment colData
+#' @importFrom ggplot2 ggplot aes geom_violin scale_fill_gradient2 theme_bw theme aes_string facet_grid element_text
+#' @importFrom cowplot save_plot plot_grid
+#' @importFrom data.table melt
+#' @details If `gene` is not NULL, violin of the genes' expression will be plot; if columns in not
+#' NULL, colData of obj with names in `columns` will be plot in violin.
+#' @export
+ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
+                            group.var="majorCluster",
+                            out.prefix=NULL,p.ncol=1,base_aspect_ratio=1.1)
+{
+  requireNamespace("ggplot2")
+  requireNamespace("data.table")
+  gene <- ssc.displayName2id(obj,display.name = gene)
+  dat.plot <- t(assay(obj,assay.name)[gene,])
+  colnames(dat.plot) <- ssc.id2displayName(obj,colnames(dat.plot))
+  dat.plot.df <- data.table::data.table(sample=rownames(dat.plot),stringsAsFactors = F)
+  dat.plot.df[,group.var] <- colData(obj)[,group.var]
+  dat.plot.df <- cbind(dat.plot.df,dat.plot)
+  dat.plot.df <- data.table::melt(dat.plot.df,id.vars=c("sample",group.var),
+                                  variable.name="gene",value.name=assay.name)
+  dat.plot.df.grpMean <- dat.plot.df[,lapply(.SD,mean),by=c("gene",group.var),.SDcols=assay.name]
+  colnames(dat.plot.df.grpMean) <- c("gene",group.var,"meanExp")
+  dat.plot.df <- dat.plot.df.grpMean[dat.plot.df,,on=c("gene",group.var)]
+  dat.plot.df[meanExp<0,meanExp:=0,]
+  dat.plot.df[meanExp>15,meanExp:=15,]
+  head(dat.plot.df)
+  p <- ggplot(dat.plot.df, aes_string(group.var, assay.name)) +
+    geom_violin(scale = "width",aes(fill=meanExp),color=NA,show.legend = T) +
+    scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = 7.5,
+                        limits=c(0,15)) +
+    theme_bw(base_size = 12) +
+    facet_grid(gene ~ .,switch = "y",scales = "free_y") +
+    theme(axis.text.x = element_text(angle = 60, hjust = 1),strip.placement = "inside")
+  if(!is.null(out.prefix)){
+    cowplot::save_plot(sprintf("%s.violin.gene.pdf",out.prefix),p,
+                       ncol = p.ncol,
+                       base_aspect_ratio=base_aspect_ratio)
+  }else{
+    print(p)
+  }
+}
+
+
 #' Plot pca result, such as scree plot.
 #' @param obj object of \code{singleCellExperiment} class
 #' @param out.prefix character; output prefix. (default: NULL)
 #' @param p.ncol integer; number of columns in the figure layout. (default: 2)
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw
 #' @export
-ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2){
+ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2)
+{
   requireNamespace("ggplot2")
   eigenv <- metadata(obj)$ssc$pca.res$eigenv.prop
   dat.plot.eigenv <- data.frame(PC=seq_along(eigenv),

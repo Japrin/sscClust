@@ -7,7 +7,7 @@
 ssc.clustSubsamplingClassification(obj, assay.name = "exprs", frac = 0.4,
   method.vgene = "sd", method.reduction = "iCor", method.clust = "kmeans",
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1, use.proj = T,
-  k.batch = 2:6)
+  k.batch = 2:6, seed = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -32,6 +32,8 @@ ssc.clustSubsamplingClassification(obj, assay.name = "exprs", frac = 0.4,
 \item{use.proj}{logical; whether use the projected data for classification. (default: T)}
 
 \item{k.batch}{integer; number of clusters to be evaluated. (default: 2:6)}
+
+\item{seed}{integer; seed of random number generation. (default: NULL)}
 }
 \value{
 an object of \code{SingleCellExperiment} class with cluster labels added.
