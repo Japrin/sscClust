@@ -47,13 +47,13 @@ ssc.build <- function(x,display.name=NULL)
     metadata(obj)$ssc <- list()
   }else if(class(x) %in% c("matrix","data.frame")){
     obj <- SingleCellExperiment(assays = list(exprs = as.matrix(x)))
-    if(!is.null(display.name)){
-      f.na <- is.na(display.name)
-      display.name[f.na] <- row.names(obj)[f.na]
-      rowData(obj)[,"display.name"] <- display.name
-    }else{
-      rowData(obj)[,"display.name"] <- row.names(obj)
-    }
+  }
+  if(!is.null(display.name)){
+    f.na <- is.na(display.name)
+    display.name[f.na] <- row.names(obj)[f.na]
+    rowData(obj)[,"display.name"] <- display.name
+  }else{
+    rowData(obj)[,"display.name"] <- row.names(obj)
   }
   return(obj)
 }
@@ -236,7 +236,9 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @importFrom ADPclust adpclust
 #' @importFrom densityClust densityClust findClusters
 #' @importFrom scran buildSNNGraph
-#' @importFrom igraph cluster_fast_greedy cluster_leading_eigen E
+#' @importFrom igraph cluster_fast_greedy cluster_leading_eigen cluster_infomap
+#' cluster_label_prop cluster_louvain cluster_optimal cluster_spinglass cluster_walktrap
+#' cluster_edge_betweenness
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
@@ -245,7 +247,8 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
 #' @param SNN.k integer; number of shared NN. (default: 10)
-#' @param SNN.method character; cluster method applied on SNN， one of "greedy", "eigen". (default: "eigen")
+#' @param SNN.method character; cluster method applied on SNN， one of "greedy", "eigen", "infomap",
+#' "prop", "louvain", "optimal", "spinglass", "walktrap", "betweenness". (default: "eigen")
 #' @param dpclust.rho numberic; cuttoff of rho, if it is NULL, infer frome the data (default: NULL)
 #' @param dpclust.delta numberic; cuttoff of delta, if it is NULL, infer frome the data (default: NULL)
 #' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
@@ -365,8 +368,22 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       if(SNN.method=="greedy"){
         clust.res <- igraph::cluster_fast_greedy(snn.gr)
       }else if(SNN.method=="eigen"){
-        ##clust.res <- igraph::cluster_leading_eigen(snn.gr)
-        clust.res <- igraph::cluster_leading_eigen(snn.gr,weights = igraph::E(snn.gr)$weight)
+        clust.res <- igraph::cluster_leading_eigen(snn.gr)
+        ##clust.res <- igraph::cluster_leading_eigen(snn.gr,weights = igraph::E(snn.gr)$weight)
+      }else if(SNN.method=="infomap"){
+        clust.res <- igraph::cluster_infomap(snn.gr)
+      }else if(SNN.method=="prop"){
+        clust.res <- igraph::cluster_label_prop(snn.gr)
+      }else if(SNN.method=="louvain"){
+        clust.res <- igraph::cluster_louvain(snn.gr)
+      }else if(SNN.method=="optimal"){
+        clust.res <- igraph::cluster_optimal(snn.gr)
+      }else if(SNN.method=="spinglass"){
+        clust.res <- igraph::cluster_spinglass(snn.gr)
+      }else if(SNN.method=="walktrap"){
+        clust.res <- igraph::cluster_walktrap(snn.gr)
+      }else if(SNN.method=="betweenness"){
+        clust.res <- igraph::cluster_edge_betweenness(snn.gr)
       }
       k <- "auto"
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)

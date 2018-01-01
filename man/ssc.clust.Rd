@@ -25,7 +25,8 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 
 \item{SNN.k}{integer; number of shared NN. (default: 10)}
 
-\item{SNN.method}{character; cluster method applied on SNN， one of "greedy", "eigen". (default: "eigen")}
+\item{SNN.method}{character; cluster method applied on SNN， one of "greedy", "eigen", "infomap",
+"prop", "louvain", "optimal", "spinglass", "walktrap", "betweenness". (default: "eigen")}
 
 \item{dpclust.rho}{numberic; cuttoff of rho, if it is NULL, infer frome the data (default: NULL)}
 
