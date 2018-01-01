@@ -827,6 +827,9 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
       ### gene symbol?
       gene <- ssc.displayName2id(obj,display.name = gene)
     }
+    if(is.null(names(gene))){
+      names(gene) <- gene
+    }
     p <- ggGeneOnTSNE(assay(obj,assay.name),
                      dat.map,
                      ##reducedDim(obj,reduced.name)[,reduced.dim],
