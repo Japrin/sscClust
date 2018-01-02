@@ -19,6 +19,8 @@ ssc.variableGene(obj, method = "sd", sd.n = 1500, mean.thre = 0.1,
 \item{assay.name}{which assay to be used (default "exprs")}
 
 \item{reuse}{logical; don't calculate if the query is already available. (default: F)}
+
+\item{out.prefix}{character; if not NULL, output prefix. (default: F)}
 }
 \value{
 an object of \code{SingleCellExperiment} class

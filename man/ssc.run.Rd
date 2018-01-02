@@ -5,7 +5,7 @@
 \title{Wrapper for running all the pipeline}
 \usage{
 ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
-  method.reduction = "iCor", method.clust = "kmeans",
+  mean.thre = 0.1, method.reduction = "iCor", method.clust = "kmeans",
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
   iCor.method = "spearman", subsampling = F, sub.frac = 0.4,
   sub.use.proj = T, k.batch = 2:6, refineGene = F, de.n = 1500,
@@ -20,6 +20,8 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
 \item{method.vgene}{character; variable gene identification method used. (default: "sd")}
 
 \item{sd.n}{integer; top number of genes as variable genes (default 1500)}
+
+\item{mean.thre}{numeric; threshold for mean, used in trendVar method (default 0.1)}
 
 \item{method.reduction}{character; which dimention reduction method to be used, should be one of
 "iCor", "pca" and "none". (default: "iCor")}

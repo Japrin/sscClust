@@ -48,12 +48,14 @@ ssc.build <- function(x,display.name=NULL)
   }else if(class(x) %in% c("matrix","data.frame")){
     obj <- SingleCellExperiment(assays = list(exprs = as.matrix(x)))
   }
-  if(!is.null(display.name)){
-    f.na <- is.na(display.name)
-    display.name[f.na] <- row.names(obj)[f.na]
-    rowData(obj)[,"display.name"] <- display.name
-  }else{
-    rowData(obj)[,"display.name"] <- row.names(obj)
+  if(is.null(rowData(obj)[["display.name"]])){
+    if(!is.null(display.name)){
+      f.na <- is.na(display.name)
+      display.name[f.na] <- row.names(obj)[f.na]
+      rowData(obj)[,"display.name"] <- display.name
+    }else{
+      rowData(obj)[,"display.name"] <- row.names(obj)
+    }
   }
   return(obj)
 }
@@ -70,12 +72,14 @@ ssc.build <- function(x,display.name=NULL)
 #' @param mean.thre numeric; threshold for mean, used in trendVar method (default 0.1)
 #' @param assay.name which assay to be used (default "exprs")
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
+#' @param out.prefix character; if not NULL, output prefix. (default: F)
 #' @details Method "sd": calculate the standard deviation of each gene and sort decreasingly, the top `sd.n` genes are the
 #' variable genes. Method "trendVar": fit the trend between variance and mean, and decompose each gene's variance into
 #' 'tech' part(fitted value) and 'bio' part (residual value), then select genes according FDR and mean threshold.
 #' @return an object of \code{SingleCellExperiment} class
 #' @export
-ssc.variableGene <- function(obj,method="sd",sd.n=1500,mean.thre=0.1,assay.name="exprs",reuse=F,out.prefix=NULL)
+ssc.variableGene <- function(obj,method="sd",sd.n=1500,mean.thre=0.1,assay.name="exprs",
+                             reuse=F,out.prefix=NULL)
 {
   if(method=="sd")
   {
@@ -402,7 +406,13 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       out.prefix = sprintf("%s.dpclust",out.prefix),base_aspect_ratio = 1.4)
       }
     }else if(method=="SNN"){
-      snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
+      if(!is.null(metadata(obj)$ssc$clust.res[["snn.gr"]])){
+        snn.gr <- metadata(obj)$ssc$clust.res[["snn.gr"]]
+      }else{
+        loginfo(sprintf("buildSNNGraph with k=%d\n",SNN.k))
+        snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
+      }
+      loginfo(sprintf("cluster using method %s begin\n",SNN.method))
       if(SNN.method=="greedy"){
         clust.res <- igraph::cluster_fast_greedy(snn.gr)
       }else if(SNN.method=="eigen"){
@@ -423,6 +433,8 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       }else if(SNN.method=="betweenness"){
         clust.res <- igraph::cluster_edge_betweenness(snn.gr)
       }
+      metadata(obj)$ssc$clust.res[["snn.gr"]] <- snn.gr
+      loginfo(sprintf("cluster using method %s finished\n",SNN.method))
       k <- "auto"
       colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)
     }
@@ -558,6 +570,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
+#' @param mean.thre numeric; threshold for mean, used in trendVar method (default 0.1)
 #' @param sd.n integer; top number of genes as variable genes (default 1500)
 #' @param de.n integer; number of differential genes used for refined geneset for another run of clustering (default 1500)
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
@@ -591,6 +604,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 ssc.run <- function(obj, assay.name="exprs",
                     method.vgene="sd",
                     sd.n=1500,
+                    mean.thre=0.1,
                     method.reduction="iCor",
                     method.clust="kmeans",
                     method.classify="knn",
@@ -638,7 +652,9 @@ ssc.run <- function(obj, assay.name="exprs",
         parlist.rid <- NULL
       }
       loginfo(sprintf("select variable genes ... (%s)",rid))
-      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name,reuse = reuse,out.prefix = sprintf("%s.%s",out.prefix,rid))
+      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,mean.thre = mean.thre,
+                              assay.name=assay.name,reuse = reuse,
+                              out.prefix = sprintf("%s.%s",out.prefix,rid))
       loginfo(sprintf("reduce dimensions ... (%s)",rid))
       obj <- ssc.reduceDim(obj,assay.name=assay.name,
                            method=method.reduction,
@@ -736,6 +752,8 @@ ssc.run <- function(obj, assay.name="exprs",
             f.cls <- colData(obj)[,clustLabel]==cls
             obj.cls <- obj[,f.cls]
             cls.rid <- sprintf("%s.L%s%s",rid,level+1,cls)
+            ### clear the metadata of obj.cls
+            obj.cls <- ssc.build(obj.cls)
             if(ncol(obj.cls)>10)
             {
               nsamples <- ncol(obj.cls)
