@@ -4,15 +4,17 @@
 \alias{ssc.variableGene}
 \title{Identify variable genes}
 \usage{
-ssc.variableGene(obj, method = "sd", sd.n = 1500, assay.name = "exprs",
-  reuse = F)
+ssc.variableGene(obj, method = "sd", sd.n = 1500, mean.thre = 0.1,
+  assay.name = "exprs", reuse = F, out.prefix = NULL)
 }
 \arguments{
 \item{obj}{object of SingleCellExperiment}
 
-\item{method}{method to be used, can be one of "sd" (default),}
+\item{method}{method to be used, can be one of "sd", mean.sd, trendVar. (default: "sd")}
 
 \item{sd.n}{top number of genes (default 1500)}
+
+\item{mean.thre}{numeric; threshold for mean, used in trendVar method (default 0.1)}
 
 \item{assay.name}{which assay to be used (default "exprs")}
 
@@ -25,6 +27,7 @@ an object of \code{SingleCellExperiment} class
 Identify variable genes which will be used in downstream analysis. Multiple methods are available.
 }
 \details{
-Method "sd", calculate the standard deviation of each gene and sort decreasingly, the top `sd.n` genes are the
-variable genes.
+Method "sd": calculate the standard deviation of each gene and sort decreasingly, the top `sd.n` genes are the
+variable genes. Method "trendVar": fit the trend between variance and mean, and decompose each gene's variance into
+'tech' part(fitted value) and 'bio' part (residual value), then select genes according FDR and mean threshold.
 }

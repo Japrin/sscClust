@@ -63,16 +63,19 @@ ssc.build <- function(x,display.name=NULL)
 #' Identify variable genes which will be used in downstream analysis. Multiple methods are available.
 #'
 #' @importFrom stats sd
+#' @importFrom scran trendVar decomposeVar
 #' @param obj object of SingleCellExperiment
-#' @param method method to be used, can be one of "sd" (default),
+#' @param method method to be used, can be one of "sd", mean.sd, trendVar. (default: "sd")
 #' @param sd.n top number of genes (default 1500)
+#' @param mean.thre numeric; threshold for mean, used in trendVar method (default 0.1)
 #' @param assay.name which assay to be used (default "exprs")
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
-#' @details Method "sd", calculate the standard deviation of each gene and sort decreasingly, the top `sd.n` genes are the
-#' variable genes.
+#' @details Method "sd": calculate the standard deviation of each gene and sort decreasingly, the top `sd.n` genes are the
+#' variable genes. Method "trendVar": fit the trend between variance and mean, and decompose each gene's variance into
+#' 'tech' part(fitted value) and 'bio' part (residual value), then select genes according FDR and mean threshold.
 #' @return an object of \code{SingleCellExperiment} class
 #' @export
-ssc.variableGene <- function(obj,method="sd",sd.n=1500,assay.name="exprs",reuse=F)
+ssc.variableGene <- function(obj,method="sd",sd.n=1500,mean.thre=0.1,assay.name="exprs",reuse=F,out.prefix=NULL)
 {
   if(method=="sd")
   {
@@ -89,6 +92,41 @@ ssc.variableGene <- function(obj,method="sd",sd.n=1500,assay.name="exprs",reuse=
       info.gene.sd <- sort(info.gene.sd,decreasing = T)
       metadata(obj)$ssc[["variable.gene"]][["mean.sd"]] <- names(head(info.gene.sd,n=sd.n))
     }
+  }else if(method=="trendVar")
+  {
+    trendVar.min.mean <- 0.1
+    var.fit <- scran::trendVar(obj, parametric=TRUE, span=0.3, min.mean=trendVar.min.mean, use.spikes=F, assay.type=assay.name)
+    var.out <- scran::decomposeVar(obj, var.fit, assay.type=assay.name)
+    var.out <- var.out[order(var.out$FDR,-var.out$bio/var.out$total),]
+    f.var <- var.out$FDR<0.001 & var.out$mean>mean.thre
+    metadata(obj)$ssc[["variable.gene"]][["trendVar"]] <- rownames(var.out)[f.var]
+    #head(var.out)
+    ### debug
+    row.sd <- apply(assay(obj,assay.name),1,sd)
+    sd.thre <- sort(row.sd,decreasing = T)[min(sd.n,length(row.sd))]
+    print("debug info (ssc.variableGene)")
+    list.a <- names(row.sd)[row.sd>=sd.thre]
+    list.b <- rownames(var.out)[f.var]
+    print(length(list.a))
+    print(length(list.b))
+    print(length(intersect(list.a,list.b)))
+    if(!is.null(out.prefix) && file.exists(dirname(out.prefix))){
+      pdf(sprintf("%s.varGene.%s.pdf",out.prefix,method),width = 10,height = 4)
+      opar=par(mfcol=c(1,2))
+      plot(var.out$mean, var.out$total,pch=16,cex=0.3, xlab="Mean log-expression",
+           ylab="Variance of log-expression")
+      points(var.out$mean[f.var],
+             var.out$total[f.var], col="red", pch=16,cex=0.3)
+      curve(var.fit$trend(x), col="dodgerblue", add=TRUE, lwd=2)
+      plot(var.out$mean, var.out$total,pch=16,cex=0.3, xlab="Mean log-expression",
+           ylab="Variance of log-expression")
+      points(var.out[names(row.sd)[row.sd>=sd.thre],"mean"],
+             var.out[names(row.sd)[row.sd>=sd.thre],"total"], col="red", pch=16,cex=0.3)
+      curve(var.fit$trend(x), col="dodgerblue", add=TRUE, lwd=2)
+      par(opar)
+      dev.off()
+    }
+    ### end of debug
   }
   return(obj)
 }
