@@ -8,9 +8,9 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
   method.reduction = "iCor", method.clust = "kmeans",
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
   iCor.method = "spearman", subsampling = F, sub.frac = 0.4,
-  sub.use.proj = T, k.batch = 2:6, refineGene = F, nIter = 1,
-  out.prefix = NULL, parfile = NULL, reuse = F, ncore = NULL,
-  seed = NULL, do.DE = F, ...)
+  sub.use.proj = T, k.batch = 2:6, refineGene = F, de.n = 1500,
+  nIter = 1, out.prefix = NULL, parfile = NULL, reuse = F,
+  ncore = NULL, seed = NULL, do.DE = F, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -19,7 +19,7 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
 
 \item{method.vgene}{character; variable gene identification method used. (default: "sd")}
 
-\item{sd.n}{top number of genes (default 1500)}
+\item{sd.n}{integer; top number of genes as variable genes (default 1500)}
 
 \item{method.reduction}{character; which dimention reduction method to be used, should be one of
 "iCor", "pca" and "none". (default: "iCor")}
@@ -44,6 +44,8 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
 
 \item{refineGene}{logical; whether perform second round demension reduction and clustering pipeline using the differential
 genes found by the first round cluster result. (default: F)}
+
+\item{de.n}{integer; number of differential genes used for refined geneset for another run of clustering (default 1500)}
 
 \item{nIter}{integer; number of iterative clustering in sub-cluster. (default: 1)}
 
