@@ -558,7 +558,8 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
-#' @param sd.n top number of genes (default 1500)
+#' @param sd.n integer; top number of genes as variable genes (default 1500)
+#' @param de.n integer; number of differential genes used for refined geneset for another run of clustering (default 1500)
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
 #' "iCor", "pca" and "none". (default: "iCor")
 #' @param method.clust character; clustering method to be used, should be one of "kmeans", "hclust", "SNN" and "adpclust". (default: "kmeans")
@@ -601,6 +602,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     sub.use.proj=T,
                     k.batch=2:6,
                     refineGene=F,
+                    de.n=1500,
                     nIter=1,
                     out.prefix=NULL,
                     parfile=NULL,
@@ -636,7 +638,7 @@ ssc.run <- function(obj, assay.name="exprs",
         parlist.rid <- NULL
       }
       loginfo(sprintf("select variable genes ... (%s)",rid))
-      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name,reuse = reuse)
+      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,assay.name=assay.name,reuse = reuse,out.prefix = sprintf("%s.%s",out.prefix,rid))
       loginfo(sprintf("reduce dimensions ... (%s)",rid))
       obj <- ssc.reduceDim(obj,assay.name=assay.name,
                            method=method.reduction,
@@ -688,7 +690,7 @@ ssc.run <- function(obj, assay.name="exprs",
                                      gid.mapping = rowData(obj)[,"display.name"])
           if(!is.null(de.out) && nrow(de.out$aov.out.sig)>30){
             metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
-            metadata(obj)$ssc[["variable.gene"]][["refine.de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
+            metadata(obj)$ssc[["variable.gene"]][["refine.de"]] <- head(de.out$aov.out.sig$geneID,n=de.n)
             loginfo(sprintf("reduce dimensions using DE genes ... (%s)",rid))
             obj <- ssc.reduceDim(obj,assay.name=assay.name,
                          method=method.reduction,
