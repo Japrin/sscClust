@@ -289,32 +289,49 @@ run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30){
 #' @details Run SC3 clustering pipeline
 #' @return an object of \code{SingleCellExperiment} class with cluster labels and other info added.
 #' @export
-run.SC3 <- function(obj,assay.name="exprs",out.prefix,n.cores=8,ks=2:10,verbose=F)
+run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,sc3.biology=T,verbose=F)
 {
   rownames.old <- rownames(obj)
   #### current SC3 need feature_symbol as rownames
   if(!"feature_symbol" %in% names(rowData(obj))){ rowData(obj)$feature_symbol <- rownames.old }
   rownames(obj) <- rowData(obj)$feature_symbol
   #### current SC3 use logcounts as dataset
-  if(!"logcounts" %in% assayNames(obj)){ assay(obj,"logcounts") <- assay(obj,assay.name) }
+  psu.logcounts <- F
+  if(!"logcounts" %in% assayNames(obj)){
+    assay(obj,"logcounts") <- assay(obj,assay.name)
+    psu.logcounts <- T
+  }
+  #### current SC3 usde counts also
+  psu.counts <- F
+  if(!"counts" %in% assayNames(obj)){
+    assay(obj,"counts") <- assay(obj,assay.name)
+    psu.counts <- T
+  }
   #### run
-  obj <- sc3(obj, ks = ks, biology = TRUE, n_cores = n.cores,svm_max = 50000000)
-  for(k in ks)
+  obj <- sc3(obj, ks = ks, biology = sc3.biology, n_cores = n.cores,svm_max = 50000000,gene_filter = F)
+  if(!is.null(out.prefix))
   {
-    png(sprintf("%s.consensus.k%d.png",out.prefix,k),width = 600,height = 480)
-    sc3_plot_consensus(obj, k = k,  show_pdata = c( "sampleType", sprintf("sc3_%d_clusters",k),
-                                                    sprintf("sc3_%s_log2_outlier_score",k)))
-    dev.off()
-    pdf(sprintf("%s.silhouette.k%d.pdf",out.prefix,k),width = 6,height = 6)
-    sc3_plot_silhouette(obj, k = k)
-    dev.off()
-    p <- sc3_plot_cluster_stability(obj, k = k)
-    ggsave(sprintf("%s.stability.k%d.pdf",out.prefix,k),width = 4,height = 3)
-    sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k)),
-                     show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
+    for(k in ks)
+    {
+      png(sprintf("%s.consensus.k%d.png",out.prefix,k),width = 600,height = 480)
+      sc3_plot_consensus(obj, k = k,  show_pdata = c( "sampleType", sprintf("sc3_%d_clusters",k),
+                                                      sprintf("sc3_%s_log2_outlier_score",k)))
+      dev.off()
+      pdf(sprintf("%s.silhouette.k%d.pdf",out.prefix,k),width = 6,height = 6)
+      sc3_plot_silhouette(obj, k = k)
+      dev.off()
+      p <- sc3_plot_cluster_stability(obj, k = k)
+      ggsave(sprintf("%s.stability.k%d.pdf",out.prefix,k),width = 4,height = 3)
+      sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k)),
+                       show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
+    }
+    if(verbose){ save(obj,file=sprintf("%s.verbose.sce.RData",out.prefix)) }
   }
   rownames(obj) <- rownames.old
-  if(verbose){ save(obj,file=sprintf("%s.verbose.sce.RData",out.prefix)) }
+  #### current SC3 use logcounts as dataset
+  if(psu.logcounts){ assay(obj,"logcounts") <- NULL }
+  #### current SC3 usde counts also
+  if(psu.counts){ assay(obj,"counts") <- NULL }
   return(obj)
 }
 

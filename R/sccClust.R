@@ -324,7 +324,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
   }else{
     dat.transformed <- reducedDim(obj,method.reduction)
   }
-  if(is.null(dat.transformed)){
+  if(is.null(dat.transformed) && method!="SC3"){
     warning("dat.transformed is null !!")
     metadata(obj)$ssc$clust.res[[method]] <- NULL
     if(method %in% c("adpclust","dpclust","SNN")){
@@ -445,8 +445,11 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     }
   }else{
     vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
-    obj.tmp <- run.SC3(obj[vgene,],out.prefix,n.cores = ncore,ks=k.batch)
+    obj.tmp <- run.SC3(obj[vgene,],assay.name = assay.name,out.prefix=out.prefix,n.cores = ncore,ks=k.batch)
     colData(obj) <- colData(obj.tmp)
+    metadata(obj)$sc3 <- metadata(obj.tmp)$sc3
+    ## metadata(obj)$sc3$transformations$spearman_laplacian
+    res.list[["sc3.biology"]] <- rowData(obj.tmp)[,grepl("^(sc3_|display.name|feature_symbol)",names(rowData(obj.tmp)),perl = T),drop=F]
   }
   metadata(obj)$ssc$clust.res[[method]] <- res.list
   return(obj)
