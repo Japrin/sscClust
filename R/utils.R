@@ -279,7 +279,7 @@ run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30){
 
 
 #' Wraper for running SC3
-#' @importFrom SC3 sc3 sc3_plot_consensus sc3_plot_silhouette sc3_plot_markers
+#' @importFrom SC3 sc3 sc3_plot_consensus sc3_plot_silhouette sc3_plot_cluster_stability sc3_plot_markers
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param out.prefix character, output prefix

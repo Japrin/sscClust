@@ -7,7 +7,7 @@
 ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
   method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10,
   SNN.method = "eigen", dpclust.rho = NULL, dpclust.delta = NULL,
-  parlist = NULL, out.prefix = NULL, seed = NULL)
+  parlist = NULL, out.prefix = NULL, seed = NULL, ncore = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -17,7 +17,7 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{method.reduction}{character; which dimention reduction method to be used, should be one of
 "iCor", "pca" and "none". (default: "iCor")}
 
-\item{method}{character; clustering method to be used, should be one of "kmeans", "hclust", "SNN" an "adpclust". (default: "kmeans")}
+\item{method}{character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "adpclust" and "SC3". (default: "kmeans")}
 
 \item{k.batch}{integer; number of clusters to be evaluated. (default: 2:6)}
 
@@ -37,6 +37,8 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{out.prefix}{character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)}
 
 \item{seed}{integer; seed of random number generation. (default: NULL)}
+
+\item{ncore}{integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)}
 }
 \value{
 an object of \code{SingleCellExperiment} class with cluster labels added.
