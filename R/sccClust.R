@@ -447,8 +447,15 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
     obj.tmp <- run.SC3(obj[vgene,],assay.name = assay.name,out.prefix=out.prefix,n.cores = ncore,ks=k.batch)
     colData(obj) <- colData(obj.tmp)
+    .cls.labbel <- grep("sc3_\\d+_clusters",names(colData(obj)),perl=T,value = T)
+    for(.cls.l in .cls.labbel){
+      colData(obj)[[.cls.l]] <- as.character(colData(obj)[[.cls.l]])
+    }
     metadata(obj)$sc3 <- metadata(obj.tmp)$sc3
-    ## metadata(obj)$sc3$transformations$spearman_laplacian
+    for(.dname in names(metadata(obj)$sc3$transformations)){
+      reducedDim(obj,sprintf("sc3.%s",.dname)) <- metadata(obj)$sc3$transformations[[.dname]]
+      reducedDim(obj,sprintf("sc3.%s.tsne",.dname)) <- run.tSNE(reducedDim(obj,sprintf("sc3.%s",.dname)),tSNE.usePCA=F,30)
+    }
     res.list[["sc3.biology"]] <- rowData(obj.tmp)[,grepl("^(sc3_|display.name|feature_symbol)",names(rowData(obj.tmp)),perl = T),drop=F]
   }
   metadata(obj)$ssc$clust.res[[method]] <- res.list
@@ -585,7 +592,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param de.n integer; number of differential genes used for refined geneset for another run of clustering (default 1500)
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
 #' "iCor", "pca" and "none". (default: "iCor")
-#' @param method.clust character; clustering method to be used, should be one of "kmeans", "hclust", "SNN" and "adpclust". (default: "kmeans")
+#' @param method.clust character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "adpclust" and "SC3. (default: "kmeans")
 #' @param method.classify character; method used for classification, one of "knn" and "RF". (default: "knn")
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
