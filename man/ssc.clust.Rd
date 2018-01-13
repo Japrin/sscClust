@@ -6,8 +6,9 @@
 \usage{
 ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
   method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10,
-  SNN.method = "eigen", dpclust.rho = NULL, dpclust.delta = NULL,
-  parlist = NULL, out.prefix = NULL, seed = NULL, ncore = NULL)
+  SNN.method = "eigen", SC3.biology = T, dpclust.rho = NULL,
+  dpclust.delta = NULL, parlist = NULL, out.prefix = NULL, seed = NULL,
+  ncore = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

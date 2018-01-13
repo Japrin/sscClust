@@ -5,7 +5,7 @@
 \title{Wraper for running SC3}
 \usage{
 run.SC3(obj, assay.name = "exprs", out.prefix = NULL, n.cores = 8,
-  ks = 2:10, sc3.biology = T, verbose = F)
+  ks = 2:10, SC3.biology = T, verbose = F)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

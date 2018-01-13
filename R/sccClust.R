@@ -308,6 +308,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       method="kmeans", k.batch=2:6,
                       method.vgene="sd",
                       SNN.k=10,SNN.method="eigen",
+                      SC3.biology=T,
                       dpclust.rho=NULL,dpclust.delta=NULL,
                       parlist=NULL,
                       out.prefix=NULL,seed=NULL,ncore=NULL)
@@ -445,7 +446,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     }
   }else{
     vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
-    obj.tmp <- run.SC3(obj[vgene,],assay.name = assay.name,out.prefix=out.prefix,n.cores = ncore,ks=k.batch)
+    obj.tmp <- run.SC3(obj[vgene,],assay.name = assay.name,out.prefix=out.prefix,n.cores = ncore,ks=k.batch,SC3.biology=SC3.biology)
     colData(obj) <- colData(obj.tmp)
     .cls.labbel <- grep("sc3_\\d+_clusters",names(colData(obj)),perl=T,value = T)
     for(.cls.l in .cls.labbel){

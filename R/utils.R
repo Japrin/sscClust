@@ -289,7 +289,7 @@ run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30){
 #' @details Run SC3 clustering pipeline
 #' @return an object of \code{SingleCellExperiment} class with cluster labels and other info added.
 #' @export
-run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,sc3.biology=T,verbose=F)
+run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3.biology=T,verbose=F)
 {
   rownames.old <- rownames(obj)
   #### current SC3 need feature_symbol as rownames
@@ -308,7 +308,7 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,sc3
     psu.counts <- T
   }
   #### run
-  obj <- sc3(obj, ks = ks, biology = sc3.biology, n_cores = n.cores,svm_max = 50000000,gene_filter = F)
+  obj <- sc3(obj, ks = ks, biology = SC3.biology, n_cores = n.cores,svm_max = 50000000,gene_filter = F)
   if(!is.null(out.prefix))
   {
     for(k in ks)
