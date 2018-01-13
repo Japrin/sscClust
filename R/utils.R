@@ -322,8 +322,10 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
       dev.off()
       p <- sc3_plot_cluster_stability(obj, k = k)
       ggsave(sprintf("%s.stability.k%d.pdf",out.prefix,k),width = 4,height = 3)
-      sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k)),
-                       show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
+      if(SC3.biology){
+        sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k)),
+                         show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
+      }
     }
     if(verbose){ save(obj,file=sprintf("%s.verbose.sce.RData",out.prefix)) }
   }
