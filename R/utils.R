@@ -285,11 +285,13 @@ run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30){
 #' @param out.prefix character, output prefix
 #' @param n.cores integer, number of cors to use. (default: 8)
 #' @param ks integer vector, number of clusters. (default: 2:10)
+#' @param SC3.biology logical, SC3 parameter, whether calcualte biology. (default: T)
+#' @param SC3.markerplot.width integer, SC3 parameter, with of the marker plot (default: 15)
 #' @param verbose logical, whether verbose output. (default: F)
 #' @details Run SC3 clustering pipeline
 #' @return an object of \code{SingleCellExperiment} class with cluster labels and other info added.
 #' @export
-run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3.biology=T,verbose=F)
+run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3.biology=T,SC3.markerplot.width=15,verbose=F)
 {
   rownames.old <- rownames(obj)
   #### current SC3 need feature_symbol as rownames
@@ -323,7 +325,7 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
       p <- sc3_plot_cluster_stability(obj, k = k)
       ggsave(sprintf("%s.stability.k%d.pdf",out.prefix,k),width = 4,height = 3)
       if(SC3.biology){
-        sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k)),
+        sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k),width=SC3.markerplot.width),
                          show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
       }
     }

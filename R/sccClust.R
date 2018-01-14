@@ -291,6 +291,8 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @param SNN.k integer; number of shared NN. (default: 10)
 #' @param SNN.method character; cluster method applied on SNN， one of "greedy", "eigen", "infomap",
 #' "prop", "louvain", "optimal", "spinglass", "walktrap", "betweenness". (default: "eigen")
+#' @param SC3.biology logical, SC3 parameter, whether calcualte biology. (default: T)
+#' @param SC3.markerplot.width integer, SC3 parameter, with of the marker plot (default: 15)
 #' @param dpclust.rho numberic; cuttoff of rho, if it is NULL, infer frome the data (default: NULL)
 #' @param dpclust.delta numberic; cuttoff of delta, if it is NULL, infer frome the data (default: NULL)
 #' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
@@ -308,7 +310,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                       method="kmeans", k.batch=2:6,
                       method.vgene="sd",
                       SNN.k=10,SNN.method="eigen",
-                      SC3.biology=T,
+                      SC3.biology=T,SC3.markerplot.width=15,
                       dpclust.rho=NULL,dpclust.delta=NULL,
                       parlist=NULL,
                       out.prefix=NULL,seed=NULL,ncore=NULL)
@@ -446,7 +448,8 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     }
   }else{
     vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
-    obj.tmp <- run.SC3(obj[vgene,],assay.name = assay.name,out.prefix=out.prefix,n.cores = ncore,ks=k.batch,SC3.biology=SC3.biology)
+    obj.tmp <- run.SC3(obj[vgene,],assay.name = assay.name,out.prefix=out.prefix,n.cores = ncore,ks=k.batch,
+                       SC3.biology=SC3.biology,SC3.markerplot.width=SC3.markerplot.width)
     colData(obj) <- colData(obj.tmp)
     .cls.labbel <- grep("sc3_\\d+_clusters",names(colData(obj)),perl=T,value = T)
     for(.cls.l in .cls.labbel){

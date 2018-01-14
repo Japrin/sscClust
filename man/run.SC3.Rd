@@ -5,7 +5,7 @@
 \title{Wraper for running SC3}
 \usage{
 run.SC3(obj, assay.name = "exprs", out.prefix = NULL, n.cores = 8,
-  ks = 2:10, SC3.biology = T, verbose = F)
+  ks = 2:10, SC3.biology = T, SC3.markerplot.width = 15, verbose = F)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -17,6 +17,10 @@ run.SC3(obj, assay.name = "exprs", out.prefix = NULL, n.cores = 8,
 \item{n.cores}{integer, number of cors to use. (default: 8)}
 
 \item{ks}{integer vector, number of clusters. (default: 2:10)}
+
+\item{SC3.biology}{logical, SC3 parameter, whether calcualte biology. (default: T)}
+
+\item{SC3.markerplot.width}{integer, SC3 parameter, with of the marker plot (default: 15)}
 
 \item{verbose}{logical, whether verbose output. (default: F)}
 }

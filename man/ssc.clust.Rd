@@ -6,9 +6,9 @@
 \usage{
 ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
   method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10,
-  SNN.method = "eigen", SC3.biology = T, dpclust.rho = NULL,
-  dpclust.delta = NULL, parlist = NULL, out.prefix = NULL, seed = NULL,
-  ncore = NULL)
+  SNN.method = "eigen", SC3.biology = T, SC3.markerplot.width = 15,
+  dpclust.rho = NULL, dpclust.delta = NULL, parlist = NULL,
+  out.prefix = NULL, seed = NULL, ncore = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -28,6 +28,10 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 
 \item{SNN.method}{character; cluster method applied on SNN， one of "greedy", "eigen", "infomap",
 "prop", "louvain", "optimal", "spinglass", "walktrap", "betweenness". (default: "eigen")}
+
+\item{SC3.biology}{logical, SC3 parameter, whether calcualte biology. (default: T)}
+
+\item{SC3.markerplot.width}{integer, SC3 parameter, with of the marker plot (default: 15)}
 
 \item{dpclust.rho}{numberic; cuttoff of rho, if it is NULL, infer frome the data (default: NULL)}
 
