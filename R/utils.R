@@ -318,22 +318,27 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
   {
     RhpcBLASctl::omp_set_num_threads(1)
     registerDoParallel(cores = n.cores)
-    no.ret <- llply(ks,function(k){
-      ###### sc3_plot_consensus is slow, not sure why
-      png(sprintf("%s.consensus.k%d.png",out.prefix,k),width = 600,height = 480)
-      sc3_plot_consensus(obj, k = k,  show_pdata = c( "sampleType", sprintf("sc3_%d_clusters",k),
-                                                      sprintf("sc3_%s_log2_outlier_score",k)))
-      dev.off()
-      pdf(sprintf("%s.silhouette.k%d.pdf",out.prefix,k),width = 6,height = 6)
-      sc3_plot_silhouette(obj, k = k)
-      dev.off()
-      p <- sc3_plot_cluster_stability(obj, k = k)
-      ggsave(sprintf("%s.stability.k%d.pdf",out.prefix,k),width = 4,height = 3)
-      if(SC3.biology){
-        sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k),width=SC3.markerplot.width),
-                         show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
-      }
-    },.progress = "none",.parallel=T)
+    tryCatch({
+      no.ret <- llply(ks,function(k){
+        ###### sc3_plot_consensus is slow, not sure why
+        png(sprintf("%s.consensus.k%d.png",out.prefix,k),width = 600,height = 480)
+        sc3_plot_consensus(obj, k = k,  show_pdata = c( "sampleType", sprintf("sc3_%d_clusters",k),
+                                                        sprintf("sc3_%s_log2_outlier_score",k)))
+        dev.off()
+        pdf(sprintf("%s.silhouette.k%d.pdf",out.prefix,k),width = 6,height = 6)
+        sc3_plot_silhouette(obj, k = k)
+        dev.off()
+        p <- sc3_plot_cluster_stability(obj, k = k)
+        ggsave(sprintf("%s.stability.k%d.pdf",out.prefix,k),width = 4,height = 3)
+        if(SC3.biology){
+          sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k),width=SC3.markerplot.width),
+                           show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
+        }
+      },.progress = "none",.parallel=T)
+    },error=function(e){
+      cat(sprintf("Error occur in llply(ks,...).\n"))
+      print(e)
+    })
     if(verbose){ save(obj,file=sprintf("%s.verbose.sce.RData",out.prefix)) }
   }
   rownames(obj) <- rownames.old
