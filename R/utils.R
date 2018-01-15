@@ -280,6 +280,9 @@ run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30){
 
 #' Wraper for running SC3
 #' @importFrom SC3 sc3 sc3_plot_consensus sc3_plot_silhouette sc3_plot_cluster_stability sc3_plot_markers
+#' @importFrom plyr llply
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom doParallel registerDoParallel
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param out.prefix character, output prefix
@@ -313,8 +316,10 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
   obj <- sc3(obj, ks = ks, biology = SC3.biology, n_cores = n.cores,svm_max = 50000000,gene_filter = F)
   if(!is.null(out.prefix))
   {
-    for(k in ks)
-    {
+    RhpcBLASctl::omp_set_num_threads(1)
+    registerDoParallel(cores = n.cores)
+    no.ret <- llply(ks,function(k){
+      ###### sc3_plot_consensus is slow, not sure why
       png(sprintf("%s.consensus.k%d.png",out.prefix,k),width = 600,height = 480)
       sc3_plot_consensus(obj, k = k,  show_pdata = c( "sampleType", sprintf("sc3_%d_clusters",k),
                                                       sprintf("sc3_%s_log2_outlier_score",k)))
@@ -328,7 +333,7 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
         sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k),width=SC3.markerplot.width),
                          show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
       }
-    }
+    },.progress = "none",.parallel=T)
     if(verbose){ save(obj,file=sprintf("%s.verbose.sce.RData",out.prefix)) }
   }
   rownames(obj) <- rownames.old
