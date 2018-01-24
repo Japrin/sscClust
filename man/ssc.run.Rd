@@ -24,7 +24,7 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
 \item{mean.thre}{numeric; threshold for mean, used in trendVar method (default 0.1)}
 
 \item{method.reduction}{character; which dimention reduction method to be used, should be one of
-"iCor", "pca" and "none". (default: "iCor")}
+"iCor", "pca", "zinbwave" and "none". (default: "iCor")}
 
 \item{method.clust}{character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "adpclust" and "SC3. (default: "kmeans")}
 

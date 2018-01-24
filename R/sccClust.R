@@ -178,7 +178,7 @@ ssc.displayName2id <- function(obj,display.name)
 #' @importFrom stats cor prcomp
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
-#' @param method character; method to be used for dimension reduction, should be one of (pca, tsne, iCor). (default: "iCor")
+#' @param method character; method to be used for dimension reduction, should be one of (pca, tsne, iCor, zinbwave). (default: "iCor")
 #' @param method.vgene character; method to identify variable genes. (default: sd)
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
 #' @param tSNE.usePCA logical; whether use PCA before tSNE. Only for reduction method "tsne". (default: T)
@@ -211,6 +211,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
                           pca.npc=NULL,
                           tSNE.usePCA=T,
                           tSNE.perplexity=30,
+                          zinbwave.K=20, zinbwave.X="~patient",
                           autoTSNE=T,
                           dim.name=NULL,
                           iCor.niter=1,iCor.method="spearman",
@@ -264,6 +265,11 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
         proj_data <- cor.BLAS(t(proj_data),method=iCor.method,nthreads = ncore)
         iCor.niter <- iCor.niter-1
       }
+      if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
+    }else if(method=="zinbwave"){
+      res.zinb <- run.zinbWave(obj,assay.name=assay.name,n.cores=ncore, zinbwave.K=zinbwave.K, zinbwave.X=zinbwave.X,verbose=F)
+      proj_data <- getW(obj.zinb)
+      colnames(proj_data) <- sprintf("W%d",seq_len(ncol(proj_data)))
       if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
     }
     reducedDim(obj,dim.name) <- proj_data
@@ -595,7 +601,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param sd.n integer; top number of genes as variable genes (default 1500)
 #' @param de.n integer; number of differential genes used for refined geneset for another run of clustering (default 1500)
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
-#' "iCor", "pca" and "none". (default: "iCor")
+#' "iCor", "pca", "zinbwave" and "none". (default: "iCor")
 #' @param method.clust character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "adpclust" and "SC3. (default: "kmeans")
 #' @param method.classify character; method used for classification, one of "knn" and "RF". (default: "knn")
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
