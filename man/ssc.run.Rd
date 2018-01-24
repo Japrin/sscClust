@@ -7,10 +7,11 @@
 ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
   mean.thre = 0.1, method.reduction = "iCor", method.clust = "kmeans",
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
-  iCor.method = "spearman", subsampling = F, sub.frac = 0.4,
-  sub.use.proj = T, k.batch = 2:6, refineGene = F, de.n = 1500,
-  nIter = 1, out.prefix = NULL, parfile = NULL, reuse = F,
-  ncore = NULL, seed = NULL, do.DE = F, ...)
+  iCor.method = "spearman", zinbwave.K = 20, zinbwave.X = "~patient",
+  subsampling = F, sub.frac = 0.4, sub.use.proj = T, k.batch = 2:6,
+  refineGene = F, de.n = 1500, nIter = 1, out.prefix = NULL,
+  parfile = NULL, reuse = F, ncore = NULL, seed = NULL, do.DE = F,
+  ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -35,6 +36,10 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
 \item{iCor.niter}{integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)}
 
 \item{iCor.method}{character; correlation method, one of "spearman", "pearson" (default: "spearman")}
+
+\item{zinbwave.K}{integer, zinbwave parameter, number of latent variables. (default: 20)}
+
+\item{zinbwave.X}{character, zinbwave parameter, cell-level covariates. (default: "~patient")}
 
 \item{subsampling}{logical; whether cluster using the subsampling->cluster->classification method. (default: F)}
 

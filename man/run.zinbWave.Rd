@@ -4,8 +4,9 @@
 \alias{run.zinbWave}
 \title{Wraper for running ZinbWave}
 \usage{
-run.zinbWave(obj, assay.name = "exprs", out.prefix = "./zinbwave",
-  n.cores = 8, zinbwave.K = 20, zinbwave.X = "~patient", verbose = F)
+run.zinbWave(obj, assay.name = "exprs", vgene = NULL,
+  out.prefix = "./zinbwave", n.cores = 8, zinbwave.K = 20,
+  zinbwave.X = "~patient", verbose = F)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

@@ -189,6 +189,8 @@ ssc.displayName2id <- function(obj,display.name)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
 #' @param iCor.method character; method to calculate correlation between samples,
 #' should be one of "spearman" and "pearson". (default "spearman")
+#' @param zinbwave.K integer, zinbwave parameter, number of latent variables. (default: 20)
+#' @param zinbwave.X character, zinbwave parameter, cell-level covariates. (default: "~patient")
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
 #' @param seed integer; seed of random number generation. (default: NULL)
 #' @param ncore integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)
@@ -267,7 +269,8 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
       }
       if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
     }else if(method=="zinbwave"){
-      res.zinb <- run.zinbWave(obj,assay.name=assay.name,n.cores=ncore, zinbwave.K=zinbwave.K, zinbwave.X=zinbwave.X,verbose=F)
+      res.zinb <- run.zinbWave(obj,assay.name=assay.name,vgene=vgene,n.cores=ncore,
+                               zinbwave.K=zinbwave.K, zinbwave.X=zinbwave.X,verbose=F)
       proj_data <- getW(obj.zinb)
       colnames(proj_data) <- sprintf("W%d",seq_len(ncol(proj_data)))
       if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
@@ -607,6 +610,8 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
 #' @param iCor.method character; correlation method, one of "spearman", "pearson" (default: "spearman")
+#' @param zinbwave.K integer, zinbwave parameter, number of latent variables. (default: 20)
+#' @param zinbwave.X character, zinbwave parameter, cell-level covariates. (default: "~patient")
 #' @param subsampling logical; whether cluster using the subsampling->cluster->classification method. (default: F)
 #' @param sub.frac numeric; subsample to frac of original samples. (default: 0.4)
 #' @param sub.use.proj logical; whether use the projected data for classification. (default: T)
@@ -638,6 +643,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     pca.npc=NULL,
                     iCor.niter=1,
                     iCor.method="spearman",
+                    zinbwave.K=20, zinbwave.X="~patient",
                     subsampling=F,
                     sub.frac=0.4,
                     sub.use.proj=T,
@@ -688,6 +694,7 @@ ssc.run <- function(obj, assay.name="exprs",
                            pca.npc = pca.npc,
                            iCor.niter = iCor.niter,
                            iCor.method = iCor.method,
+                           zinbwave.K = zinbwave.K, zinbwave.X = zinbwave.X,
                            method.vgene=method.vgene,
                            ncore = ncore,
                            seed = seed,
@@ -740,6 +747,7 @@ ssc.run <- function(obj, assay.name="exprs",
                          pca.npc = pca.npc,
                          iCor.niter = iCor.niter,
                          iCor.method = iCor.method,
+                         zinbwave.K = zinbwave.K, zinbwave.X = zinbwave.X,
                          ncore = ncore,
                          seed = seed,
                          dim.name = sprintf("de.%s",method.reduction),
@@ -812,6 +820,7 @@ ssc.run <- function(obj, assay.name="exprs",
       metadata(obj)$ssc[["variable.gene"]][["de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
       ### for general visualization
       obj <- ssc.reduceDim(obj,assay.name=assay.name, method="tsne",
+                           zinbwave.K = zinbwave.K, zinbwave.X = zinbwave.X,
                            method.vgene="de",dim.name = sprintf("vis.tsne"))
     }
   }else{

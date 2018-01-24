@@ -363,33 +363,18 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
 #' @details Run ZinbWave fitting
 #' @return an object of class ZinbModel
 #' @export
-run.zinbWave <- function(obj,assay.name="exprs",out.prefix="./zinbwave",n.cores=8,
+run.zinbWave <- function(obj,assay.name="exprs", vgene=NULL,out.prefix="./zinbwave",n.cores=8,
                          zinbwave.K=20,
                          zinbwave.X="~patient",verbose=F)
 {
-  if(is.null(metadata(obj)$ssc$variable.gene$sd)){
+  if(is.null(vgene)){
     obj <- ssc.variableGene(obj,method = "sd",sd.n = 1500,assay.name = assay.name)
+    vgene <- metadata(obj)$ssc$variable.gene$sd
   }
-  f.gene <- metadata(obj)$ssc$variable.gene$sd
   RhpcBLASctl::omp_set_num_threads(1)
   #### fitting
-  obj.zinb <- zinbFit(obj[f.gene,], K=zinbwave.K, X=zinbwave.X, epsilon=1000,BPPARAM=MulticoreParam(n.cores),verbose=verbose)
-  #### to SingleCellExperiment obj (also add assays "normalizedValues" and "residuals")
-  #sce.obj.zinb <- zinbwave(obj[f.gene,], fitted_model=obj.zinb, normalizedValues=TRUE, residuals = TRUE)
-  #W <- getW(obj.zinb)
+  obj.zinb <- zinbFit(obj[vgene,], K=zinbwave.K, X=zinbwave.X, epsilon=1000,BPPARAM=MulticoreParam(n.cores),verbose=verbose)
   return(obj.zinb)
-
-  #library(Rtsne)
-  #d <- dist(getW(obj.zinb))
-  #tsne_data <- Rtsne(d, is_distance = TRUE, pca = FALSE, perplexity=10, max_iter=5000)
-  #tsne_data$Y
-
-  #colnames(W) <- paste0("W", 1:2)
-  #dat.plot <- data.frame(W, sampleType=colData(obj)$sampleType, coverage=colData(obj)$log10_total_counts)
-  #p <- ggplot(dat.plot,aes(W1, W2, colour=sampleType)) + geom_point() +
-  #        scale_color_brewer(type = "qual", palette = "Set1") +
-  #        theme_bw()
-  #ggsave(sprintf("%s.zinbWave.W.pdf",out.prefix),width = 5,height = 4)
 }
 
 

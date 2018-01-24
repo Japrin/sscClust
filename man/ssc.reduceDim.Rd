@@ -25,6 +25,10 @@ ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
 
 \item{tSNE.perplexity}{logical; perplexity parameter. Used in all Rtsne() calling. (default: 30)}
 
+\item{zinbwave.K}{integer, zinbwave parameter, number of latent variables. (default: 20)}
+
+\item{zinbwave.X}{character, zinbwave parameter, cell-level covariates. (default: "~patient")}
+
 \item{autoTSNE}{logical; Wheter generate automatically a tSNE map when reduction method is "pca" or "iCor". (default: T)}
 
 \item{dim.name}{character; store the reduced data under the name in the obj's reducedDim SimpleList. If i
