@@ -271,7 +271,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
     }else if(method=="zinbwave"){
       res.zinb <- run.zinbWave(obj,assay.name=assay.name,vgene=vgene,n.cores=ncore,
                                zinbwave.K=zinbwave.K, zinbwave.X=zinbwave.X,verbose=F)
-      proj_data <- getW(obj.zinb)
+      proj_data <- getW(res.zinb)
       colnames(proj_data) <- sprintf("W%d",seq_len(ncol(proj_data)))
       if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
     }
