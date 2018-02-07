@@ -249,7 +249,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
         ### method 1
         ######pca.res$kneePts <- which(pca.res$eigengap<1e-4)[1]
         ### method 2 (max distance to the line defined by the first and last point in the scree plot)
-        pca.res$kneePts <- findKneePoint(head(pca.res$eigenv.prop,n=50))
+        pca.res$kneePts <- findKneePoint(head(pca.res$eigenv.prop,n=100))
         if(is.null(pca.npc) && !is.na(pca.res$kneePts)){ pca.npc <- pca.res$kneePts
         }else{ pca.npc <- 30 }
         pca.npc <- min(pca.npc,ncol(pca.res$x))
@@ -294,7 +294,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
 #' "iCor", "pca" and "none". (default: "iCor")
-#' @param method character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "adpclust" and "SC3". (default: "kmeans")
+#' @param method character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "dpclust", "adpclust" and "SC3". (default: "kmeans")
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
 #' @param SNN.k integer; number of shared NN. (default: 10)
@@ -407,7 +407,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
           pdf(sprintf("%s.decision.pdf",out.prefix),width = 5,height = 5)
           plot(clust.res$rho, clust.res$delta, main = 'Decision graph', xlab = expression(rho),
                ylab = expression(delta))
-          if (!is.na(clust.res$peaks[1])) {
+          if (all(!is.na(clust.res$peaks))) {
             points(clust.res$rho[clust.res$peaks], clust.res$delta[clust.res$peaks],
                    col = 2:(1 + length(clust.res$peaks)),pch = 19)
           }
@@ -416,7 +416,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
           plot(sort(clust.res$rho * clust.res$delta,decreasing = T),ylab="rho * delta")
           dev.off()
           ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
-                        peaks = if(!is.na(clust.res$peaks)) clust.res$peaks else NULL,
+                        peaks = if(all(!is.na(clust.res$peaks))) clust.res$peaks else NULL,
                         out.prefix = sprintf("%s.dpclust",out.prefix),base_aspect_ratio = 1.4)
         }
       }else if(method=="SNN"){
@@ -1001,18 +1001,18 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 #' @param obj object of \code{singleCellExperiment} class
 #' @param out.prefix character; output prefix. (default: NULL)
 #' @param p.ncol integer; number of columns in the figure layout. (default: 2)
-#' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw
+#' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw ylab
 #' @export
 ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2)
 {
   requireNamespace("ggplot2")
-  eigenv <- metadata(obj)$ssc$pca.res$eigenv.prop
+  eigenv <- metadata(obj)$ssc$pca.res$eigenv.prop * 100
   dat.plot.eigenv <- data.frame(PC=seq_along(eigenv),
                                 eigenv=eigenv,
                                 isKneePts=as.character(seq_along(eigenv)==metadata(obj)$ssc$pca.res$kneePts),
                                 stringsAsFactors = F)
   p <- ggplot2::ggplot(head(dat.plot.eigenv,n=30),mapping = aes(PC,eigenv)) +
-    geom_point(aes(colour=isKneePts),show.legend=F) +
+    geom_point(aes(colour=isKneePts),show.legend=F) + ylab("Variation explained (%)") +
     scale_colour_manual(values = c("TRUE"="#E41A1C","FALSE"="#377EB8")) +
     theme_bw()
   print(p)

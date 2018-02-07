@@ -18,7 +18,7 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{method.reduction}{character; which dimention reduction method to be used, should be one of
 "iCor", "pca" and "none". (default: "iCor")}
 
-\item{method}{character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "adpclust" and "SC3". (default: "kmeans")}
+\item{method}{character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "dpclust", "adpclust" and "SC3". (default: "kmeans")}
 
 \item{k.batch}{integer; number of clusters to be evaluated. (default: 2:6)}
 

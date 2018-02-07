@@ -1,0 +1,11 @@
+parlist <- list("L1C1"=list("delta"=3, "rho"=3),
+                "L1C1.de"=list("delta"=3, "rho"=3),
+                "L1C1.L2C1"=list("k"=1),
+                "L1C1.L2C2"=list("k"=1),
+                "L1C1.L2C3"=list("k"=1),
+                "L1C1.L2C4"=list("k"=1),
+                #"L1C1.L2C5"=list("k"=1),
+                "L1C1.L2C6"=list("k"=1),
+                "L1C1.L2C7"=list("k"=1),
+                "L1C1.L2C8"=list("k"=1),
+                "L1C1.L2C9"=list("k"=1))

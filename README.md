@@ -17,12 +17,16 @@ devtools::install_github("Japrin/sscClust")
 Run the clustering pipeline for clustering using all data:
 ```
 data("sce.Pollen")
-sce.all <- ssc.run(sce.Pollen, subsampling=F, k.batch=5)
+sce.all <- ssc.run(sce.Pollen, subsampling=F, k.batch=11)
 ```
 for clustering with subsampling:
 ```
 data("sce.Pollen")
-sce.sub <- ssc.run(sce.Pollen, subsampling=T, sub.frac = 0.8, k.batch=5)
+sce.sub <- ssc.run(sce.Pollen, subsampling=T, sub.frac = 0.8, k.batch=11)
 ```
 
-More information can be found in the [vignette](http://htmlpreview.github.io/?https://github.com/Japrin/sscClust/blob/master/vignettes/sscClust.html).
+More information can be found in the vignettes:
+
+1) clustring by various methods, see this [vignette](http://htmlpreview.github.io/?https://github.com/Japrin/sscClust/blob/master/vignettes/sscClust.html)
+
+2) clustering using spearman correlation and subsampling, see this [vignette](http://htmlpreview.github.io/?https://github.com/Japrin/sscClust/blob/master/vignettes/sscClust.iCor.html).
