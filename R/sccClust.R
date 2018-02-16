@@ -528,7 +528,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
   if(method.reduction=="none"){
     warning(sprintf("Reducing the dimensions first is recommended"))
   }else if(method.reduction %in% c("pca","iCor")){
-    obj.train <- ssc.reduceDim(obj.train,method=method.reduction,
+    obj.train <- ssc.reduceDim(obj.train,assay.name = assay.name,method=method.reduction,
                               method.vgene=method.vgene,
                               pca.npc=pca.npc,autoTSNE = T,seed = seed,
                               iCor.niter=iCor.niter,iCor.method="spearman")
@@ -541,7 +541,9 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
       #### for (tsne) visualization
       ###
       A <- cor((assay(obj.pred[vgene,],assay.name)),assay(obj.train[vgene,],assay.name),method = "spearman")
-      S <- cor(assay(obj.train[vgene,],assay.name),method = "spearman")
+      #S <- cor(assay(obj.train[vgene,],assay.name),method = "spearman")
+      S <- cor.BLAS(t(assay(obj.train[vgene,],assay.name)),method = "spearman")
+
       #S <- reducedDim(obj.train,sprintf("%s",method.reduction))
       dat.map.train <- reducedDim(obj.train,sprintf("%s.tsne",method.reduction))
       dat.map.pred <- A %*% solve(S) %*% dat.map.train
@@ -560,7 +562,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
     stop(sprintf("unsupported dimension reduction method: %s\n",method.reduction))
   }
   #### clustering
-  obj.train <- ssc.clust(obj.train, method.reduction=method.reduction,
+  obj.train <- ssc.clust(obj.train,assay.name = assay.name, method.reduction=method.reduction,
                          method=method.clust, k.batch=k.batch,seed = seed)
   colData(obj)[,"isTrainSet"] <- F
   colData(obj)[colnames(obj.train),"isTrainSet"] <- T
