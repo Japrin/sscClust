@@ -3,11 +3,12 @@
 #' @importFrom data.table frank
 #' @importFrom RhpcBLASctl omp_get_num_procs omp_set_num_threads
 #' @param x matrix; input data, rows for variable (genes), columns for observations (cells).
+#' @param y matrix; input data, rows for variable (genes), columns for observations (cells) (default: NULL)
 #' @param method character; method used. (default: "pearson")
 #' @param nthreads integer; number of threads to use. if NULL, automatically detect the number. (default: NULL)
 #' @details calcualte the correlation among variables(rows)
 #' @return correlation coefficient matrix among rows
-cor.BLAS <- function(x,method="pearson",nthreads=NULL)
+cor.BLAS <- function(x,y=NULL,method="pearson",nthreads=NULL)
 {
   if(is.null(nthreads))
   {
@@ -16,22 +17,46 @@ cor.BLAS <- function(x,method="pearson",nthreads=NULL)
   }else{
     RhpcBLASctl::omp_set_num_threads(nthreads)
   }
-  cor.pearson <- function(x)
+  cor.pearson <- function(x,y=NULL)
   {
-    x = x - rowMeans(x)
-    x = x / sqrt(rowSums(x^2))
-    x.cor = tcrossprod(x)
-    return(x.cor)
+    if(is.null(y)){
+      x = x - rowMeans(x)
+      x = x / sqrt(rowSums(x^2))
+      ### cause 'memory not mapped' :( ; and slower in my evaluation: 38 sec .vs. 12 sec.
+      #x.cor = tcrossprod(x)
+      x.cor = x %*% t(x)
+      return(x.cor)
+    }else{
+      x = x - rowMeans(x)
+      x = x / sqrt(rowSums(x^2))
+      y = y - rowMeans(y)
+      y = y / sqrt(rowSums(y^2))
+      #xy.cor <- tcrossprod(x,y)
+      xy.cor <- x %*% t(y)
+      return(xy.cor)
+    }
   }
   x <- as.matrix(x)
   if(!is.matrix(x)){
     warning("x is not like a matrix")
     return(NULL)
   }
+  if(!is.null(y)){
+    y <- as.matrix(y)
+    if(!is.matrix(y)){
+      warning("y is not like a matrix")
+      return(NULL)
+    }
+  }
   if(method=="pearson"){
-    return(cor.pearson(x))
+    return(cor.pearson(x,y))
   }else if(method=="spearman"){
-    return(cor.pearson(t(apply(x, 1, data.table::frank, na.last="keep"))))
+    if(is.null(y)){
+      return(cor.pearson(t(apply(x, 1, data.table::frank, na.last="keep"))))
+    }else{
+      return(cor.pearson(t(apply(x, 1, data.table::frank, na.last="keep")),
+                         t(apply(y, 1, data.table::frank, na.last="keep"))))
+    }
   }else{
     warning("method must be pearson or spearman")
     return(NULL)
@@ -237,6 +262,28 @@ run.RF <- function(xdata, xlabel, ydata, do.norm=F)
   ylabel <- predict(rfsel$rf.model, newdata = ydata[,rfsel$selected.vars])
   names(ylabel) <- rownames(ydata)
   return(list("ylabel"=ylabel,"rfsel"=rfsel))
+}
+
+#' Wraper for running svm
+#'
+#' @importFrom e1071 svm
+#' @importFrom stats predict
+#' @param xdata data frame or matrix; data used for training, with sample id in rows and variables in columns
+#' @param xlabel factor; classification label of the samples, with length equal to the number of rows in xdata
+#' @param ydata data frame or matrix; data to be predicted the label, same format as xdata
+#' @param kern character; which kernel to use, can be one of linear, polynomial, radial and sigmoid (default: "linear")
+#' @return List with the following elements:
+#' \item{ylabel}{ppredicted labels of the samples in ydata}
+#' \item{rfsel}{trained model; output of varSelRF()}
+run.SVM <- function(xdata, xlabel, ydata,kern="linear")
+{
+  f.g <- intersect(colnames(xdata),colnames(ydata))
+  xdata <- xdata[,f.g,drop=F]
+  ydata <- ydata[,f.g,drop=F]
+  model <- e1071::svm(xdata, xlabel, kernel = kern)
+  ylabel <- predict(model, newdata=ydata)
+  names(ylabel) <- rownames(ydata)
+  return(list("ylabel"=ylabel,"svm"=model))
 }
 
 #' Wraper for running random forest classifier

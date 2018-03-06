@@ -232,6 +232,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
   }
   if(is.null(dim.name)){ dim.name <- method }
   vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
+  vgene <- intersect(vgene,rownames(obj))
   if(!reuse || !(dim.name %in% reducedDimNames(obj)) ){
     if(is.null(seed)){
       myseed <- as.integer(Sys.time())
@@ -290,6 +291,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @importFrom igraph cluster_fast_greedy cluster_leading_eigen cluster_infomap
 #' cluster_label_prop cluster_louvain cluster_optimal cluster_spinglass cluster_walktrap
 #' cluster_edge_betweenness
+#' @importFrom plyr llply
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
@@ -360,102 +362,94 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
   }
   loginfo(sprintf("set.seed(%s) for ssc.clust\n",as.character(myseed)))
   set.seed(myseed)
-
-  if(method!="SC3"){
-    for(k in k.batch){
-      if(method=="kmeans"){
-        clust.res <- kmeans(dat.transformed,k,iter.max=1000,nstart=50)
-        colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$cluster)
-      }else if(method=="hclust"){
-        clust.res <- factoextra::eclust(dat.transformed, "hclust", k = k, method = "complete", graph = FALSE)
-        colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$cluster)
-      }else if(method=="adpclust"){
-        clust.res <- ADPclust::adpclust(dat.transformed,nclust = k.batch)
-        k <- "auto"
-        colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
-        if(!is.null(out.prefix)){
-          dir.create(dirname(out.prefix),showWarnings = F,recursive = T)
-          pdf(sprintf("%s.adpclust.diagnostic.pdf",out.prefix),width=11,height = 5)
-          plot(clust.res)
-          dev.off()
-          ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
-                        peaks = clust.res$centers,
-                        out.prefix = sprintf("%s.aadpclust",out.prefix),base_aspect_ratio = 1.4)
-        }
-      }else if(method=="dpclust"){
-        dist.obj <- stats::dist(dat.transformed)
-        clust.res <- densityClust::densityClust(dist.obj, gaussian = T)
-        if(is.null(dpclust.rho)){ dpclust.rho <- quantile(clust.res$rho, probs = 0.90) }
-        if(is.null(dpclust.delta)){ dpclust.delta <- quantile(clust.res$delta, probs = 0.95) }
-        ## overwritet the parameter using those in parlist
-        if(!is.null(parlist)){
-          if("rho" %in% names(parlist)){ dpclust.rho <- parlist[["rho"]] }
-          if("delta" %in% names(parlist)){ dpclust.delta <- parlist[["delta"]] }
-        }
-        cat(sprintf("(dpclust.rho: %4.2f)\n",dpclust.rho))
-        cat(sprintf("(dpclust.delta: %4.2f)\n",dpclust.delta))
-        if(sum(clust.res$rho >= dpclust.rho & clust.res$delta >= dpclust.delta)<2){
-          clust.res$clusters <- rep(1,length(clust.res$rho))
-          clust.res$peaks <- NA
-        }else{
-          clust.res <- densityClust::findClusters(clust.res,rho = dpclust.rho,
-                                                  delta = dpclust.delta,plot=F)
-        }
-        k <- "auto"
-        colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
-        if(!is.null(out.prefix)){
-          pdf(sprintf("%s.decision.pdf",out.prefix),width = 5,height = 5)
-          plot(clust.res$rho, clust.res$delta, main = 'Decision graph', xlab = expression(rho),
-               ylab = expression(delta))
-          if (all(!is.na(clust.res$peaks))) {
-            points(clust.res$rho[clust.res$peaks], clust.res$delta[clust.res$peaks],
-                   col = 2:(1 + length(clust.res$peaks)),pch = 19)
-          }
-          abline(v=dpclust.rho,lty=2)
-          abline(h=dpclust.delta,lty=2)
-          plot(sort(clust.res$rho * clust.res$delta,decreasing = T),ylab="rho * delta")
-          dev.off()
-          ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
-                        peaks = if(all(!is.na(clust.res$peaks))) clust.res$peaks else NULL,
-                        out.prefix = sprintf("%s.dpclust",out.prefix),base_aspect_ratio = 1.4)
-        }
-      }else if(method=="SNN"){
-        if(!is.null(metadata(obj)$ssc$clust.res[["snn.gr"]])){
-          snn.gr <- metadata(obj)$ssc$clust.res[["snn.gr"]]
-        }else{
-          loginfo(sprintf("buildSNNGraph with k=%d\n",SNN.k))
-          snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
-        }
-        loginfo(sprintf("cluster using method %s begin\n",SNN.method))
-        if(SNN.method=="greedy"){
-          clust.res <- igraph::cluster_fast_greedy(snn.gr)
-        }else if(SNN.method=="eigen"){
-          clust.res <- igraph::cluster_leading_eigen(snn.gr)
-          ##clust.res <- igraph::cluster_leading_eigen(snn.gr,weights = igraph::E(snn.gr)$weight)
-        }else if(SNN.method=="infomap"){
-          clust.res <- igraph::cluster_infomap(snn.gr)
-        }else if(SNN.method=="prop"){
-          clust.res <- igraph::cluster_label_prop(snn.gr)
-        }else if(SNN.method=="louvain"){
-          clust.res <- igraph::cluster_louvain(snn.gr)
-        }else if(SNN.method=="optimal"){
-          clust.res <- igraph::cluster_optimal(snn.gr)
-        }else if(SNN.method=="spinglass"){
-          clust.res <- igraph::cluster_spinglass(snn.gr)
-        }else if(SNN.method=="walktrap"){
-          clust.res <- igraph::cluster_walktrap(snn.gr)
-        }else if(SNN.method=="betweenness"){
-          clust.res <- igraph::cluster_edge_betweenness(snn.gr)
-        }
-        metadata(obj)$ssc$clust.res[["snn.gr"]] <- snn.gr
-        loginfo(sprintf("cluster using method %s finished\n",SNN.method))
-        k <- "auto"
-        colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)
-      }
-      res.list[[as.character(k)]] <- clust.res
-      if(method %in% c("adpclust","dpclust","SNN")){ break }
+    
+  ### No k needed for methods: "adpclust","dpclust","SNN"
+  if(method=="adpclust"){
+    clust.res <- ADPclust::adpclust(dat.transformed,nclust = k.batch)
+    k <- "auto"
+    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
+    if(!is.null(out.prefix)){
+      dir.create(dirname(out.prefix),showWarnings = F,recursive = T)
+      pdf(sprintf("%s.adpclust.diagnostic.pdf",out.prefix),width=11,height = 5)
+      plot(clust.res)
+      dev.off()
+      ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
+                    peaks = clust.res$centers,
+                    out.prefix = sprintf("%s.aadpclust",out.prefix),base_aspect_ratio = 1.4)
     }
-  }else{
+    res.list[[as.character(k)]] <- clust.res
+  }else if(method=="dpclust"){
+    dist.obj <- stats::dist(dat.transformed)
+    clust.res <- densityClust::densityClust(dist.obj, gaussian = T)
+    if(is.null(dpclust.rho)){ dpclust.rho <- quantile(clust.res$rho, probs = 0.90) }
+    if(is.null(dpclust.delta)){ dpclust.delta <- quantile(clust.res$delta, probs = 0.95) }
+    ## overwritet the parameter using those in parlist
+    if(!is.null(parlist)){
+      if("rho" %in% names(parlist)){ dpclust.rho <- parlist[["rho"]] }
+      if("delta" %in% names(parlist)){ dpclust.delta <- parlist[["delta"]] }
+    }
+    cat(sprintf("(dpclust.rho: %4.2f)\n",dpclust.rho))
+    cat(sprintf("(dpclust.delta: %4.2f)\n",dpclust.delta))
+    if(sum(clust.res$rho >= dpclust.rho & clust.res$delta >= dpclust.delta)<2){
+      clust.res$clusters <- rep(1,length(clust.res$rho))
+      clust.res$peaks <- NA
+    }else{
+      clust.res <- densityClust::findClusters(clust.res,rho = dpclust.rho,
+                                              delta = dpclust.delta,plot=F)
+    }
+    k <- "auto"
+    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
+    res.list[[as.character(k)]] <- clust.res
+    if(!is.null(out.prefix)){
+      pdf(sprintf("%s.decision.pdf",out.prefix),width = 5,height = 5)
+      plot(clust.res$rho, clust.res$delta, main = 'Decision graph', xlab = expression(rho),
+           ylab = expression(delta))
+      if (all(!is.na(clust.res$peaks))) {
+        points(clust.res$rho[clust.res$peaks], clust.res$delta[clust.res$peaks],
+               col = 2:(1 + length(clust.res$peaks)),pch = 19)
+      }
+      abline(v=dpclust.rho,lty=2)
+      abline(h=dpclust.delta,lty=2)
+      plot(sort(clust.res$rho * clust.res$delta,decreasing = T),ylab="rho * delta")
+      dev.off()
+      ssc.plot.tsne(obj,plotDensity = T,reduced.name = sprintf("%s",method.reduction),
+                    peaks = if(all(!is.na(clust.res$peaks))) clust.res$peaks else NULL,
+                    out.prefix = sprintf("%s.dpclust",out.prefix),base_aspect_ratio = 1.4)
+    }
+  }else if(method=="SNN"){
+    if(!is.null(metadata(obj)$ssc$clust.res[["snn.gr"]])){
+      snn.gr <- metadata(obj)$ssc$clust.res[["snn.gr"]]
+    }else{
+      loginfo(sprintf("buildSNNGraph with k=%d\n",SNN.k))
+      snn.gr <- scran::buildSNNGraph(t(dat.transformed), k=SNN.k,d=NA)
+    }
+    loginfo(sprintf("cluster using method %s begin\n",SNN.method))
+    if(SNN.method=="greedy"){
+      clust.res <- igraph::cluster_fast_greedy(snn.gr)
+    }else if(SNN.method=="eigen"){
+      clust.res <- igraph::cluster_leading_eigen(snn.gr)
+      ##clust.res <- igraph::cluster_leading_eigen(snn.gr,weights = igraph::E(snn.gr)$weight)
+    }else if(SNN.method=="infomap"){
+      clust.res <- igraph::cluster_infomap(snn.gr)
+    }else if(SNN.method=="prop"){
+      clust.res <- igraph::cluster_label_prop(snn.gr)
+    }else if(SNN.method=="louvain"){
+      clust.res <- igraph::cluster_louvain(snn.gr)
+    }else if(SNN.method=="optimal"){
+      clust.res <- igraph::cluster_optimal(snn.gr)
+    }else if(SNN.method=="spinglass"){
+      clust.res <- igraph::cluster_spinglass(snn.gr)
+    }else if(SNN.method=="walktrap"){
+      clust.res <- igraph::cluster_walktrap(snn.gr)
+    }else if(SNN.method=="betweenness"){
+      clust.res <- igraph::cluster_edge_betweenness(snn.gr)
+    }
+    metadata(obj)$ssc$clust.res[["snn.gr"]] <- snn.gr
+    loginfo(sprintf("cluster using method %s finished\n",SNN.method))
+    k <- "auto"
+    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)
+    res.list[[as.character(k)]] <- clust.res
+  }else if(method=="SC3"){
     vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
     obj.tmp <- run.SC3(obj[vgene,],assay.name = assay.name,out.prefix=out.prefix,n.cores = ncore,ks=k.batch,
                        SC3.biology=SC3.biology,SC3.markerplot.width=SC3.markerplot.width)
@@ -470,6 +464,32 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       reducedDim(obj,sprintf("sc3.%s.tsne",.dname)) <- run.tSNE(reducedDim(obj,sprintf("sc3.%s",.dname)),tSNE.usePCA=F,30)
     }
     res.list[["sc3.biology"]] <- rowData(obj.tmp)[,grepl("^(sc3_|display.name|feature_symbol)",names(rowData(obj.tmp)),perl = T),drop=F]
+  }else{
+    ### for other methods need k, llply on k.batch
+    RhpcBLASctl::omp_set_num_threads(1)
+    registerDoParallel(cores = ncore)
+    .tmp.ret <- NULL
+    tryCatch({
+      .tmp.ret <- llply(k.batch,function(k){
+        if(method=="kmeans"){
+            loginfo(sprintf("begin kmeans(..,k=%d) ...",k))
+            clust.res <- kmeans(dat.transformed,k,iter.max=1000,nstart=50)
+            loginfo(sprintf("end kmeans(..,k=%d) ...",k))
+        }else if(method=="hclust"){
+            clust.res <- factoextra::eclust(dat.transformed, "hclust", k = k, method = "complete", graph = FALSE)
+        }
+        list("clust.res"=clust.res,"label"=sprintf("C%d",clust.res$cluster))
+        #colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$cluster)
+      },.progress = "none",.parallel=T)
+    },error=function(e){
+      cat(sprintf("Error occur in ssc.clust --> llply(k.batch,...).\n"))
+      print(e)
+    })
+    names(.tmp.ret) <- sprintf("%d",k.batch)
+    for(k in k.batch){
+        colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- .tmp.ret[[as.character(k)]][["label"]]
+        res.list[[as.character(k)]] <- .tmp.ret[[as.character(k)]][["clust.res"]]
+    }
   }
   metadata(obj)$ssc$clust.res[[method]] <- res.list
   return(obj)
@@ -478,6 +498,8 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
 #' Clustering with subsampling and classification
 #' @importFrom SingleCellExperiment reducedDims
 #' @importFrom stats cor
+#' @importFrom plyr llply
+#' @importFrom MASS ginv
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param frac numeric; subsample to frac of original samples. (default: 0.4)
@@ -489,6 +511,8 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
 #' @param use.proj logical; whether use the projected data for classification. (default: T)
+#' @param vis.proj logical; whether get low dimensional representation for visualization. (default: F)
+#' @param ncore integer; number of cpu to use. (default: NULL)
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param seed integer; seed of random number generation. (default: NULL)
 #' @details The function first subsmaple the samples to the specified fraction (such 40%), and perform clustering. The clustering will
@@ -508,10 +532,16 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
                                                pca.npc=NULL,
                                                iCor.niter=1,
                                                use.proj=T,
+                                               vis.proj=F,
+                                               ncore=NULL,
                                                k.batch=2:6,seed=NULL)
 {
   #### subsampling
-  n.sub <- floor(ncol(obj)*frac)
+  if(frac>1){
+      n.sub <- floor(frac)
+  }else{
+      n.sub <- floor(ncol(obj)*frac)
+  }
   if(n.sub<10){
     stop(sprintf("too few samples, n.sub: %d\n",n.sub))
   }
@@ -522,34 +552,49 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
   f.sd0 <- (apply(assay(obj.train,assay.name),1,sd)==0 | apply(assay(obj.pred,assay.name),1,sd)==0)
   obj.train <- obj.train[!f.sd0,]
   obj.pred <- obj.pred[!f.sd0,]
+  metadata(obj.train)$ssc[["variable.gene"]][[method.vgene]] <- intersect(metadata(obj.train)$ssc[["variable.gene"]][[method.vgene]],
+                                                                        rownames(obj.train))
+  metadata(obj.pred)$ssc[["variable.gene"]][[method.vgene]] <- intersect(metadata(obj.pred)$ssc[["variable.gene"]][[method.vgene]],
+                                                                         rownames(obj.pred))
 
   reducedDims(obj.train) <- SimpleList()
   #### reduction
   if(method.reduction=="none"){
     warning(sprintf("Reducing the dimensions first is recommended"))
   }else if(method.reduction %in% c("pca","iCor")){
+    loginfo(sprintf("begin obj.train=ssc.reduceDim(,...,method=%s) ...",method.reduction))
     obj.train <- ssc.reduceDim(obj.train,assay.name = assay.name,method=method.reduction,
                               method.vgene=method.vgene,
-                              pca.npc=pca.npc,autoTSNE = T,seed = seed,
-                              iCor.niter=iCor.niter,iCor.method="spearman")
+                              pca.npc=pca.npc,autoTSNE = F,seed = seed, ### disable auto tSNE temporarily
+                              iCor.niter=iCor.niter,iCor.method="spearman",ncore=ncore)
+    loginfo(sprintf("end obj.train=ssc.reduceDim(,...,method=%s) ...",method.reduction))
     if(!all(rownames(obj.train)==rownames(obj.pred))){
       stop("The genes of obj.train and obj.pred are different!")
     }
     vgene <- metadata(obj.pred)$ssc$variable.gene[[method.vgene]]
 
     if(method.reduction=="iCor"){
+      loginfo(sprintf("begin A=cor.BLAS() ..."))
+      A <- cor.BLAS(t(assay(obj.pred[vgene,],assay.name)),t(assay(obj.train[vgene,],assay.name)),method = "spearman",nthreads=ncore)
+      loginfo(sprintf("end A=cor.BLAS() ..."))
       #### for (tsne) visualization
       ###
-      A <- cor((assay(obj.pred[vgene,],assay.name)),assay(obj.train[vgene,],assay.name),method = "spearman")
-      #S <- cor(assay(obj.train[vgene,],assay.name),method = "spearman")
-      S <- cor.BLAS(t(assay(obj.train[vgene,],assay.name)),method = "spearman")
-
-      #S <- reducedDim(obj.train,sprintf("%s",method.reduction))
-      dat.map.train <- reducedDim(obj.train,sprintf("%s.tsne",method.reduction))
-      dat.map.pred <- A %*% solve(S) %*% dat.map.train
-      reducedDim(obj.pred,sprintf("%s.tsne",method.reduction)) <- dat.map.pred
-      dat.map.obj <- rbind(dat.map.train,dat.map.pred)
-      reducedDim(obj,sprintf("%s.tsne",method.reduction)) <- dat.map.obj[colnames(obj),,drop=F]
+      #vis.proj <- F
+      if(vis.proj){
+          S <- cor.BLAS(t(assay(obj.train[vgene,],assay.name)),method = "spearman",nthreads=ncore)
+          dat.map.train <- reducedDim(obj.train,sprintf("%s.tsne",method.reduction))
+          ### S may be computationally singular
+          ####dat.map.pred <- A %*% solve(S) %*% dat.map.train
+          dat.map.pred <- A %*% MASS::ginv(S) %*% dat.map.train
+          reducedDim(obj.pred,sprintf("%s.tsne",method.reduction)) <- dat.map.pred
+          dat.map.obj <- rbind(dat.map.train,dat.map.pred)
+          reducedDim(obj,sprintf("%s.tsne",method.reduction)) <- dat.map.obj[colnames(obj),,drop=F]
+#      }else{
+#          obj <- ssc.reduceDim(obj,assay.name = assay.name,method=method.reduction,
+#                              method.vgene=method.vgene,
+#                              pca.npc=pca.npc,autoTSNE = T,seed = seed,
+#                              iCor.niter=iCor.niter,iCor.method="spearman")
+      }
       #### for prediction
       metadata(obj.pred)$ssc$data.transformed <- A
     }else if(method.reduction=="pca"){
@@ -563,7 +608,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
   }
   #### clustering
   obj.train <- ssc.clust(obj.train,assay.name = assay.name, method.reduction=method.reduction,
-                         method=method.clust, k.batch=k.batch,seed = seed)
+                         method=method.clust, k.batch=k.batch,seed = seed,ncore=ncore)
   colData(obj)[,"isTrainSet"] <- F
   colData(obj)[colnames(obj.train),"isTrainSet"] <- T
   #### data for classification
@@ -579,20 +624,33 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
   #cls.label <- colData(obj.train)[,sprintf("%s.%s.k%s",method.reduction,method.clust,k.best)]
   ## option 2: loop all k.batch
   ## parallel
+  RhpcBLASctl::omp_set_num_threads(1)
+  registerDoParallel(cores = ncore)
+  .tmp.ret <- NULL
+  tryCatch({
+    .tmp.ret <- llply(k.batch,function(kk){
+        cls.label <- colData(obj.train)[,sprintf("%s.%s.k%s",method.reduction,method.clust,kk)]
+        names(cls.label) <- colnames(obj.train)
+        loginfo(sprintf("begin run.%s(..) base on clustering result using k=%d ...",toupper(method.classify),kk))
+        if(method.classify=="RF") {
+          res.pred <- run.RF(data.train, as.factor(cls.label), data.pred,do.norm = T)
+        }else if(method.classify=="knn") {
+          res.pred <- run.KNN(data.train,as.factor(cls.label), data.pred,k=1)
+        }else if(method.classify=="svm") {
+          res.pred <- run.SVM(data.train,as.factor(cls.label),data.pred,kern="linear")
+        }
+        loginfo(sprintf("end run.%s(..) base on clustering result using k=%d ...",toupper(method.classify),kk))
+        pred.label <- structure(as.character(res.pred$ylabel), names=names(res.pred$ylabel))
+        ret.label <- c(cls.label,pred.label)
+        list("ret.label"=ret.label)
+    },.progress = "none",.parallel=T)
+  },error=function(e){
+      cat(sprintf("Error occur in ssc.clust --> llply(k.batch,...).\n"))
+      print(e)
+  })
+  names(.tmp.ret) <- sprintf("%d",k.batch)
   for(kk in k.batch){
-    cls.label <- colData(obj.train)[,sprintf("%s.%s.k%s",method.reduction,method.clust,kk)]
-    names(cls.label) <- colnames(obj.train)
-    if(method.classify=="RF")
-    {
-      res.pred <- run.RF(data.train, as.factor(cls.label), data.pred,do.norm = T)
-    }else if(method.classify=="knn")
-    {
-      res.pred <- run.KNN(data.train,as.factor(cls.label), data.pred,k=1)
-    }else if(method.classify=="svm")
-    {
-    }
-    pred.label <- structure(as.character(res.pred$ylabel), names=names(res.pred$ylabel))
-    ret.label <- c(cls.label,pred.label)
+    ret.label <- .tmp.ret[[as.character(kk)]][["ret.label"]]
     colData(obj)[names(ret.label),sprintf("%s.%s.k%s",method.reduction,method.clust,kk)] <- ret.label
   }
   return(obj)
@@ -617,6 +675,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param subsampling logical; whether cluster using the subsampling->cluster->classification method. (default: F)
 #' @param sub.frac numeric; subsample to frac of original samples. (default: 0.4)
 #' @param sub.use.proj logical; whether use the projected data for classification. (default: T)
+#' @param sub.vis.proj logical; whether get low dimensional representation for visualization, only used in downsample mode. (default: F)
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param refineGene logical; whether perform second round demension reduction and clustering pipeline using the differential
 #' genes found by the first round cluster result. (default: F)
@@ -649,6 +708,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     subsampling=F,
                     sub.frac=0.4,
                     sub.use.proj=T,
+                    sub.vis.proj=F,
                     k.batch=2:6,
                     refineGene=F,
                     de.n=1500,
@@ -836,6 +896,7 @@ ssc.run <- function(obj, assay.name="exprs",
                                                    pca.npc=pca.npc,
                                                    iCor.niter=iCor.niter,
                                                    use.proj=sub.use.proj,
+                                                   vis.proj=sub.vis.proj,
                                                    k.batch=k.batch)
   }
   return(obj)
