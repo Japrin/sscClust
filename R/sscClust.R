@@ -251,8 +251,10 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
         ######pca.res$kneePts <- which(pca.res$eigengap<1e-4)[1]
         ### method 2 (max distance to the line defined by the first and last point in the scree plot)
         pca.res$kneePts <- findKneePoint(head(pca.res$eigenv.prop,n=100))
-        if(is.null(pca.npc) && !is.na(pca.res$kneePts)){ pca.npc <- pca.res$kneePts
-        }else{ pca.npc <- 30 }
+        if(is.null(pca.npc)){
+          if(!is.na(pca.res$kneePts)){ pca.npc <- pca.res$kneePts
+          }else{ pca.npc <- 30 }
+        }
         pca.npc <- min(pca.npc,ncol(pca.res$x))
         pca.res$npc <- pca.npc
         ### save to object
@@ -362,7 +364,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
   }
   loginfo(sprintf("set.seed(%s) for ssc.clust\n",as.character(myseed)))
   set.seed(myseed)
-    
+
   ### No k needed for methods: "adpclust","dpclust","SNN"
   if(method=="adpclust"){
     clust.res <- ADPclust::adpclust(dat.transformed,nclust = k.batch)
