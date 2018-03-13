@@ -257,6 +257,8 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
         }
         pca.npc <- min(pca.npc,ncol(pca.res$x))
         pca.res$npc <- pca.npc
+        loginfo(sprintf("set pca.npc to %d while kneePts is at %d (ssc.reduceDim)\n",pca.npc,
+                        if(!is.na(pca.res$kneePts)) pca.res$kneePts else -1))
         ### save to object
         metadata(obj)$ssc$pca.res <- pca.res
         proj_data <- pca.res$x[,1:pca.npc,drop=F]
