@@ -1,5 +1,11 @@
 language: r
+sudo: required
 cache: packages
 bioc_packages:
   - SingleCellExperiment
   - zinbwave
+
+addons:
+  apt:
+    packages:
+    - libgsl0-dev
