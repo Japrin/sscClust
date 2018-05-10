@@ -940,7 +940,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param ylim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @param size double; points' size. If NULL, infer from number of points (default NULL)
 #' @importFrom SingleCellExperiment colData
-#' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend
+#' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend coord_cartesian
 #' @importFrom cowplot save_plot plot_grid
 #' @importFrom utils read.table
 #' @importFrom RColorBrewer brewer.pal

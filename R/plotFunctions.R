@@ -31,7 +31,7 @@ auto.point.size <- function(n){
 #' Plot gene expression on tSNE map
 #'
 #' @importFrom RColorBrewer brewer.pal
-#' @importFrom ggplot2 ggplot ggsave scale_colour_gradientn geom_point facet_wrap theme_bw
+#' @importFrom ggplot2 ggplot ggsave scale_colour_gradientn geom_point facet_wrap theme_bw coord_cartesian
 #' @importFrom data.table melt
 #' @importFrom utils head
 #' @param Y matrix or data.frame; Gene expression data, rownames shoud be gene id, colnames
