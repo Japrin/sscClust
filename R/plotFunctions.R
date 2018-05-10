@@ -42,6 +42,7 @@ auto.point.size <- function(n){
 #' @param p.ncol integer; number of columns in the plot's layout (default: 3)
 #' @param xlim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @param ylim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
+#' @param size double; points' size. If NULL, infer from number of points (default NULL)
 #' @param width numeric; width of the plot (default: 9)
 #' @param height numeric; height of the plot (default: 8)
 #' @details For genes contained in both `Y` and `gene.to.show`, show their expression on the tSNE
@@ -49,7 +50,7 @@ auto.point.size <- function(n){
 #' also have darker color.
 #' @return a ggplot object
 ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
-                         xlim=NULL,ylim=NULL,
+                         xlim=NULL,ylim=NULL,size=NULL,
                          width=9,height=8){
   #suppressPackageStartupMessages(require("data.table"))
   #requireNamespace("ggplot2",quietly = T)
@@ -71,7 +72,7 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
   dat.plot.melt <- dat.plot.melt[order(dat.plot.melt$value,decreasing = F),]
   npts <- nrow(dat.plot.melt)
   p <- ggplot2::ggplot(dat.plot.melt,aes(Dim1,Dim2)) +
-    geom_point(aes(colour=value),size=auto.point.size(npts)*1.1) +
+    geom_point(aes(colour=value),size=if(is.null(size)) auto.point.size(npts)*1.1 else size) +
     scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
     facet_wrap(~variable, ncol = p.ncol) +
     theme_bw() +

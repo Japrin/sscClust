@@ -938,6 +938,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param peaks integer or character; index or names of the peaks. (default: NULL)
 #' @param xlim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @param ylim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
+#' @param size double; points' size. If NULL, infer from number of points (default NULL)
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend
 #' @importFrom cowplot save_plot plot_grid
@@ -950,7 +951,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' be used.
 #' @export
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plotDensity=F, colSet=list(),
-                          reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,
+                          reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,size=NULL,
                           out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
   #requireNamespace("ggplot2")
@@ -978,7 +979,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
           dat.plot <- dat.plot[order(dat.plot[,cc]),]
           npts <- nrow(dat.plot)
           p <- ggplot2::ggplot(dat.plot,aes(Dim1,Dim2)) +
-            geom_point(aes_string(colour=cc),size=auto.point.size(npts)*1.1)
+            geom_point(aes_string(colour=cc),size=if(is.null(size)) auto.point.size(npts)*1.1 else size)
           if(is.numeric(dat.plot[,cc])){
             p <- p + scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9, "YlOrRd"))
           }else{
@@ -1015,7 +1016,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
     }
     p <- ggGeneOnTSNE(assay(obj,assay.name),
                      dat.map,
-                     gene,out.prefix,p.ncol=p.ncol,xlim=xlim,ylim=ylim,width=width,height=height)
+                     gene,out.prefix,p.ncol=p.ncol,xlim=xlim,ylim=ylim,size=size,width=width,height=height)
     if(is.null(out.prefix)){ print(p) }
   }
   if(plotDensity){

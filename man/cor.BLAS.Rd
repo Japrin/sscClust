@@ -4,10 +4,12 @@
 \alias{cor.BLAS}
 \title{Correlation calculation. use BLAS and data.table to speed up.}
 \usage{
-cor.BLAS(x, method = "pearson", nthreads = NULL)
+cor.BLAS(x, y = NULL, method = "pearson", nthreads = NULL)
 }
 \arguments{
 \item{x}{matrix; input data, rows for variable (genes), columns for observations (cells).}
+
+\item{y}{matrix; input data, rows for variable (genes), columns for observations (cells) (default: NULL)}
 
 \item{method}{character; method used. (default: "pearson")}
 

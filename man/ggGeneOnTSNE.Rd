@@ -5,7 +5,7 @@
 \title{Plot gene expression on tSNE map}
 \usage{
 ggGeneOnTSNE(Y, dat.map, gene.to.show, out.prefix = NULL, p.ncol = 3,
-  width = 9, height = 8)
+  xlim = NULL, ylim = NULL, size = NULL, width = 9, height = 8)
 }
 \arguments{
 \item{Y}{matrix or data.frame; Gene expression data, rownames shoud be gene id, colnames
@@ -18,6 +18,12 @@ should be sample id}
 \item{out.prefix}{character; output prefix (default: NULL)}
 
 \item{p.ncol}{integer; number of columns in the plot's layout (default: 3)}
+
+\item{xlim}{integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)}
+
+\item{ylim}{integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)}
+
+\item{size}{double; points' size. If NULL, infer from number of points (default NULL)}
 
 \item{width}{numeric; width of the plot (default: 9)}
 
