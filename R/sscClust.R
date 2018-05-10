@@ -71,14 +71,17 @@ ssc.build <- function(x,display.name=NULL)
 #' @param sd.n top number of genes (default 1500)
 #' @param mean.thre numeric; threshold for mean, used in trendVar method (default 0.1)
 #' @param assay.name which assay to be used (default "exprs")
+#' @param var.block character; specify the uninteresting factors by formula. E.g. "~patient" (default NULL)
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
 #' @param out.prefix character; if not NULL, output prefix. (default: F)
 #' @details Method "sd": calculate the standard deviation of each gene and sort decreasingly, the top `sd.n` genes are the
 #' variable genes. Method "trendVar": fit the trend between variance and mean, and decompose each gene's variance into
-#' 'tech' part(fitted value) and 'bio' part (residual value), then select genes according FDR and mean threshold.
+#' 'tech' part(fitted value) and 'bio' part (residual value), then select genes according FDR and mean threshold. Note,
+#' when using "trendVar", will use expression data stored in "norm_exprs" slot of `obj`, no matter what `assay.name` is.
 #' @return an object of \code{SingleCellExperiment} class
 #' @export
 ssc.variableGene <- function(obj,method="sd",sd.n=1500,mean.thre=0.1,assay.name="exprs",
+                             var.block=NULL,
                              reuse=F,out.prefix=NULL)
 {
   if(method=="sd")
@@ -99,8 +102,17 @@ ssc.variableGene <- function(obj,method="sd",sd.n=1500,mean.thre=0.1,assay.name=
   }else if(method=="trendVar")
   {
     trendVar.min.mean <- 0.1
-    var.fit <- scran::trendVar(obj, parametric=TRUE, span=0.3, min.mean=trendVar.min.mean, use.spikes=F, assay.type=assay.name)
-    var.out <- scran::decomposeVar(obj, var.fit, assay.type=assay.name)
+    if(!is.null(var.block)){
+      var.design <- model.matrix(as.formula(var.block),data = colData(obj))
+    }else{
+      var.design <- NULL
+    }
+    var.fit <- scran::trendVar(obj, parametric=TRUE, span=0.3, min.mean=trendVar.min.mean,
+                               design=var.design,
+                               use.spikes=F, assay.type="norm_exprs")
+                               ####use.spikes=F, assay.type=assay.name)
+    var.out <- scran::decomposeVar(obj, var.fit, assay.type="norm_exprs")
+    ####var.out <- scran::decomposeVar(obj, var.fit, assay.type=assay.name)
     var.out <- var.out[order(var.out$FDR,-var.out$bio/var.out$total),]
     f.var <- var.out$FDR<0.001 & var.out$mean>mean.thre
     metadata(obj)$ssc[["variable.gene"]][["trendVar"]] <- rownames(var.out)[f.var]
@@ -665,6 +677,8 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
 #' @param mean.thre numeric; threshold for mean, used in trendVar method (default 0.1)
+#' @param var.block character; specify the uninteresting factors by formula. E.g. "~patient".
+#' used in trendVar method (default NULL)
 #' @param sd.n integer; top number of genes as variable genes (default 1500)
 #' @param de.n integer; number of differential genes used for refined geneset for another run of clustering (default 1500)
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
@@ -702,6 +716,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     method.vgene="sd",
                     sd.n=1500,
                     mean.thre=0.1,
+                    var.block=NULL,
                     method.reduction="iCor",
                     method.clust="kmeans",
                     method.classify="knn",
@@ -752,7 +767,7 @@ ssc.run <- function(obj, assay.name="exprs",
       }
       loginfo(sprintf("select variable genes ... (%s)",rid))
       obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,mean.thre = mean.thre,
-                              assay.name=assay.name,reuse = reuse,
+                              assay.name=assay.name,reuse = reuse,var.block = var.block,
                               out.prefix = sprintf("%s.%s",out.prefix,rid))
       loginfo(sprintf("reduce dimensions ... (%s)",rid))
       obj <- ssc.reduceDim(obj,assay.name=assay.name,
@@ -921,10 +936,13 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param height numeric; height of the plot, used for geneOnTSNE. (default: NA)
 #' @param base_aspect_ratio numeric; base_aspect_ratio, used for plotting metadata. (default 1.1)
 #' @param peaks integer or character; index or names of the peaks. (default: NULL)
+#' @param xlim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
+#' @param ylim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend
 #' @importFrom cowplot save_plot plot_grid
 #' @importFrom utils read.table
+#' @importFrom RColorBrewer brewer.pal
 #' @details If `gene` is not NULL, expression of the specified genes will be plot on the tSNE map; if columns in not
 #' NULL, colData of obj with names in `columns` will be plot on the tSNE map. The tSNE map used is specified by option
 #' `reduced.name` and `reduced.dim`. Both `gene` and `columns` can be non-NULL. For list `colSet`, each element define
@@ -932,7 +950,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' be used.
 #' @export
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plotDensity=F, colSet=list(),
-                          reduced.name="iCor.tsne",reduced.dim=c(1,2),
+                          reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,
                           out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
   #requireNamespace("ggplot2")
@@ -948,7 +966,6 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
     if(all(columns %in% colnames(colData(obj))))
     {
       if(is.list(colSet)){
-        #dat.map <- reducedDim(obj,reduced.name)
         multi.p <- lapply(columns,function(cc){
           if(is.null(colSet[[cc]])){
             cc.values <- sort(unique(colData(obj)[,cc]))
@@ -957,14 +974,19 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
           }
           dat.plot <- data.frame(sample=rownames(dat.map),stringsAsFactors = F)
           dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,cc,drop=F]))
-          #dat.plot <- as.data.frame(cbind(dat.plot,dat.map[,reduced.dim],colData(obj)[,cc,drop=F]))
           colnames(dat.plot) <- c("sample","Dim1","Dim2",cc)
+          dat.plot <- dat.plot[order(dat.plot[,cc]),]
           npts <- nrow(dat.plot)
           p <- ggplot2::ggplot(dat.plot,aes(Dim1,Dim2)) +
-            geom_point(aes_string(colour=cc),size=auto.point.size(npts)*1.1) +
-            scale_colour_manual(values = colSet[[cc]]) +
-            theme_bw() +
+            geom_point(aes_string(colour=cc),size=auto.point.size(npts)*1.1)
+          if(is.numeric(dat.plot[,cc])){
+            p <- p + scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9, "YlOrRd"))
+          }else{
+            p <- p + scale_colour_manual(values = colSet[[cc]])
+          }
+          p <- p + theme_bw() + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE) +
             ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size=4)))
+
           return(p)
         })
         pp <- cowplot::plot_grid(plotlist=multi.p,ncol = if(length(columns)>1) 2 else 1,align = "hv")
@@ -993,18 +1015,15 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
     }
     p <- ggGeneOnTSNE(assay(obj,assay.name),
                      dat.map,
-                     ##reducedDim(obj,reduced.name)[,reduced.dim],
-                     gene,out.prefix,p.ncol=p.ncol,width=width,height=height)
+                     gene,out.prefix,p.ncol=p.ncol,xlim=xlim,ylim=ylim,width=width,height=height)
     if(is.null(out.prefix)){ print(p) }
   }
   if(plotDensity){
     if(is.null(out.prefix)){
       plot.density2D(dat.map,peaks = peaks)
-      #plot.density2D(reducedDim(obj,reduced.name)[,reduced.dim],peaks = peaks)
     }else{
       pdf(sprintf("%s.density.pdf",out.prefix),width = 5,height = 5)
       plot.density2D(dat.map,peaks = peaks)
-      #plot.density2D(reducedDim(obj,reduced.name)[,reduced.dim],peaks = peaks)
       dev.off()
     }
   }
@@ -1020,6 +1039,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
 #' @param out.prefix character; output prefix. (default: NULL)
 #' @param p.ncol integer; number of columns in the figure layout. (default: 3)
 #' @param base_aspect_ratio numeric; base_aspect_ratio, used for plotting metadata. (default 1.1)
+#' @param ... parameter passed to cowplot::save_plot
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_violin scale_fill_gradient2 theme_bw theme aes_string facet_grid element_text
 #' @importFrom cowplot save_plot plot_grid
@@ -1029,7 +1049,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
 #' @export
 ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
                             group.var="majorCluster",
-                            out.prefix=NULL,p.ncol=1,base_aspect_ratio=1.1)
+                            out.prefix=NULL,p.ncol=1,base_aspect_ratio=1.1,...)
 {
   requireNamespace("ggplot2")
   requireNamespace("data.table")
@@ -1057,7 +1077,7 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
   if(!is.null(out.prefix)){
     cowplot::save_plot(sprintf("%s.violin.gene.pdf",out.prefix),p,
                        ncol = p.ncol,
-                       base_aspect_ratio=base_aspect_ratio)
+                       base_aspect_ratio=base_aspect_ratio,...)
   }else{
     print(p)
   }

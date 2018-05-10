@@ -40,13 +40,17 @@ auto.point.size <- function(n){
 #' @param gene.to.show character; gene id to be showd on the tSNE map
 #' @param out.prefix character; output prefix (default: NULL)
 #' @param p.ncol integer; number of columns in the plot's layout (default: 3)
+#' @param xlim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
+#' @param ylim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @param width numeric; width of the plot (default: 9)
 #' @param height numeric; height of the plot (default: 8)
 #' @details For genes contained in both `Y` and `gene.to.show`, show their expression on the tSNE
 #' map provided as `dat.map`. One point in the map represent a cell; cells with higher expression
 #' also have darker color.
 #' @return a ggplot object
-ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,width=9,height=8){
+ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
+                         xlim=NULL,ylim=NULL,
+                         width=9,height=8){
   #suppressPackageStartupMessages(require("data.table"))
   #requireNamespace("ggplot2",quietly = T)
   #requireNamespace("RColorBrewer",quietly = T)
@@ -70,7 +74,8 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,width=9
     geom_point(aes(colour=value),size=auto.point.size(npts)*1.1) +
     scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
     facet_wrap(~variable, ncol = p.ncol) +
-    theme_bw()
+    theme_bw() +
+    coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
   if(!is.null(out.prefix)){
     ggplot2::ggsave(sprintf("%s.geneOntSNE.pdf",out.prefix),width = width,height = height)
   }

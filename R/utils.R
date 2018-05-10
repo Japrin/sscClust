@@ -237,10 +237,12 @@ findDEGenesByAOV <- function(xdata,xlabel,out.prefix=NULL,mod=NULL,
 #' @param xlabel factor; classification label of the samples, with length equal to the number of rows in xdata
 #' @param ydata data frame or matrix; data to be predicted the label, same format as xdata
 #' @param do.norm logical; whether perform Z score normalization on data
+#' @param ntree integer; parameter of varSelRF::varSelRF
+#' @param ntreeIterat integer; parameter of varSelRF::varSelRF
 #' @return List with the following elements:
 #' \item{ylabel}{ppredicted labels of the samples in ydata}
 #' \item{rfsel}{trained model; output of varSelRF()}
-run.RF <- function(xdata, xlabel, ydata, do.norm=F)
+run.RF <- function(xdata, xlabel, ydata, do.norm=F, ntree = 500, ntreeIterat = 200)
 {
   #require("varSelRF")
   #require("randomForest")
@@ -254,14 +256,16 @@ run.RF <- function(xdata, xlabel, ydata, do.norm=F)
   }
   ### random forest
   rfsel <- varSelRF::varSelRF(xdata, xlabel,
-                              ntree = 500, ntreeIterat = 200,
+                              ntree = ntree, ntreeIterat = ntreeIterat,
                               whole.range = FALSE,keep.forest = T)
   #rfsel$selected.vars %>% str %>% print
   #rfsel$initialImportances %>% head %>% print
   #rfsel$rf.model$confusion %>% print
-  ylabel <- predict(rfsel$rf.model, newdata = ydata[,rfsel$selected.vars])
+  yres <- predict(rfsel$rf.model, newdata = ydata[,rfsel$selected.vars],type = "prob")
+  cls.set <- colnames(yres)
+  ylabel <- apply(yres,1,function(x){ cls.set[which.max(x)] })
   names(ylabel) <- rownames(ydata)
-  return(list("ylabel"=ylabel,"rfsel"=rfsel))
+  return(list("ylabel"=ylabel,"rfsel"=rfsel,"yres"=yres))
 }
 
 #' Wraper for running svm
