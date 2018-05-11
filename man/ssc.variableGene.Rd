@@ -5,7 +5,8 @@
 \title{Identify variable genes}
 \usage{
 ssc.variableGene(obj, method = "sd", sd.n = 1500, mean.thre = 0.1,
-  assay.name = "exprs", var.block = NULL, reuse = F, out.prefix = NULL)
+  fdr.thre = 0.001, assay.name = "exprs", var.block = NULL, reuse = F,
+  out.prefix = NULL)
 }
 \arguments{
 \item{obj}{object of SingleCellExperiment}
@@ -15,6 +16,8 @@ ssc.variableGene(obj, method = "sd", sd.n = 1500, mean.thre = 0.1,
 \item{sd.n}{top number of genes (default 1500)}
 
 \item{mean.thre}{numeric; threshold for mean, used in trendVar method (default 0.1)}
+
+\item{fdr.thre}{numeric; threshold for fdr, used in trendVar method (default 0.001)}
 
 \item{assay.name}{which assay to be used (default "exprs")}
 

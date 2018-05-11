@@ -5,13 +5,14 @@
 \title{Wrapper for running all the pipeline}
 \usage{
 ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
-  mean.thre = 0.1, var.block = NULL, method.reduction = "iCor",
-  method.clust = "kmeans", method.classify = "knn", pca.npc = NULL,
-  iCor.niter = 1, iCor.method = "spearman", zinbwave.K = 20,
-  zinbwave.X = "~patient", subsampling = F, sub.frac = 0.4,
-  sub.use.proj = T, sub.vis.proj = F, k.batch = 2:6, refineGene = F,
-  de.n = 1500, nIter = 1, out.prefix = NULL, parfile = NULL,
-  reuse = F, ncore = NULL, seed = NULL, do.DE = F, ...)
+  mean.thre = 0.1, fdr.thre = 0.001, var.block = NULL,
+  method.reduction = "iCor", method.clust = "kmeans",
+  method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
+  iCor.method = "spearman", zinbwave.K = 20, zinbwave.X = "~patient",
+  subsampling = F, sub.frac = 0.4, sub.use.proj = T, sub.vis.proj = F,
+  k.batch = 2:6, refineGene = F, de.n = 1500, nIter = 1,
+  out.prefix = NULL, parfile = NULL, reuse = F, ncore = NULL,
+  seed = NULL, do.DE = F, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -23,6 +24,8 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
 \item{sd.n}{integer; top number of genes as variable genes (default 1500)}
 
 \item{mean.thre}{numeric; threshold for mean, used in trendVar method (default 0.1)}
+
+\item{fdr.thre}{numeric; threshold for fdr, used in trendVar method (default 0.001)}
 
 \item{var.block}{character; specify the uninteresting factors by formula. E.g. "~patient".
 used in trendVar method (default NULL)}

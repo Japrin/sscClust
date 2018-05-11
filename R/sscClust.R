@@ -70,6 +70,7 @@ ssc.build <- function(x,display.name=NULL)
 #' @param method method to be used, can be one of "sd", mean.sd, trendVar. (default: "sd")
 #' @param sd.n top number of genes (default 1500)
 #' @param mean.thre numeric; threshold for mean, used in trendVar method (default 0.1)
+#' @param fdr.thre numeric; threshold for fdr, used in trendVar method (default 0.001)
 #' @param assay.name which assay to be used (default "exprs")
 #' @param var.block character; specify the uninteresting factors by formula. E.g. "~patient" (default NULL)
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
@@ -80,7 +81,7 @@ ssc.build <- function(x,display.name=NULL)
 #' when using "trendVar", will use expression data stored in "norm_exprs" slot of `obj`, no matter what `assay.name` is.
 #' @return an object of \code{SingleCellExperiment} class
 #' @export
-ssc.variableGene <- function(obj,method="sd",sd.n=1500,mean.thre=0.1,assay.name="exprs",
+ssc.variableGene <- function(obj,method="sd",sd.n=1500,mean.thre=0.1,fdr.thre=0.001,assay.name="exprs",
                              var.block=NULL,
                              reuse=F,out.prefix=NULL)
 {
@@ -114,8 +115,9 @@ ssc.variableGene <- function(obj,method="sd",sd.n=1500,mean.thre=0.1,assay.name=
     var.out <- scran::decomposeVar(obj, var.fit, assay.type="norm_exprs")
     ####var.out <- scran::decomposeVar(obj, var.fit, assay.type=assay.name)
     var.out <- var.out[order(var.out$FDR,-var.out$bio/var.out$total),]
-    f.var <- var.out$FDR<0.001 & var.out$mean>mean.thre
+    f.var <- var.out$FDR<fdr.thre & var.out$mean>mean.thre
     metadata(obj)$ssc[["variable.gene"]][["trendVar"]] <- rownames(var.out)[f.var]
+    metadata(obj)$ssc[["variable.gene"]][["trendVar.detail"]] <- var.out
     #head(var.out)
     ### debug
     row.sd <- apply(assay(obj,assay.name),1,sd)
@@ -677,6 +679,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.vgene character; variable gene identification method used. (default: "sd")
 #' @param mean.thre numeric; threshold for mean, used in trendVar method (default 0.1)
+#' @param fdr.thre numeric; threshold for fdr, used in trendVar method (default 0.001)
 #' @param var.block character; specify the uninteresting factors by formula. E.g. "~patient".
 #' used in trendVar method (default NULL)
 #' @param sd.n integer; top number of genes as variable genes (default 1500)
@@ -716,6 +719,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     method.vgene="sd",
                     sd.n=1500,
                     mean.thre=0.1,
+                    fdr.thre=0.001,
                     var.block=NULL,
                     method.reduction="iCor",
                     method.clust="kmeans",
@@ -766,7 +770,7 @@ ssc.run <- function(obj, assay.name="exprs",
         parlist.rid <- NULL
       }
       loginfo(sprintf("select variable genes ... (%s)",rid))
-      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,mean.thre = mean.thre,
+      obj <- ssc.variableGene(obj,method=method.vgene,sd.n=sd.n,mean.thre = mean.thre,fdr.thre=fdr.thre,
                               assay.name=assay.name,reuse = reuse,var.block = var.block,
                               out.prefix = sprintf("%s.%s",out.prefix,rid))
       loginfo(sprintf("reduce dimensions ... (%s)",rid))
