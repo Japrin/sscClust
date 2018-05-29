@@ -1059,7 +1059,7 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
   requireNamespace("ggplot2")
   requireNamespace("data.table")
   gene <- ssc.displayName2id(obj,display.name = gene)
-  dat.plot <- t(assay(obj,assay.name)[gene,])
+  dat.plot <- t(assay(obj,assay.name)[gene,,drop=F])
   colnames(dat.plot) <- ssc.id2displayName(obj,colnames(dat.plot))
   dat.plot.df <- data.table::data.table(sample=rownames(dat.plot),stringsAsFactors = F)
   dat.plot.df[,group.var] <- colData(obj)[,group.var]
