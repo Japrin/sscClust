@@ -45,7 +45,7 @@ ssc.build <- function(x,display.name=NULL)
   {
     obj <- x
     metadata(obj)$ssc <- list()
-  }else if(class(x) %in% c("matrix","data.frame")){
+  }else if(class(x) %in% c("matrix","data.frame","dgCMatrix","dgTMatrix")){
     obj <- SingleCellExperiment(assays = list(exprs = as.matrix(x)))
   }
   if(is.null(rowData(obj)[["display.name"]])){
@@ -56,6 +56,9 @@ ssc.build <- function(x,display.name=NULL)
     }else{
       rowData(obj)[,"display.name"] <- row.names(obj)
     }
+  }
+  if(is.null(obj)){
+    warning("SingleCellExperiment object building failed!")
   }
   return(obj)
 }
@@ -190,6 +193,7 @@ ssc.displayName2id <- function(obj,display.name)
 #' Reduce dimension by various methods
 #' @importFrom SingleCellExperiment reducedDim
 #' @importFrom stats cor prcomp
+#' @importFrom BiocGenerics t
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method character; method to be used for dimension reduction, should be one of (pca, tsne, iCor, zinbwave). (default: "iCor")
@@ -257,7 +261,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
     set.seed(myseed)
 
     if(method=="pca"){
-        pca.res <- prcomp(t(assay(obj[vgene,],assay.name)))
+        pca.res <- prcomp(BiocGenerics::t(assay(obj[vgene,],assay.name)))
         ### find elbow point and get number of components to be used
         pca.res$eigenv.prop <- pca.res$sdev/sum(pca.res$sdev)
         pca.res$eigengap <- sapply(seq_len(length(pca.res$eigenv.prop)-1),function(i){ pca.res$eigenv.prop[i]-pca.res$eigenv.prop[i+1] })
@@ -278,9 +282,9 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
         proj_data <- pca.res$x[,1:pca.npc,drop=F]
         if(autoTSNE){ reducedDim(obj,sprintf("%s.tsne",dim.name)) <- run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity) }
     }else if(method=="tsne"){
-      proj_data <- run.tSNE(t(assay(obj[vgene,],assay.name)),tSNE.usePCA,tSNE.perplexity)
+      proj_data <- run.tSNE(BiocGenerics::t(assay(obj[vgene,],assay.name)),tSNE.usePCA,tSNE.perplexity)
     }else if(method=="iCor"){
-      proj_data <- assay(obj[vgene,],assay.name)
+      proj_data <- as.matrix(assay(obj[vgene,],assay.name))
       while(iCor.niter>0){
         ##proj_data <- cor(proj_data,method=iCor.method)
         proj_data <- cor.BLAS(t(proj_data),method=iCor.method,nthreads = ncore)
