@@ -5,8 +5,8 @@
 \title{Plot violin}
 \usage{
 ssc.plot.violin(obj, assay.name = "exprs", gene = NULL, columns = NULL,
-  group.var = "majorCluster", out.prefix = NULL, p.ncol = 1,
-  base_aspect_ratio = 1.1, ...)
+  group.var = "majorCluster", clamp = c(0, 15), out.prefix = NULL,
+  p.ncol = 1, base_aspect_ratio = 1.1, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -18,6 +18,8 @@ ssc.plot.violin(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 \item{columns}{character; columns in colData(obj) to be showd. (default: NULL)}
 
 \item{group.var}{character; column in the colData(obj) used for grouping. (default: "majorCluster")}
+
+\item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter. (default: c(0,15))}
 
 \item{out.prefix}{character; output prefix. (default: NULL)}
 
