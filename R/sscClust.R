@@ -1067,7 +1067,7 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
   dat.plot <- t(assay(obj,assay.name)[gene,,drop=F])
   colnames(dat.plot) <- ssc.id2displayName(obj,colnames(dat.plot))
   dat.plot.df <- data.table::data.table(sample=rownames(dat.plot),stringsAsFactors = F)
-  dat.plot.df[,group.var] <- colData(obj)[,group.var]
+  dat.plot.df <- cbind(dat.plot.df,as.data.frame(colData(obj)[,group.var,drop=F]))
   dat.plot.df <- cbind(dat.plot.df,dat.plot)
   dat.plot.df <- data.table::melt(dat.plot.df,id.vars=c("sample",group.var),
                                   variable.name="gene",value.name=assay.name)
@@ -1086,10 +1086,11 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
   }else if(length(group.var)==2)
   {
     p <- p +
-      geom_violin(scale = "width",aes_string(fill="meanExp",linetype=group.var[2]),color=group.var[2],show.legend = T) +
-      scale_colour_brewer(palette = "Set1") +
-      scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),
-                           limits=clamp)
+        geom_boxplot(aes_string(colour = group.var[2])) +
+        scale_colour_brewer(palette = "Set1")
+        #geom_violin(scale = "width",aes_string(fill="meanExp",linetype=group.var[2],color=group.var[2]),
+        #            show.legend = T) +
+        #scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),limits=clamp)
   }
   p <- p +
     theme_bw(base_size = 12) +
