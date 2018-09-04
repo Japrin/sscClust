@@ -1045,6 +1045,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
 #' @param gene character; genes to be showed. (default: NULL)
 #' @param columns character; columns in colData(obj) to be showd. (default: NULL)
 #' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
+#' @param clamp integer vector; expression values will be clamped to the range defined by this parameter. (default: c(0,15))
 #' @param out.prefix character; output prefix. (default: NULL)
 #' @param p.ncol integer; number of columns in the figure layout. (default: 3)
 #' @param base_aspect_ratio numeric; base_aspect_ratio, used for plotting metadata. (default 1.1)
@@ -1057,7 +1058,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
 #' NULL, colData of obj with names in `columns` will be plot in violin.
 #' @export
 ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
-                            group.var="majorCluster",
+                            group.var="majorCluster",clamp=c(0,15),
                             out.prefix=NULL,p.ncol=1,base_aspect_ratio=1.1,...)
 {
   requireNamespace("ggplot2")
@@ -1073,13 +1074,24 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
   dat.plot.df.grpMean <- dat.plot.df[,lapply(.SD,mean),by=c("gene",group.var),.SDcols=assay.name]
   colnames(dat.plot.df.grpMean) <- c("gene",group.var,"meanExp")
   dat.plot.df <- dat.plot.df.grpMean[dat.plot.df,,on=c("gene",group.var)]
-  dat.plot.df[meanExp<0,meanExp:=0,]
-  dat.plot.df[meanExp>15,meanExp:=15,]
+  dat.plot.df[meanExp<clamp[1],meanExp:=clamp[1],]
+  dat.plot.df[meanExp>clamp[2],meanExp:=clamp[2],]
   head(dat.plot.df)
-  p <- ggplot(dat.plot.df, aes_string(group.var, assay.name)) +
-    geom_violin(scale = "width",aes(fill=meanExp),color=NA,show.legend = T) +
-    scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = 7.5,
-                        limits=c(0,15)) +
+  p <- ggplot(dat.plot.df, aes_string(group.var[1], assay.name))
+  if(length(group.var)==1){
+    p <- p +
+      geom_violin(scale = "width",aes(fill=meanExp),color=NA,show.legend = T) +
+      scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),
+                          limits=clamp)
+  }else if(length(group.var)==2)
+  {
+    p <- p +
+      geom_violin(scale = "width",aes_string(fill="meanExp",linetype=group.var[2]),color=group.var[2],show.legend = T) +
+      scale_colour_brewer(palette = "Set1") +
+      scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),
+                           limits=clamp)
+  }
+  p <- p +
     theme_bw(base_size = 12) +
     facet_grid(gene ~ .,switch = "y",scales = "free_y") +
     theme(axis.text.x = element_text(angle = 60, hjust = 1),strip.placement = "inside")
