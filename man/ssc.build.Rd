@@ -4,12 +4,14 @@
 \alias{ssc.build}
 \title{Build an SingleCellExperiment object}
 \usage{
-ssc.build(x, display.name = NULL)
+ssc.build(x, display.name = NULL, assay.name = "exprs")
 }
 \arguments{
 \item{x}{matrix/data.frame or SingleCellExperiment; input expression data}
 
 \item{display.name}{a vector, should be human readable gene name}
+
+\item{assay.name}{assay name (default "exprs")}
 }
 \value{
 an object of \code{SingleCellExperiment} class

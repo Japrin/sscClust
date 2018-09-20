@@ -29,6 +29,7 @@ ssc.plot.silhouette <- function(obj,cluster.label,reducedDim.name="iCor.tsne",do
 #' @importFrom SingleCellExperiment SingleCellExperiment rowData
 #' @param x matrix/data.frame or SingleCellExperiment; input expression data
 #' @param display.name a vector, should be human readable gene name
+#' @param assay.name assay name (default "exprs")
 #' @details if x is an object of SingleCellExperiment, just clear the metadata;
 #' if x is matrix/data.frame, convert it to an object of SingleCellExperiment.
 #' Also a vector `display.name` can be provided, which would be used in some plots,
@@ -38,15 +39,17 @@ ssc.plot.silhouette <- function(obj,cluster.label,reducedDim.name="iCor.tsne",do
 #' would be used.
 #' @return an object of \code{SingleCellExperiment} class
 #' @export
-ssc.build <- function(x,display.name=NULL)
+ssc.build <- function(x,display.name=NULL,assay.name="exprs")
 {
   obj <- NULL
   if(class(x)=="SingleCellExperiment")
   {
     obj <- x
     metadata(obj)$ssc <- list()
-  }else if(class(x) %in% c("matrix","data.frame","dgCMatrix","dgTMatrix")){
-    obj <- SingleCellExperiment(assays = list(exprs = as.matrix(x)))
+  }else if(class(x) %in% c("matrix","data.frame")){
+    obj <- SingleCellExperiment(assays = setNames(list(as.matrix(x)),assay.name))
+  }else if(class(x) %in% c("dgCMatrix","dgTMatrix")){
+    obj <- SingleCellExperiment(assays = setNames(list(x),assay.name))
   }
   if(is.null(rowData(obj)[["display.name"]])){
     if(!is.null(display.name)){
