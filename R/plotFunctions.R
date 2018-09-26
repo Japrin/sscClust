@@ -66,7 +66,7 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
   gene.to.show <- gene.to.show[f.g]
 
   dat.plot <- data.frame(sample=rownames(dat.map),stringsAsFactors = F)
-  dat.plot <- cbind(dat.plot,dat.map,t(Y[gene.to.show,dat.plot$sample,drop=F]))
+  dat.plot <- cbind(dat.plot,dat.map,t(as.matrix(Y[gene.to.show,dat.plot$sample,drop=F])))
   colnames(dat.plot) <- c("sample","Dim1","Dim2",names(gene.to.show))
   dat.plot.melt <- data.table::melt(dat.plot,id.vars = c("sample","Dim1","Dim2"))
   dat.plot.melt <- dat.plot.melt[order(dat.plot.melt$value,decreasing = F),]
