@@ -963,6 +963,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @export
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plotDensity=F, colSet=list(),
                           reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,size=NULL,
+                          brewer.palette="YlOrRd",
                           out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
   #requireNamespace("ggplot2")
@@ -989,10 +990,17 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL, plot
           colnames(dat.plot) <- c("sample","Dim1","Dim2",cc)
           dat.plot <- dat.plot[order(dat.plot[,cc]),]
           npts <- nrow(dat.plot)
-          p <- ggplot2::ggplot(dat.plot,aes(Dim1,Dim2)) +
-            geom_point(aes_string(colour=cc),size=if(is.null(size)) auto.point.size(npts)*1.1 else size)
           if(is.numeric(dat.plot[,cc])){
-            p <- p + scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9, "YlOrRd"))
+            nvalues <- Inf
+          }else{
+            nvalues <- length(unique(dat.plot[,cc]))
+          }
+          p <- ggplot2::ggplot(dat.plot,aes(Dim1,Dim2)) +
+            geom_point(aes_string(colour=cc),
+                       show.legend=if(!is.numeric(dat.plot[,cc]) && nvalues>30) F else NA,
+                       size=if(is.null(size)) auto.point.size(npts)*1.1 else size)
+          if(is.numeric(dat.plot[,cc])){
+            p <- p + scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9, brewer.palette))
           }else{
             p <- p + scale_colour_manual(values = colSet[[cc]])
           }
