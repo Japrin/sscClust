@@ -10,9 +10,9 @@ ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
   method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
   iCor.method = "spearman", zinbwave.K = 20, zinbwave.X = "~patient",
   subsampling = F, sub.frac = 0.4, sub.use.proj = T, sub.vis.proj = F,
-  k.batch = 2:6, refineGene = F, de.n = 1500, nIter = 1,
-  out.prefix = NULL, parfile = NULL, reuse = F, ncore = NULL,
-  seed = NULL, do.DE = F, ...)
+  k.batch = 2:6, refineGene = F, de.n = 1500, HSD.FC.THRESHOLD = 1,
+  nIter = 1, out.prefix = NULL, parfile = NULL, reuse = F,
+  ncore = NULL, seed = NULL, do.DE = F, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -61,6 +61,8 @@ used in trendVar method (default NULL)}
 genes found by the first round cluster result. (default: F)}
 
 \item{de.n}{integer; number of differential genes used for refined geneset for another run of clustering (default 1500)}
+
+\item{HSD.FC.THRESHOLD}{numeric; threshold for log2FoldChange, used in findDEGenesByAOV (default 1)}
 
 \item{nIter}{integer; number of iterative clustering in sub-cluster. (default: 1)}
 

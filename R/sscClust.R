@@ -707,6 +707,7 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param k.batch integer; number of clusters to be evaluated. (default: 2:6)
 #' @param refineGene logical; whether perform second round demension reduction and clustering pipeline using the differential
 #' genes found by the first round cluster result. (default: F)
+#' @param HSD.FC.THRESHOLD numeric; threshold for log2FoldChange, used in findDEGenesByAOV (default 1)
 #' @param nIter integer; number of iterative clustering in sub-cluster. (default: 1)
 #' @param do.DE logical; perform DE analysis when clustering finished. (default: F)
 #' @param out.prefix character; output prefix, if not NULL, some plots of intermediate result will be produced. (default: NULL)
@@ -742,6 +743,7 @@ ssc.run <- function(obj, assay.name="exprs",
                     k.batch=2:6,
                     refineGene=F,
                     de.n=1500,
+                    HSD.FC.THRESHOLD=1,
                     nIter=1,
                     out.prefix=NULL,
                     parfile=NULL,
@@ -829,6 +831,7 @@ ssc.run <- function(obj, assay.name="exprs",
           de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
                                      xlabel = colData(obj)[,.xlabel],
                                      n.cores = ncore,
+                                     HSD.FC.THRESHOLD = HSD.FC.THRESHOLD,
                                      gid.mapping = rowData(obj)[,"display.name"])
           if(!is.null(de.out) && nrow(de.out$aov.out.sig)>30){
             metadata(obj)$ssc[["de.res"]][[rid]] <- de.out
@@ -907,6 +910,7 @@ ssc.run <- function(obj, assay.name="exprs",
       }
       de.out <- findDEGenesByAOV(xdata = assay(obj,assay.name),
                                  xlabel = .xlabel,
+                                 HSD.FC.THRESHOLD = HSD.FC.THRESHOLD,
                                  gid.mapping = rowData(obj)[,"display.name"])
       metadata(obj)$ssc[["de.res"]][["L1C1"]] <- de.out
       metadata(obj)$ssc[["variable.gene"]][["de"]] <- head(de.out$aov.out.sig$geneID,n=sd.n)
