@@ -225,7 +225,87 @@ findDEGenesByAOV <- function(xdata,xlabel,out.prefix=NULL,mod=NULL,
   return(list(aov.out=ret.df,aov.out.sig=ret.df.sig))
 }
 
+#' calculate the AUC of one gene, using it as a classifier. code from SC3
+#' @importFrom ROCR prediction performance
+#' @importFrom stats aggregate wilcox.test
+#' @param gene numeric; expression profile of one gene across samples
+#' @param labels; character; clusters of the samples belong to
+#' @param use.rank; logical; using the expression value itself or convert to rank value. (default: TRUE)
+getAUC <- function(gene, labels,use.rank=T)
+{
+    suppressPackageStartupMessages(require("ROCR"))
+    if(use.rank){
+        score <- rank(gene)
+    }else{
+        score <- gene
+    }
+    # Get average score for each cluster
+    ms <- aggregate(score ~ labels, FUN = mean)
+    # Get cluster with highest average score
+    posgroup <- ms[ms$score == max(ms$score), ]$labels
+    # Return negatives if there is a tie for cluster with highest average score
+    # (by definition this is not cluster specific)
+    if(length(posgroup) > 1) {
+        return (c(-1,-1,1))
+    }
+    # Create 1/0 vector of truths for predictions, cluster with highest
+    # average score vs everything else
+    truth <- as.numeric(labels == posgroup)
+    #Make predictions & get auc using RCOR package.
+    pred <- prediction(score,truth)
+    val <- unlist(performance(pred,"auc")@y.values)
+    pval <- suppressWarnings(wilcox.test(score[truth == 1],
+                                         score[truth == 0])$p.value)
+    return(c(val,posgroup,pval))
+}
 
+#' For each gene, calculate the frequency of cells in each clusters are expressed.
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom doParallel registerDoParallel
+#' @importFrom plyr ldply
+#' @param exp.bin; numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.
+#' @param group; character; clusters of the samples belong to
+#' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+expressedFraction <- function(exp.bin,group,n.cores=NULL){
+    suppressPackageStartupMessages(require("plyr"))
+    suppressPackageStartupMessages(require("doParallel"))
+    RhpcBLASctl::omp_set_num_threads(1)
+    registerDoParallel(cores = n.cores)
+    out.res <- ldply(rownames(exp.bin),function(v){
+                .res <- aggregate(exp.bin[v,],by=list(group),FUN=function(x){ sum(x==1)/length(x) })
+                structure(.res[,2],names=.res[,1])
+			},.progress = "none",.parallel=T)
+    rownames(out.res) <- rownames(exp.bin)
+    colnames(out.res) <- sprintf("HiFrac.%s",colnames(out.res))
+    out.res <- as.matrix(out.res)
+    return(out.res)
+}
+
+#' For each gene, calculate the average expression of the expressor.
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom doParallel registerDoParallel
+#' @importFrom plyr ldply
+#' @param exp.bin; numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.
+#' @param exp.norm; numeric; expression matrix, rows for genes and columns for samples. original version of exp.bin.
+#' @param group; character; clusters of the samples belong to
+#' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+expressedFraction.HiExpressorMean <- function(exp.bin,exp.norm,group,n.cores=NULL){
+    suppressPackageStartupMessages(require("plyr"))
+    suppressPackageStartupMessages(require("doParallel"))
+    RhpcBLASctl::omp_set_num_threads(1)
+    registerDoParallel(cores = n.cores)
+    exp.bin[exp.bin<1] <- 0
+    .exp <- exp.bin*exp.norm
+    out.res <- ldply(rownames(.exp),function(v){
+                .n <- aggregate(exp.bin[v,],by=list(group),FUN=function(x){ sum(x==1) })
+                .res <- aggregate(.exp[v,],by=list(group),FUN=function(x){ sum(x) })
+                structure(.res[,2]/.n[,2],names=.res[,1])
+			},.progress = "none",.parallel=T)
+    rownames(out.res) <- rownames(exp.bin)
+    colnames(out.res) <- sprintf("AvgHiExpr.%s",colnames(out.res))
+    out.res <- as.matrix(out.res)
+    return(out.res)
+}
 
 ####### classification functions
 

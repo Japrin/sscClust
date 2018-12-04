@@ -59,6 +59,7 @@ ssc.build <- function(x,display.name=NULL,assay.name="exprs")
     }else{
       rowData(obj)[,"display.name"] <- row.names(obj)
     }
+    if(is.null(names(rowData(obj)$display.name))){ names(rowData(obj)$display.name) <- row.names(obj) }
   }
   if(is.null(obj)){
     warning("SingleCellExperiment object building failed!")
@@ -1079,7 +1080,7 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
   requireNamespace("ggplot2")
   requireNamespace("data.table")
   gene <- ssc.displayName2id(obj,display.name = gene)
-  dat.plot <- t(assay(obj,assay.name)[gene,,drop=F])
+  dat.plot <- as.matrix(t(assay(obj,assay.name)[gene,,drop=F]))
   colnames(dat.plot) <- ssc.id2displayName(obj,colnames(dat.plot))
   dat.plot.df <- data.table::data.table(sample=rownames(dat.plot),stringsAsFactors = F)
   dat.plot.df <- cbind(dat.plot.df,as.data.frame(colData(obj)[,group.var,drop=F]))
@@ -1141,4 +1142,143 @@ ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2)
     theme_bw()
   print(p)
 }
+
+
+#' identify marker genes of each cluster
+#' @param obj object of \code{singleCellExperiment} class
+#' @param out.prefix character; output prefix. (default: NULL)
+#' @param p.ncol integer; number of columns in the figure layout. (default: 2)
+#' @param exp.bin; numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.
+#' @param exp.norm; numeric; expression matrix, rows for genes and columns for samples. original version of exp.bin.
+#' @param group; character; clusters of the samples belong to
+#' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom doParallel registerDoParallel
+#' @importFrom plyr ldply
+#' @importFrom dplyr inner_join
+#' @details identify marker genes based on aov and AUC.
+#' @export
+ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorCluster",
+                                  assay.bin=NULL,minCell=5,
+                                  out.prefix,n.cores=NULL,
+                                  do.plot=T,
+                                  #clust.col=NULL,ann.col=NULL,
+                                  #sampleType=NULL,sampleTypeColSet=NULL,
+                                  F.FDR.THRESHOLD=0.05,pairwise.P.THRESHOLD=0.05,pairwise.FC.THRESHOLD=1,
+                                  verbose=F)
+{
+    suppressPackageStartupMessages(require("plyr"))
+    suppressPackageStartupMessages(require("dplyr"))
+    suppressPackageStartupMessages(require("doParallel"))
+    suppressPackageStartupMessages(require("factoextra"))
+    clust <- colData(obj)[,group.var]
+    if(length(unique(clust))<2 || is.null(obj) || !all(table(clust) > 1)){
+        cat("WARN: clusters<2 or no obj provided or not all clusters have more than 1 samples\n")
+        return(NULL)
+    }
+    RhpcBLASctl::omp_set_num_threads(1)
+    registerDoParallel(cores = n.cores)
+
+    if(is.null(names(rowData(obj)$display.name))){ names(rowData(obj)$display.name) <- row.names(obj) }
+    gid.mapping <- rowData(obj)$display.name
+    if(is.null(names(gid.mapping))){ names(gid.mapping) <- row.names(obj) }
+    dat.to.test <- as.matrix(assay(obj,assay.name))
+    #### filter genes
+    exp.frac <- NULL
+    if(!is.null(assay.bin) && assay.bin %in% assayNames(obj)){
+        #.f.gid <- intersect(rownames(exp.bin),rownames(dat.to.test))
+        exp.frac <- expressedFraction(as.matrix(assay(obj,assay.bin)),clust,n.cores)
+        #print(str(exp.frac))
+        #print(head(exp.frac))
+#        f.bin <- apply(exp.frac,1,function(x){ nE <- sum(x>0.05); nNE <- sum(x<0.95); return(nE > 0 && nNE > 0) })
+#        dat.to.test <- dat.to.test[f.bin,]
+        f.notAllZero <- apply(dat.to.test,1,
+                              function(x){ nE <- sum(x>0); return( nE > minCell & nE/length(x) > 0.01 ) })
+        dat.to.test <- dat.to.test[f.notAllZero,]
+    }else{
+        ### currently the same with using assay.bin
+        f.notAllZero <- apply(dat.to.test,1,
+                              function(x){ nE <- sum(x>0); return( nE > minCell & nE/length(x) > 0.01 ) })
+        dat.to.test <- dat.to.test[f.notAllZero,]
+    }
+    ### AUC
+    .gene.table <- ldply(rownames(dat.to.test),function(x){
+        getAUC(dat.to.test[x,],clust,use.rank = F)
+    },.progress = "none",.parallel=T)
+    colnames(.gene.table) <- c("AUC","cluster","score.p.value")
+    #print("str(.gene.table)")
+    #print(str(.gene.table))
+    if(is.character(.gene.table$AUC)){ .gene.table$AUC <- as.numeric(.gene.table$AUC) }
+    if(is.character(.gene.table$score.p.value)){ .gene.table$score.p.value <- as.numeric(.gene.table$score.p.value) }
+    if(is.numeric(.gene.table$cluster)){ .gene.table$cluster <- sprintf("C%s",.gene.table$cluster) }
+    ##.gene.table$score.q.value <- p.adjust(.gene.table$score.p.value,method = "BH")
+                                    ####geneSymbol=if(original.labels) rownames(dat.to.test) else entrezToXXX(rownames(dat.to.test)),
+    .gene.table$score.q.value <- 1
+    .gene.table <- cbind(data.frame(geneID=rownames(dat.to.test),
+                                    geneSymbol=gid.mapping[rownames(dat.to.test)],
+                                    stringsAsFactors = F),
+                         .gene.table)
+    #### diff genes
+    .aov.res <- findDEGenesByAOV(xdata = dat.to.test,
+                                 xlabel =if(is.numeric(clust)) sprintf("C%s",clust) else clust,
+                                 out.prefix=out.prefix,mod=NULL,
+                                 F.FDR.THRESHOLD=F.FDR.THRESHOLD,
+                                 HSD.FDR.THRESHOLD=pairwise.P.THRESHOLD,
+                                 HSD.FC.THRESHOLD=pairwise.FC.THRESHOLD,
+                                 verbose=verbose,n.cores=n.cores, gid.mapping=gid.mapping)
+    if(verbose){
+        .gene.table <- inner_join(x = .gene.table,y = .aov.res$aov.out)
+    }else{
+        .gene.table <- inner_join(x = .gene.table,y = .aov.res$aov.out.sig)
+    }
+    ### average expression of each cluster
+    avg.exp <- ldply(as.character(.gene.table$geneID),function(v){
+                .res <- aggregate(dat.to.test[v,],by=list(clust),FUN=mean)
+                .res.2 <- aggregate(dat.to.test[v,],by=list(clust),FUN=sd)
+                structure(c(.res[,2],.res.2[,2]),names=c(sprintf("avg.%s",.res[,1]),sprintf("sd.%s",.res[,1])))
+			},.progress = "none",.parallel=T)
+    ##rownames(avg.exp) <- rownames(dat.to.test[as.character(.gene.table$geneID),,drop=F])
+    rownames(avg.exp) <- as.character(.gene.table$geneID)
+    ####colnames(avg.exp) <- sprintf("avg.%s",colnames(avg.exp))
+    avg.exp.df <- data.frame(geneID=rownames(avg.exp),
+                             geneSymbol=gid.mapping[rownames(avg.exp)],
+                             stringsAsFactors = F)
+    avg.exp.df <- cbind(avg.exp.df,avg.exp)
+    .gene.table <- inner_join(x=.gene.table,y=avg.exp.df)
+    ### binarized expression fraction
+    if(!is.null(exp.frac)){
+        exp.frac.df <- data.frame(geneID=rownames(exp.frac),
+                                  geneSymbol=gid.mapping[rownames(exp.frac)],
+                                  stringsAsFactors = F)
+        exp.frac.df <- cbind(exp.frac.df,exp.frac)
+        .gene.table <- inner_join(x = .gene.table,y = exp.frac.df)
+    }
+    rownames(.gene.table) <- .gene.table$geneID
+    if(verbose){
+        .gene.table <- .gene.table[order(.gene.table$F,decreasing = T),]
+        write.table(.gene.table, file = sprintf("%s.geneTable.all.txt",out.prefix),
+                    row.names = F,quote = F,sep = "\t")
+    }
+    ### final .gene.table always contain only thoase show significant differential expression
+    f.isSig <- intersect(rownames(.aov.res$aov.out.sig),rownames(.gene.table))
+    .gene.table <- .gene.table[f.isSig,]
+    .gene.table$score.q.value <- p.adjust(.gene.table$score.p.value,method = "BH")
+    order.gene <- order(.gene.table$cluster,-.gene.table$AUC)
+    .gene.table <- .gene.table[order.gene,,drop=F]
+
+    #rownames(.gene.table) <- .gene.table$geneID
+    ### save .txt file
+    write.table(.gene.table, file = sprintf("%s.markerGene.all.txt",out.prefix),
+                row.names = F,quote = F,sep = "\t")
+    #write.table(subset(.gene.table,score.q.value<0.01),
+    #            file = sprintf("%s.markerGene.q01.txt",out.prefix),
+    #            row.names = F,quote = F,sep = "\t")
+    if(do.plot)
+    {
+
+    }
+    return(list(gene.table=.gene.table,aov.res=.aov.res))
+}
+
+
 
