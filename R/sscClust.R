@@ -194,6 +194,175 @@ ssc.displayName2id <- function(obj,display.name)
   return(ret)
 }
 
+####### operations on sce object ######
+#' sort by hierarchical clustering
+#' @param obj object of \code{singleCellExperiment} class
+#' @param assay.name character; which assay (default: "exprs")
+#' @param order.col logical; wheter order columns (default: FALSE)
+#' @param order.row logical; wheter order row (default: FALSE)
+#' @param clustering.distance character; one of spearmn, pearson and euclidean (default: "spearman")
+#' @param clustering.method character; method for hclust (default: "complete")
+#' @param k.row integer; number of clusters in the rows (default: 1)
+#' @param k.col integer; number of clusters in the columns (default: 1)
+#' @importFrom stats hclust
+#' @importFrom dendextend color_branches
+#' @details order genes or cells according the assay, using hclust.
+#' @export
+ssc.assay.hclust <- function(obj,assay.name="exprs",
+                             order.col=FALSE,order.row=FALSE,
+                             clustering.distance="spearman",clustering.method="complete",
+                             k.row=1,k.col=1)
+{
+    if(order.col && ncol(obj)>2)
+    {
+        branch.col <- FALSE
+        obj.hclust.col <- NULL
+        if(clustering.distance=="spearman" || clustering.distance=="pearson"){
+            tryCatch({
+                dist.out <- cor.BLAS(t(assay(obj,assay.name)),method=clustering.distance,nthreads=1)
+                obj.hclust.col <- hclust(as.dist(1-dist.out), method=clustering.method)
+            },error = function(e){
+                cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
+            })
+        }
+        if(is.logical(branch.col) && !branch.col){
+            obj.hclust.col <- hclust(dist(t(assay(obj,assay.name))),method=clustering.method)
+        }
+        branch.col <- dendextend::color_branches(as.dendrogram(obj.hclust.col),k=k.col)
+        obj <- obj[,obj.hclust.col$order]
+        metadata(obj)$assay.hclust$col <- obj.hclust.col
+        metadata(obj)$assay.hclust$branch.col <- branch.col
+    }
+    if(order.row && nrow(obj)>2){
+        branch.row <- FALSE
+        obj.hclust.row <- NULL
+        if(clustering.distance=="spearman" || clustering.distance=="pearson"){
+            tryCatch({
+                dist.out <- cor.BLAS(assay(obj,assay.name),method=clustering.distance,nthreads=1)
+                obj.hclust.row <- hclust(as.dist(1-dist.out), method=clustering.method)
+            },error = function(e){
+                cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
+            })
+        }
+        if(is.logical(branch.row) && !branch.row){
+            obj.hclust.row <- hclust(dist(assay(obj,assay.name)),method=clustering.method)
+        }
+        branch.row <- dendextend::color_branches(as.dendrogram(obj.hclust.row),k=k.row)
+        obj <- obj[obj.hclust.row$order,]
+        metadata(obj)$assay.hclust$row <- obj.hclust.row
+        metadata(obj)$assay.hclust$branch.row <- branch.row
+    }
+    return(obj)
+}
+
+#' order genes and cells
+#' @param obj object of \code{singleCellExperiment} class
+#' @param columns.order character; columns of colData(obj) used for ordering (default: NULL)
+#' @param gene.desc data.frame; it must contain columns geneID and Group (default: NULL)
+#' @export
+ssc.order <- function(obj,columns.order=NULL,gene.desc=NULL)
+{
+    if(!is.null(gene.desc) && ("Group" %in% colnames(gene.desc)) && ("geneID" %in% colnames(gene.desc))){
+        obj.tmp <- NULL
+        #### Todo: change to 'ldply' style
+        for(g.cls in unique(gene.desc$Group))
+        {
+            g.desc <- subset(gene.desc,Group==g.cls)
+            if(is.null(obj.tmp)){
+                obj.tmp <- obj[g.desc$geneID,]
+            }else{
+                obj.tmp <- rbind(obj.tmp,obj[g.desc$geneID,])
+            }
+        }
+        obj <- obj.tmp
+        obj.tmp <- NULL
+        gc()
+    }
+    if(!is.null(columns.order)){
+        annDF <- as.data.frame(colData(obj)[columns.order])
+        annDF <- annDF[eval(parse(text=sprintf("with(annDF,order(%s))", columns.order))),,drop=F]
+        obj <- obj[,rownames(annDF)]
+    }
+    return(obj)
+}
+
+#' calculate the average expression of cells
+#' @param obj object of \code{singleCellExperiment} class
+#' @param assay.name character; which assay (default: "exprs")
+#' @param columns character; columns of colData(obj) used for grouping (default: "majorCluster")
+#' @importFrom data.table as.data.table
+#' @export
+ssc.average.cell <- function(obj,assay.name="exprs",columns="majorCluster")
+{
+    requireNamespace("data.table")
+    dat.plot.exp.mtx <- as.matrix(assay(obj,assay.name))
+
+    cell.info <- as.data.table(colData(obj)[columns])
+    cell.info$cellID <- colnames(obj)
+    cell.info.split <- split(cell.info,by=columns,sorted=T)
+    dat.plot.exp.ave.mtx <- sapply(names(cell.info.split),function(x){
+                apply(dat.plot.exp.mtx[,cell.info.split[[x]][["cellID"]],drop=F],1,mean)
+            })
+    obj.ret <- ssc.build(dat.plot.exp.ave.mtx,display.name=rowData(obj)$display.name,assay.name=assay.name)
+    cDat <- ldply(cell.info.split,function(x){x[1,..columns]})
+    rownames(cDat) <- cDat$.id
+    cDat <- cDat[,columns,drop=F]
+    colData(obj.ret) <- DataFrame(cDat)
+    return(obj.ret)
+}
+
+#' scale the assay per gene
+#' @param obj object of \code{singleCellExperiment} class
+#' @param assay.name character; which assay (default: "exprs")
+#' @param assay.new character; assay name to store the scaled- expression;if NULL, will be (assay.name).z (default: NULL)
+#' @param covar character; perform scale in cells grouping by covar (default: "patient")
+#' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @param z.lo double; z-score lower boundary; if set, z-score lower than this will be set to this (default: NULL)
+#' @param z.hi double; z-score higher boundary; if set, z-score higher than this will be set to this (default: NULL)
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom doParallel registerDoParallel
+#' @importFrom data.table as.data.table
+#' @importFrom plyr ldply
+#' @export
+ssc.assay.zscore <- function(obj,assay.name="exprs",assay.new=NULL,covar="patient",n.cores=NULL,
+                             z.lo=NULL,z.hi=NULL)
+{
+    requireNamespace("data.table")
+
+    dat.plot <- as.matrix(assay(obj,assay.name))
+
+    cell.info <- as.data.table(colData(obj)[covar])
+    cell.info$cellID <- colnames(obj)
+    cell.info.split <- split(cell.info,by=covar,sorted=T)
+
+    RhpcBLASctl::omp_set_num_threads(1)
+    doParallel::registerDoParallel(cores = n.cores)
+    dat.plot.z.df <- data.table(ldply(names(cell.info.split),function(x){
+                dat.block <- dat.plot[,cell.info.split[[x]][["cellID"]],drop=F]
+                #dat.block <- scale(t(dat.block))
+                rowM <- rowMeans(dat.block, na.rm = T)
+                rowSD <- apply(dat.block, 1, sd, na.rm = T)
+                dat.block <- sweep(dat.block, 1, rowM)
+                dat.block <- sweep(dat.block, 1, rowSD, "/")
+                dat.block <- t(dat.block)
+                dat.block.df <- cbind(cellID=rownames(dat.block),as.data.frame(dat.block),stringsAsFactors=F)
+                return(dat.block.df)
+            },.progress = "none",.parallel=T))
+    dat.plot.z <- as.matrix(dat.plot.z.df[,-c("cellID")])
+    rownames(dat.plot.z) <- dat.plot.z.df$cellID
+    dat.plot.z <- t(dat.plot.z)
+
+    if(!is.null(z.lo) && !is.null(z.hi)){
+        dat.plot.z[dat.plot.z < z.lo] <- z.lo
+        dat.plot.z[dat.plot.z > z.hi] <- z.hi
+    }
+    assay(obj,if(is.null(assay.new)) sprintf("%s.z",assay.name) else assay.new) <- dat.plot.z
+    return(obj)
+}
+
+#######################################
+
+
 #' Reduce dimension by various methods
 #' @importFrom SingleCellExperiment reducedDim
 #' @importFrom stats cor prcomp
@@ -955,6 +1124,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param xlim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @param ylim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @param size double; points' size. If NULL, infer from number of points (default NULL)
+#' @param brewer.palette character; which palette to use. (default: "YlOrRd")
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend coord_cartesian
 #' @importFrom cowplot save_plot plot_grid
@@ -1146,12 +1316,16 @@ ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2)
 
 #' identify marker genes of each cluster
 #' @param obj object of \code{singleCellExperiment} class
+#' @param assay.name character; which assay (default: "exprs")
+#' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
+#' @param assay.bin character; binarized expression assay (default: NULL)
 #' @param out.prefix character; output prefix. (default: NULL)
-#' @param p.ncol integer; number of columns in the figure layout. (default: 2)
-#' @param exp.bin; numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.
-#' @param exp.norm; numeric; expression matrix, rows for genes and columns for samples. original version of exp.bin.
-#' @param group; character; clusters of the samples belong to
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @param do.plot logical; whether plot. (default: TRUE)
+#' @param F.FDR.THRESHOLD numeric; threshold of the adjusted p value of F-test. (default: 0.01)
+#' @param pairwise.P.THRESHOLD numeric; threshold of the adjusted p value of HSD-test (default: 0.01)
+#' @param pairwise.FC.THRESHOLD numeric; threshold of the absoute diff of HSD-test (default: 1)
+#' @param verbose logical; whether output all genes' result. (default: FALSE)
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom doParallel registerDoParallel
 #' @importFrom plyr ldply
@@ -1159,25 +1333,21 @@ ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2)
 #' @details identify marker genes based on aov and AUC.
 #' @export
 ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorCluster",
-                                  assay.bin=NULL,minCell=5,
-                                  out.prefix,n.cores=NULL,
-                                  do.plot=T,
-                                  #clust.col=NULL,ann.col=NULL,
-                                  #sampleType=NULL,sampleTypeColSet=NULL,
-                                  F.FDR.THRESHOLD=0.05,pairwise.P.THRESHOLD=0.05,pairwise.FC.THRESHOLD=1,
+                                  assay.bin=NULL, out.prefix=NULL,n.cores=NULL, do.plot=T,
+                                  F.FDR.THRESHOLD=0.01,pairwise.P.THRESHOLD=0.01,pairwise.FC.THRESHOLD=1,
                                   verbose=F)
 {
-    suppressPackageStartupMessages(require("plyr"))
-    suppressPackageStartupMessages(require("dplyr"))
-    suppressPackageStartupMessages(require("doParallel"))
-    suppressPackageStartupMessages(require("factoextra"))
+#    requireNamespace("doParallel")
+    requireNamespace("plyr")
+    requireNamespace("dplyr")
+
     clust <- colData(obj)[,group.var]
     if(length(unique(clust))<2 || is.null(obj) || !all(table(clust) > 1)){
         cat("WARN: clusters<2 or no obj provided or not all clusters have more than 1 samples\n")
         return(NULL)
     }
     RhpcBLASctl::omp_set_num_threads(1)
-    registerDoParallel(cores = n.cores)
+    doParallel::registerDoParallel(cores = n.cores)
 
     if(is.null(names(rowData(obj)$display.name))){ names(rowData(obj)$display.name) <- row.names(obj) }
     gid.mapping <- rowData(obj)$display.name
@@ -1185,6 +1355,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorClust
     dat.to.test <- as.matrix(assay(obj,assay.name))
     #### filter genes
     exp.frac <- NULL
+    minCell <- 5
     if(!is.null(assay.bin) && assay.bin %in% assayNames(obj)){
         #.f.gid <- intersect(rownames(exp.bin),rownames(dat.to.test))
         exp.frac <- expressedFraction(as.matrix(assay(obj,assay.bin)),clust,n.cores)
@@ -1202,7 +1373,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorClust
         dat.to.test <- dat.to.test[f.notAllZero,]
     }
     ### AUC
-    .gene.table <- ldply(rownames(dat.to.test),function(x){
+    .gene.table <- plyr::ldply(rownames(dat.to.test),function(x){
         getAUC(dat.to.test[x,],clust,use.rank = F)
     },.progress = "none",.parallel=T)
     colnames(.gene.table) <- c("AUC","cluster","score.p.value")
@@ -1227,12 +1398,12 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorClust
                                  HSD.FC.THRESHOLD=pairwise.FC.THRESHOLD,
                                  verbose=verbose,n.cores=n.cores, gid.mapping=gid.mapping)
     if(verbose){
-        .gene.table <- inner_join(x = .gene.table,y = .aov.res$aov.out)
+        .gene.table <- dplyr::inner_join(x = .gene.table,y = .aov.res$aov.out)
     }else{
-        .gene.table <- inner_join(x = .gene.table,y = .aov.res$aov.out.sig)
+        .gene.table <- dplyr::inner_join(x = .gene.table,y = .aov.res$aov.out.sig)
     }
     ### average expression of each cluster
-    avg.exp <- ldply(as.character(.gene.table$geneID),function(v){
+    avg.exp <- plyr::ldply(as.character(.gene.table$geneID),function(v){
                 .res <- aggregate(dat.to.test[v,],by=list(clust),FUN=mean)
                 .res.2 <- aggregate(dat.to.test[v,],by=list(clust),FUN=sd)
                 structure(c(.res[,2],.res.2[,2]),names=c(sprintf("avg.%s",.res[,1]),sprintf("sd.%s",.res[,1])))
@@ -1244,14 +1415,14 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorClust
                              geneSymbol=gid.mapping[rownames(avg.exp)],
                              stringsAsFactors = F)
     avg.exp.df <- cbind(avg.exp.df,avg.exp)
-    .gene.table <- inner_join(x=.gene.table,y=avg.exp.df)
+    .gene.table <- dplyr::inner_join(x=.gene.table,y=avg.exp.df)
     ### binarized expression fraction
     if(!is.null(exp.frac)){
         exp.frac.df <- data.frame(geneID=rownames(exp.frac),
                                   geneSymbol=gid.mapping[rownames(exp.frac)],
                                   stringsAsFactors = F)
         exp.frac.df <- cbind(exp.frac.df,exp.frac)
-        .gene.table <- inner_join(x = .gene.table,y = exp.frac.df)
+        .gene.table <- dplyr::inner_join(x = .gene.table,y = exp.frac.df)
     }
     rownames(.gene.table) <- .gene.table$geneID
     if(verbose){
@@ -1281,4 +1452,183 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorClust
 }
 
 
+#' plot heatmap
+#' @param obj object of \code{singleCellExperiment} class
+#' @param assay.name character; which assay (default: "exprs")
+#' @param out.prefix character; output prefix. (default: NULL)
+#' @param ncell.downsample integer; number of cells downsample to. (default: NULL)
+#' @param ave.by character; average the expression profile grouping by this. (default: NULL)
+#' @param columns character; columns in colData(obj) to be showd. must be subset of columns of colData(obj) and ave.by (if it's not NULL) (default: NULL)
+#' @param columns.order character; columns of colData(obj) used for ordering (default: NULL)
+#' @param gene.desc data.frame; it must contain columns geneID and Group (default: NULL)
+#' @param colSet list; mapping iterms in the names to colors in the values. (default: list())
+#' @param pdf.width double; width of the pdf file. (default:16)
+#' @param pdf.height double; height of the pdf file. (default:15)
+#' @param do.scale logical; wheter scale the rows, just for visualization. (default: TRUE)
+#' @param z.lo double; z-score lower boundary; z-score lower than this will be set to this (default: -2.5)
+#' @param z.hi double; z-score higher boundary; z-score higher than this will be set to this (default: 2.5)
+#' @param z.step double; z-score step, used for coloring the expression value (default: 1)
+#' @param exp.title character; title for the expression legend (default: "Exp")
+#' @param do.clustering.row logical; wheter order row (default: TRUE)
+#' @param do.clustering.col logical; wheter order columns (default: TRUE)
+#' @param clustering.distance character; one of spearmn, pearson and euclidean (default: "spearman")
+#' @param clustering.method character; method for hclust (default: "complete")
+#' @param k.row integer; number of clusters in the rows (default: 1)
+#' @param k.col integer; number of clusters in the columns (default: 1)
+#' @param palette.name character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)
+#' @param annotation_legend_param list; (default: list())
+#' @param ann.bar.height double; height of the top annotation (default: 1.5)
+#' @param mytitle character; title of the figure (default: "")
+#' @param ... parameters pass to Heatmap()
+#' @importFrom ComplexHeatmap HeatmapAnnotation Heatmap decorate_annotation
+#' @importFrom circlize colorRamp2
+#' @importFrom gridBase baseViewports
+#' @importFrom grid pushViewport grid.text
+#' @importFrom RColorBrewer brewer.pal
+#' @details identify marker genes based on aov and AUC.
+#' @export
+ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
+                             ncell.downsample=NULL,ave.by=NULL,
+                             columns=NULL,columns.order=NULL,gene.desc=NULL,
+                             colSet=list(), pdf.width=16,pdf.height=15,
+                             do.scale=TRUE,z.lo=-2.5,z.hi=2.5,z.step=1,exp.title="Exp",
+                             do.clustering.row=T,do.clustering.col=T,
+                             clustering.distance="spearman",clustering.method="complete",k.row=1,k.col=1,
+                             palette.name=NULL,
+                             annotation_legend_param=list(),ann.bar.height=1.5, mytitle="",...)
+{
+    requireNamespace("ComplexHeatmap")
+    requireNamespace("circlize")
+    requireNamespace("gridBase")
+    requireNamespace("grid")
+    requireNamespace("RColorBrewer")
+
+    if(!is.null(gene.desc) && ("Group" %in% colnames(gene.desc)) && ("geneID" %in% colnames(gene.desc))){
+        obj <- obj[gene.desc$geneID,]
+    }
+    if(!is.null(ncell.downsample) && ncell.downsample < ncol(obj) ){
+        obj <- obj[,sample(seq_len(ncol(obj)),ncell.downsample)]
+    }
+
+    n <- nrow(obj)
+    m <- ncol(obj)
+    if(n<3) { loginfo(sprintf("Too few genes: n=%s",n)); return(NULL) }
+    if(m<3) { loginfo(sprintf("Too few samples: m=%s",m)); return(NULL) }
+
+    #### sort
+    if(is.null(ave.by)){
+        obj <- ssc.assay.hclust(obj,assay.name=assay.name,
+                                order.col=do.clustering.col,
+                                order.row=do.clustering.row,
+                                clustering.distance="spearman",clustering.method="complete",
+                                k.row=1,k.col=1)
+    }else{
+        obj <- ssc.average.cell(obj,assay.name=assay.name,columns=ave.by)
+        columns <- intersect(ave.by,columns)
+        columns.order <- intersect(ave.by,columns.order)
+    }
+
+    #### visualization of annotation on top of heatmap
+    ha.col <- NULL
+    annDF <- data.frame()
+    if(!is.null(columns))
+    {
+        if(!is.null(columns.order)){
+            obj <- ssc.order(obj,columns.order=columns.order)
+        }
+        annDF <- as.data.frame(colData(obj)[columns])
+        if(length(colSet)==0) {
+            for(i in seq_along(columns)){
+                x <- columns[i]
+                if(class(colData(obj)[,x])=="numeric"){
+                    if(all(colData(obj)[,x]<=1) && all(colData(obj)[,x]>=0)){
+                        Y.level <- c(0,1)
+                    }else{
+                        Y.level <- pretty(colData(obj)[,x],n=8)
+                    }
+                    # continious version
+                    colSet[[x]] <- colorRamp2(seq(Y.level[1],Y.level[length(Y.level)],length=7),
+                                              rev(brewer.pal(n = 7, name = "RdYlBu")),
+                                              space="LAB")
+                    annotation_legend_param[[x]] <- list(color_bar="continuous",
+                                                         legend_direction="horizontal",
+                                                         legend_width=unit(4, "cm"),
+                                                         legend_height=unit(2, "cm"))
+                }else{
+                    group.value <- sort(unique(colData(obj)[,x]))
+                    colSet[[x]] <- structure(auto.colSet(length(group.value),name="Accent"),names=group.value)
+                }
+            }
+        }
+
+        g.show.legend <- T
+        ha.col <- ComplexHeatmap::HeatmapAnnotation(df = annDF, col = colSet,
+                                    show_legend = g.show.legend,
+                                    annotation_legend_param = annotation_legend_param)
+        top_annotation_height <- unit(ann.bar.height * ncol(annDF), "cm")
+    }
+
+    obj <- ssc.order(obj,columns.order=NULL,gene.desc=gene.desc)
+
+    #### scale data for visualization
+    dat.plot <- as.matrix(assay(obj,assay.name))
+    rownames(dat.plot) <- unname(rowData(obj)$display.name)
+    #### scale by row
+    if(do.scale)
+    {
+        rowM <- rowMeans(dat.plot, na.rm = T)
+        rowSD <- apply(dat.plot, 1, sd, na.rm = T)
+        dat.plot <- sweep(dat.plot, 1, rowM)
+        dat.plot <- sweep(dat.plot, 1, rowSD, "/")
+        dat.plot[dat.plot < z.lo] <- z.lo
+        dat.plot[dat.plot > z.hi] <- z.hi
+    }else{
+        ###tmp.var <- pretty(abs(dat.plot),n=8)
+        tmp.var <- pretty((dat.plot),n=8)
+        z.lo <- tmp.var[1]
+        z.hi <- tmp.var[length(tmp.var)]
+        z.step <- tmp.var[2]-tmp.var[1]
+    }
+
+    ##### plot
+    if(!is.null(out.prefix)){ pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height) }
+    par(mar=c(4,12,4,4))
+    plot.new()
+    title(main = mytitle,cex.main=2)
+    #legend("topright",legend=names(colSet),fill=colSet,border=colSet,cex=1.5,inset=c(-0.03,0),xpd=T)
+
+    ### Integrating Grid Graphics Output with Base Graphics Output
+    vps <- baseViewports()
+    pushViewport(vps$inner, vps$figure, vps$plot)
+
+    if(is.null(palette.name)){
+        exp.palette <- rev(brewer.pal(n = 7, name = ifelse(do.scale,"RdBu","RdYlBu")))
+    }else{
+        exp.palette <- rev(brewer.pal(n = 7, name = palette.name))
+    }
+    ht <- ComplexHeatmap::Heatmap(dat.plot, name=exp.title,
+                col = colorRamp2(seq(z.lo,z.hi,length=100),
+                                 colorRampPalette(exp.palette)(100),
+                                 space="LAB"),
+                column_dend_height = unit(6, "cm"), row_dend_width = unit(6, "cm"),
+                column_names_gp = gpar(fontsize = 12*28/max(m,32)),row_names_gp = gpar(fontsize = 10*28/max(n,32)),
+                show_heatmap_legend = T, row_names_max_width = unit(10,"cm"),
+                top_annotation_height = top_annotation_height,
+                cluster_columns = FALSE,
+                cluster_rows = FALSE,
+                heatmap_legend_param = list(grid_width = unit(0.8, "cm"),
+                                            grid_height = unit(0.8, "cm"),
+                                            at = seq(z.lo,z.hi,z.step),
+                                            title_gp = gpar(fontsize = 14, fontface = "bold"),
+                                            label_gp = gpar(fontsize = 12), color_bar = "continuous"),
+                top_annotation = ha.col,...)
+    ComplexHeatmap::draw(ht, newpage= FALSE)
+    if(!is.null(ha.col)){
+        for(i in seq_along(names(ha.col@anno_list))){
+          ComplexHeatmap::decorate_annotation(names(ha.col@anno_list)[i],
+                                {grid.text(names(ha.col@anno_list)[i], unit(-4, "mm"),gp=gpar(fontsize=14),just = "right")})
+        }
+    }
+    if(!is.null(out.prefix)){ dev.off() }
+}
 

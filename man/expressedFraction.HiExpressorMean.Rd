@@ -7,13 +7,13 @@
 expressedFraction.HiExpressorMean(exp.bin, exp.norm, group, n.cores = NULL)
 }
 \arguments{
+\item{exp.bin}{numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.}
+
+\item{exp.norm}{numeric; expression matrix, rows for genes and columns for samples. original version of exp.bin.}
+
+\item{group}{character; clusters of the samples belong to}
+
 \item{n.cores}{integer; number of cores used, if NULL it will be determined automatically (default: NULL)}
-
-\item{exp.bin;}{numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.}
-
-\item{exp.norm;}{numeric; expression matrix, rows for genes and columns for samples. original version of exp.bin.}
-
-\item{group;}{character; clusters of the samples belong to}
 }
 \description{
 For each gene, calculate the average expression of the expressor.

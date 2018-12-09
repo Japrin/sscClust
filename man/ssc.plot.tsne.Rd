@@ -33,6 +33,8 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 
 \item{size}{double; points' size. If NULL, infer from number of points (default NULL)}
 
+\item{brewer.palette}{character; which palette to use. (default: "YlOrRd")}
+
 \item{out.prefix}{character; output prefix. (default: NULL)}
 
 \item{p.ncol}{integer; number of columns in the figure layout. (default: 3)}

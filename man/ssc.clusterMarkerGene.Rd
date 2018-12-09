@@ -5,24 +5,32 @@
 \title{identify marker genes of each cluster}
 \usage{
 ssc.clusterMarkerGene(obj, assay.name = "exprs", group.var = "majorCluster",
-  assay.bin = NULL, minCell = 5, out.prefix, n.cores = NULL,
-  do.plot = T, F.FDR.THRESHOLD = 0.05, pairwise.P.THRESHOLD = 0.05,
+  assay.bin = NULL, out.prefix = NULL, n.cores = NULL, do.plot = T,
+  F.FDR.THRESHOLD = 0.01, pairwise.P.THRESHOLD = 0.01,
   pairwise.FC.THRESHOLD = 1, verbose = F)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
 
+\item{assay.name}{character; which assay (default: "exprs")}
+
+\item{group.var}{character; column in the colData(obj) used for grouping. (default: "majorCluster")}
+
+\item{assay.bin}{character; binarized expression assay (default: NULL)}
+
 \item{out.prefix}{character; output prefix. (default: NULL)}
 
 \item{n.cores}{integer; number of cores used, if NULL it will be determined automatically (default: NULL)}
 
-\item{p.ncol}{integer; number of columns in the figure layout. (default: 2)}
+\item{do.plot}{logical; whether plot. (default: TRUE)}
 
-\item{exp.bin;}{numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.}
+\item{F.FDR.THRESHOLD}{numeric; threshold of the adjusted p value of F-test. (default: 0.01)}
 
-\item{exp.norm;}{numeric; expression matrix, rows for genes and columns for samples. original version of exp.bin.}
+\item{pairwise.P.THRESHOLD}{numeric; threshold of the adjusted p value of HSD-test (default: 0.01)}
 
-\item{group;}{character; clusters of the samples belong to}
+\item{pairwise.FC.THRESHOLD}{numeric; threshold of the absoute diff of HSD-test (default: 1)}
+
+\item{verbose}{logical; whether output all genes' result. (default: FALSE)}
 }
 \description{
 identify marker genes of each cluster

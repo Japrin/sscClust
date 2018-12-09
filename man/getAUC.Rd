@@ -9,9 +9,9 @@ getAUC(gene, labels, use.rank = T)
 \arguments{
 \item{gene}{numeric; expression profile of one gene across samples}
 
-\item{labels;}{character; clusters of the samples belong to}
+\item{labels}{character; clusters of the samples belong to}
 
-\item{use.rank;}{logical; using the expression value itself or convert to rank value. (default: TRUE)}
+\item{use.rank}{logical; using the expression value itself or convert to rank value. (default: TRUE)}
 }
 \description{
 calculate the AUC of one gene, using it as a classifier. code from SC3

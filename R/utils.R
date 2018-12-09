@@ -63,6 +63,7 @@ cor.BLAS <- function(x,y=NULL,method="pearson",nthreads=NULL)
   }
 }
 
+
 #' dispaly message with time stamp
 #' @param msg characters; message to display
 loginfo <- function(msg) {
@@ -229,11 +230,12 @@ findDEGenesByAOV <- function(xdata,xlabel,out.prefix=NULL,mod=NULL,
 #' @importFrom ROCR prediction performance
 #' @importFrom stats aggregate wilcox.test
 #' @param gene numeric; expression profile of one gene across samples
-#' @param labels; character; clusters of the samples belong to
-#' @param use.rank; logical; using the expression value itself or convert to rank value. (default: TRUE)
+#' @param labels character; clusters of the samples belong to
+#' @param use.rank logical; using the expression value itself or convert to rank value. (default: TRUE)
 getAUC <- function(gene, labels,use.rank=T)
 {
-    suppressPackageStartupMessages(require("ROCR"))
+    requireNamespace("ROCR")
+
     if(use.rank){
         score <- rank(gene)
     }else{
@@ -263,12 +265,13 @@ getAUC <- function(gene, labels,use.rank=T)
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom doParallel registerDoParallel
 #' @importFrom plyr ldply
-#' @param exp.bin; numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.
-#' @param group; character; clusters of the samples belong to
+#' @param exp.bin numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.
+#' @param group character; clusters of the samples belong to
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 expressedFraction <- function(exp.bin,group,n.cores=NULL){
-    suppressPackageStartupMessages(require("plyr"))
-    suppressPackageStartupMessages(require("doParallel"))
+    requireNamespace("plyr")
+    requireNamespace("doParallel")
+
     RhpcBLASctl::omp_set_num_threads(1)
     registerDoParallel(cores = n.cores)
     out.res <- ldply(rownames(exp.bin),function(v){
@@ -285,13 +288,14 @@ expressedFraction <- function(exp.bin,group,n.cores=NULL){
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom doParallel registerDoParallel
 #' @importFrom plyr ldply
-#' @param exp.bin; numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.
-#' @param exp.norm; numeric; expression matrix, rows for genes and columns for samples. original version of exp.bin.
-#' @param group; character; clusters of the samples belong to
+#' @param exp.bin numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.
+#' @param exp.norm numeric; expression matrix, rows for genes and columns for samples. original version of exp.bin.
+#' @param group character; clusters of the samples belong to
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 expressedFraction.HiExpressorMean <- function(exp.bin,exp.norm,group,n.cores=NULL){
-    suppressPackageStartupMessages(require("plyr"))
-    suppressPackageStartupMessages(require("doParallel"))
+    requireNamespace("plyr")
+    requireNamespace("doParallel")
+
     RhpcBLASctl::omp_set_num_threads(1)
     registerDoParallel(cores = n.cores)
     exp.bin[exp.bin<1] <- 0
@@ -486,6 +490,7 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
 #' @importFrom BiocParallel MulticoreParam
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay to use for select genes (default: "exprs")
+#' @param vgene vector; only consider those specified genes if set. (default: NULL)
 #' @param out.prefix character, output prefix
 #' @param n.cores integer, number of cors to use. (default: 8)
 #' @param zinbwave.K integer, zinbwave parameter, number of latent variables. (default: 20)

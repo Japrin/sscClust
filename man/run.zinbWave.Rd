@@ -13,6 +13,8 @@ run.zinbWave(obj, assay.name = "exprs", vgene = NULL,
 
 \item{assay.name}{character; which assay to use for select genes (default: "exprs")}
 
+\item{vgene}{vector; only consider those specified genes if set. (default: NULL)}
+
 \item{out.prefix}{character, output prefix}
 
 \item{n.cores}{integer, number of cors to use. (default: 8)}
