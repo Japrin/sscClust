@@ -4,9 +4,10 @@
 \alias{ssc.plot.violin}
 \title{Plot violin}
 \usage{
-ssc.plot.violin(obj, assay.name = "exprs", gene = NULL, columns = NULL,
-  group.var = "majorCluster", clamp = c(0, 15), out.prefix = NULL,
-  p.ncol = 1, base_aspect_ratio = 1.1, ...)
+ssc.plot.violin(obj, assay.name = "exprs", gene = NULL,
+  columns = NULL, group.var = "majorCluster", clamp = c(0, 12),
+  adjB = NULL, out.prefix = NULL, p.ncol = 1,
+  base_aspect_ratio = 1.1, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -19,7 +20,9 @@ ssc.plot.violin(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 
 \item{group.var}{character; column in the colData(obj) used for grouping. (default: "majorCluster")}
 
-\item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter. (default: c(0,15))}
+\item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter. (default: c(0,12))}
+
+\item{adjB}{character; batch column of the colData(obj). (default: NULL)}
 
 \item{out.prefix}{character; output prefix. (default: NULL)}
 

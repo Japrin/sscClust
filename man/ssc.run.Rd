@@ -4,12 +4,13 @@
 \alias{ssc.run}
 \title{Wrapper for running all the pipeline}
 \usage{
-ssc.run(obj, assay.name = "exprs", method.vgene = "sd", sd.n = 1500,
-  mean.thre = 0.1, fdr.thre = 0.001, var.block = NULL,
+ssc.run(obj, assay.name = "exprs", method.vgene = "HVG.sd",
+  sd.n = 1500, mean.thre = 0.1, fdr.thre = 0.001, var.block = NULL,
   method.reduction = "iCor", method.clust = "kmeans",
-  method.classify = "knn", pca.npc = NULL, iCor.niter = 1,
-  iCor.method = "spearman", zinbwave.K = 20, zinbwave.X = "~patient",
-  subsampling = F, sub.frac = 0.4, sub.use.proj = T, sub.vis.proj = F,
+  method.classify = "knn", method.tsne = "Rtsne", pca.npc = NULL,
+  iCor.niter = 1, iCor.method = "spearman", zinbwave.K = 20,
+  zinbwave.X = "~patient", tSNE.perplexity = 30, subsampling = F,
+  sub.frac = 0.4, sub.use.proj = T, sub.vis.proj = F,
   k.batch = 2:6, refineGene = F, de.n = 1500, HSD.FC.THRESHOLD = 1,
   nIter = 1, out.prefix = NULL, parfile = NULL, reuse = F,
   ncore = NULL, seed = NULL, do.DE = F, ...)
@@ -37,6 +38,8 @@ used in trendVar method (default NULL)}
 
 \item{method.classify}{character; method used for classification, one of "knn" and "RF". (default: "knn")}
 
+\item{method.tsne}{character; method to run tsne, one of "Rtsne", "FIt-SNE". (default: "Rtsne")}
+
 \item{pca.npc}{integer; number of pc be used. Only for reduction method "pca". (default: NULL)}
 
 \item{iCor.niter}{integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)}
@@ -46,6 +49,8 @@ used in trendVar method (default NULL)}
 \item{zinbwave.K}{integer, zinbwave parameter, number of latent variables. (default: 20)}
 
 \item{zinbwave.X}{character, zinbwave parameter, cell-level covariates. (default: "~patient")}
+
+\item{tSNE.perplexity}{double, perplexity parameter of tSNE. (default: 30)}
 
 \item{subsampling}{logical; whether cluster using the subsampling->cluster->classification method. (default: F)}
 

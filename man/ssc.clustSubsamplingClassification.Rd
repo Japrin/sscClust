@@ -4,10 +4,11 @@
 \alias{ssc.clustSubsamplingClassification}
 \title{Clustering with subsampling and classification}
 \usage{
-ssc.clustSubsamplingClassification(obj, assay.name = "exprs", frac = 0.4,
-  method.vgene = "sd", method.reduction = "iCor", method.clust = "kmeans",
-  method.classify = "knn", pca.npc = NULL, iCor.niter = 1, use.proj = T,
-  vis.proj = F, ncore = NULL, k.batch = 2:6, seed = NULL)
+ssc.clustSubsamplingClassification(obj, assay.name = "exprs",
+  frac = 0.4, method.vgene = "HVG.sd", method.reduction = "iCor",
+  method.clust = "kmeans", method.classify = "knn", pca.npc = NULL,
+  iCor.niter = 1, use.proj = T, vis.proj = F, ncore = NULL,
+  k.batch = 2:6, seed = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -16,7 +17,7 @@ ssc.clustSubsamplingClassification(obj, assay.name = "exprs", frac = 0.4,
 
 \item{frac}{numeric; subsample to frac of original samples. (default: 0.4)}
 
-\item{method.vgene}{character; variable gene identification method used. (default: "sd")}
+\item{method.vgene}{character; variable gene identification method used. (default: "HVG.sd")}
 
 \item{method.reduction}{character; which dimention reduction method to be used, should be one of
 "iCor", "pca" and "none". (default: "iCor")}

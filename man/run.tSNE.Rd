@@ -4,7 +4,8 @@
 \alias{run.tSNE}
 \title{Wraper for running Rtsne}
 \usage{
-run.tSNE(idata, tSNE.usePCA = T, tSNE.perplexity = 30)
+run.tSNE(idata, tSNE.usePCA = T, tSNE.perplexity = 30,
+  method = "Rtsne", n.cores = NULL, out.prefix = NULL, ...)
 }
 \arguments{
 \item{idata}{matrix; expression data with sample id in rows and variables in columns}
@@ -12,6 +13,10 @@ run.tSNE(idata, tSNE.usePCA = T, tSNE.perplexity = 30)
 \item{tSNE.usePCA}{whether perform PCA before tSNE (default: T)}
 
 \item{tSNE.perplexity}{perplexity parameter of tSNE (default: 30)}
+
+\item{n.cores}{integer; number of cores used, if NULL it will be determined automatically (default: NULL)}
+
+\item{out.prefix}{character; output prefix (default: NULL)}
 }
 \value{
 If successful same as the return value of Rtsne(); otherwise NULL

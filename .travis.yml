@@ -4,6 +4,12 @@ cache: packages
 bioc_packages:
   - SingleCellExperiment
   - zinbwave
+  - BiocGenerics
+  - BiocParallel
+  - ComplexHeatmap
+  - SC3
+  - scran
+  - uwot
 
 addons:
   apt:

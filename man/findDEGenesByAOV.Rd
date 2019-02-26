@@ -4,14 +4,17 @@
 \alias{findDEGenesByAOV}
 \title{differential expression analysis}
 \usage{
-findDEGenesByAOV(xdata, xlabel, out.prefix = NULL, mod = NULL,
-  F.FDR.THRESHOLD = 0.01, HSD.FDR.THRESHOLD = 0.01, HSD.FC.THRESHOLD = 1,
-  verbose = F, n.cores = NULL, gid.mapping = NULL)
+findDEGenesByAOV(xdata, xlabel, batch = NULL, out.prefix = NULL,
+  mod = NULL, F.FDR.THRESHOLD = 0.01, HSD.FDR.THRESHOLD = 0.01,
+  HSD.FC.THRESHOLD = 1, verbose = F, n.cores = NULL,
+  gid.mapping = NULL)
 }
 \arguments{
 \item{xdata}{data frame or matrix; rows for genes and columns for samples}
 
 \item{xlabel}{factor; cluster label of the samples, with length equal to the number of columns in xdata}
+
+\item{batch}{factor; covariate. (default: NULL)}
 
 \item{out.prefix}{character; if not NULL, write the result to the file(s). (default: NULL)}
 

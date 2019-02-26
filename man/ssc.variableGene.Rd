@@ -4,14 +4,14 @@
 \alias{ssc.variableGene}
 \title{Identify variable genes}
 \usage{
-ssc.variableGene(obj, method = "sd", sd.n = 1500, mean.thre = 0.1,
-  fdr.thre = 0.001, assay.name = "exprs", var.block = NULL, reuse = F,
-  out.prefix = NULL)
+ssc.variableGene(obj, method = "HVG.sd", sd.n = 1500,
+  mean.thre = 0.1, fdr.thre = 0.001, assay.name = "exprs",
+  var.block = NULL, reuse = F, out.prefix = NULL)
 }
 \arguments{
 \item{obj}{object of SingleCellExperiment}
 
-\item{method}{method to be used, can be one of "sd", mean.sd, trendVar. (default: "sd")}
+\item{method}{method to be used, can be one of "HVG.sd", "HVG.mean.sd", "HVG.trendVar". (default: "HVG.sd")}
 
 \item{sd.n}{top number of genes (default 1500)}
 

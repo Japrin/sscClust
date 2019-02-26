@@ -5,9 +5,10 @@
 \title{Plot on tSNE map}
 \usage{
 ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
-  plotDensity = F, colSet = list(), reduced.name = "iCor.tsne",
-  reduced.dim = c(1, 2), xlim = NULL, ylim = NULL, size = NULL,
-  brewer.palette = "YlOrRd", out.prefix = NULL, p.ncol = 3, width = NA,
+  splitBy = NULL, plotDensity = F, colSet = list(),
+  reduced.name = "iCor.tsne", reduced.dim = c(1, 2), xlim = NULL,
+  ylim = NULL, size = NULL, brewer.palette = "YlOrRd", adjB = NULL,
+  clamp = NULL, out.prefix = NULL, p.ncol = 3, width = NA,
   height = NA, base_aspect_ratio = 1.1, peaks = NULL)
 }
 \arguments{
@@ -34,6 +35,10 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 \item{size}{double; points' size. If NULL, infer from number of points (default NULL)}
 
 \item{brewer.palette}{character; which palette to use. (default: "YlOrRd")}
+
+\item{adjB}{character; batch column of the colData(obj). (default: NULL)}
+
+\item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )}
 
 \item{out.prefix}{character; output prefix. (default: NULL)}
 

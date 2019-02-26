@@ -5,10 +5,11 @@
 \title{Perform clustering using reduced data}
 \usage{
 ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
-  method = "kmeans", k.batch = 2:6, method.vgene = "sd", SNN.k = 10,
-  SNN.method = "eigen", SC3.biology = T, SC3.markerplot.width = 15,
-  dpclust.rho = NULL, dpclust.delta = NULL, parlist = NULL,
-  out.prefix = NULL, seed = NULL, ncore = NULL)
+  method = "kmeans", k.batch = 2:6, method.vgene = "HVG.sd",
+  SNN.k = 10, SNN.method = "eigen", SC3.biology = T,
+  SC3.markerplot.width = 15, dpclust.rho = NULL,
+  dpclust.delta = NULL, parlist = NULL, out.prefix = NULL,
+  seed = NULL, ncore = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -22,7 +23,7 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 
 \item{k.batch}{integer; number of clusters to be evaluated. (default: 2:6)}
 
-\item{method.vgene}{character; variable gene identification method used. (default: "sd")}
+\item{method.vgene}{character; variable gene identification method used. (default: "HVG.sd")}
 
 \item{SNN.k}{integer; number of shared NN. (default: 10)}
 

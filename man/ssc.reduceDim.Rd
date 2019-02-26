@@ -5,10 +5,11 @@
 \title{Reduce dimension by various methods}
 \usage{
 ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
-  method.vgene = "sd", pca.npc = NULL, tSNE.usePCA = T,
-  tSNE.perplexity = 30, zinbwave.K = 20, zinbwave.X = "~patient",
-  autoTSNE = T, dim.name = NULL, iCor.niter = 1,
-  iCor.method = "spearman", reuse = F, ncore = NULL, seed = NULL)
+  method.vgene = "HVG.sd", method.tsne = "Rtsne", pca.npc = NULL,
+  tSNE.usePCA = T, tSNE.perplexity = 30, zinbwave.K = 20,
+  zinbwave.X = "~patient", autoTSNE = T, dim.name = NULL,
+  iCor.niter = 1, iCor.method = "spearman", reuse = F,
+  ncore = NULL, seed = NULL, out.prefix = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -18,6 +19,8 @@ ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
 \item{method}{character; method to be used for dimension reduction, should be one of (pca, tsne, iCor, zinbwave). (default: "iCor")}
 
 \item{method.vgene}{character; method to identify variable genes. (default: sd)}
+
+\item{method.tsne}{character; method to run tsne, one of "Rtsne", "FIt-SNE". (default: "Rtsne")}
 
 \item{pca.npc}{integer; number of pc be used. Only for reduction method "pca". (default: NULL)}
 
@@ -44,6 +47,8 @@ should be one of "spearman" and "pearson". (default "spearman")}
 \item{ncore}{integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)}
 
 \item{seed}{integer; seed of random number generation. (default: NULL)}
+
+\item{out.prefix}{character; output prefix (default: NULL)}
 }
 \value{
 an object of \code{SingleCellExperiment} class with reduced data added to the reducedDim slot.

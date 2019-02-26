@@ -2,17 +2,27 @@
 % Please edit documentation in R/sscClust.R
 \name{ssc.average.cell}
 \alias{ssc.average.cell}
-\title{calculate the average expression of cells}
+\title{calculate the average expression of the specified colum}
 \usage{
-ssc.average.cell(obj, assay.name = "exprs", columns = "majorCluster")
+ssc.average.cell(obj, assay.name = "exprs", gene = NULL,
+  column = "majorCluster", avg = "mean", ret.type = "data.melt")
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
 
 \item{assay.name}{character; which assay (default: "exprs")}
 
-\item{columns}{character; columns of colData(obj) used for grouping (default: "majorCluster")}
+\item{gene}{character; only consider the specified gnees (default: NULL)}
+
+\item{column}{character; columns in colData(obj) to be averaged. (default: "majorCluster")}
+
+\item{avg}{character; average method. can be one of "mean", "diff" . (default: "mean")}
+
+\item{ret.type}{character; return type. can be one of "data.melt", "data.cast", "data.mtx". (default: "data.melt")}
 }
 \description{
-calculate the average expression of cells
+calculate the average expression of the specified colum
+}
+\details{
+multiple average methods are implemented
 }

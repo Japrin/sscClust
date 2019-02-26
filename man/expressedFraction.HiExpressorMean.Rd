@@ -4,7 +4,8 @@
 \alias{expressedFraction.HiExpressorMean}
 \title{For each gene, calculate the average expression of the expressor.}
 \usage{
-expressedFraction.HiExpressorMean(exp.bin, exp.norm, group, n.cores = NULL)
+expressedFraction.HiExpressorMean(exp.bin, exp.norm, group,
+  n.cores = NULL)
 }
 \arguments{
 \item{exp.bin}{numeric; binarized expression matrix, rows for genes and columns for samples. value 1 means expressed.}

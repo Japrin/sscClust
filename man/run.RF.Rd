@@ -4,7 +4,8 @@
 \alias{run.RF}
 \title{Wraper for running random forest classifier}
 \usage{
-run.RF(xdata, xlabel, ydata, do.norm = F, ntree = 500, ntreeIterat = 200)
+run.RF(xdata, xlabel, ydata, do.norm = F, ntree = 500,
+  ntreeIterat = 200)
 }
 \arguments{
 \item{xdata}{data frame or matrix; data used for training, with sample id in rows and variables in columns}

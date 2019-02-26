@@ -4,8 +4,9 @@
 \alias{ssc.clusterMarkerGene}
 \title{identify marker genes of each cluster}
 \usage{
-ssc.clusterMarkerGene(obj, assay.name = "exprs", group.var = "majorCluster",
-  assay.bin = NULL, out.prefix = NULL, n.cores = NULL, do.plot = T,
+ssc.clusterMarkerGene(obj, assay.name = "exprs",
+  group.var = "majorCluster", batch = NULL, assay.bin = NULL,
+  out.prefix = NULL, n.cores = NULL, do.plot = T,
   F.FDR.THRESHOLD = 0.01, pairwise.P.THRESHOLD = 0.01,
   pairwise.FC.THRESHOLD = 1, verbose = F)
 }
@@ -15,6 +16,8 @@ ssc.clusterMarkerGene(obj, assay.name = "exprs", group.var = "majorCluster",
 \item{assay.name}{character; which assay (default: "exprs")}
 
 \item{group.var}{character; column in the colData(obj) used for grouping. (default: "majorCluster")}
+
+\item{batch}{character; covariate. (default: NULL)}
 
 \item{assay.bin}{character; binarized expression assay (default: NULL)}
 
