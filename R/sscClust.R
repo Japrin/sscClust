@@ -291,6 +291,55 @@ ssc.order <- function(obj,columns.order=NULL,gene.desc=NULL)
 
 
 #' calculate the average expression of the specified colum
+<<<<<<< HEAD
+=======
+#' @param obj object of \code{singleCellExperiment} class
+#' @param assay.name character; which assay (default: "exprs")
+#' @param gene character; only consider the specified gnees (default: NULL)
+#' @param columns character; columns in colData(obj) to be averaged. (default: "majorCluster")
+#' @param avg character; average method. can be one of "mean", "diff" . (default: "mean")
+#' @param ret.type character; return type. can be one of "data.melt", "data.cast", "data.mtx". (default: "data.melt")
+#' @importFrom plyr ldply
+#' @importFrom data.table dcast
+#' @details multiple average methods are implemented
+#' @export
+ssc.avg.byColumn <- function(obj,assay.name="exprs",gene=NULL,column="majorCluster",
+                             avg="mean",ret.type="data.melt")
+{
+  if(!group.by %in% colnames(colData(obj))){
+    warning(sprintf("column not in the obj: %s \n",group.by))
+    return(NULL)
+  }
+  if(!is.null(gene)){
+    obj <- obj[gene,]
+  }
+  cls <- sort(unique(colData(obj)[,group.by]))
+  data.melt.df <- ldply(cls,function(x){
+    obj.in <- obj[,colData(obj)[,group.by]==x]
+    avg.in <- NULL
+    avg.in <- rowMeans(assay(obj.in,assay.name))
+    if(avg=="mean"){
+      return(data.frame(geneID=names(avg.in),cls=x,avg=avg.in))
+    }else if (avg=="diff"){
+      obj.out <- obj[,colData(obj)[,group.by]!=x]
+      avg.out <- rowMeans(assay(obj.out,assay.name))
+      return(data.frame(geneID=names(avg.out),cls=x,avg=avg.in-avg.out))
+    }
+  })
+  if(ret.type=="data.melt"){
+    return(data.melt.df)
+  }else if(ret.type=="data.dcast"){
+    dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
+  }else if(ret.type=="data.mtx"){
+    dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
+    dat.mtx <- as.matrix(dat.df[,-1])
+    rownames(dat.mtx) <- dat.df[,1]
+  }
+}
+
+
+#' calculate the average expression of cells
+>>>>>>> 3b1dd25... bug fix
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param gene character; only consider the specified gnees (default: NULL)
@@ -1259,11 +1308,18 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
           dat.plot <- data.frame(sample=rownames(dat.map),stringsAsFactors = F)
           if(!is.null(splitBy)){
             dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,c(cc,splitBy),drop=F]))
+<<<<<<< HEAD
             colnames(dat.plot) <- c("sample","Dim1","Dim2",cc,"splitBy")
           }else{
             dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,cc,drop=F]))
             colnames(dat.plot) <- c("sample","Dim1","Dim2",cc)
           }
+=======
+          }else{
+            dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,cc,drop=F]))
+          }
+          colnames(dat.plot) <- c("sample","Dim1","Dim2",cc,"splitBy")
+>>>>>>> 3b1dd25... bug fix
           dat.plot <- dat.plot[order(dat.plot[,cc]),]
           npts <- nrow(dat.plot)
           if(is.numeric(dat.plot[,cc])){
