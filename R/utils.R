@@ -145,7 +145,7 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
   ret <- ldply(rownames(xdata),function(v){
     if(is.null(batch)){
         aov.out <- aov(y ~ g,data=data.frame(y=xdata[v,],g=xlabel))
-    }else{        
+    }else{
         aov.out <- aov(y ~ g+b,data=data.frame(y=xdata[v,],g=xlabel,b=batch))
     }
     aov.out.s <- summary(aov.out)
@@ -404,21 +404,23 @@ run.KNN <- function(xdata,xlabel,ydata,k=1)
 #' @param idata matrix; expression data with sample id in rows and variables in columns
 #' @param tSNE.usePCA whether perform PCA before tSNE (default: T)
 #' @param tSNE.perplexity perplexity parameter of tSNE (default: 30)
+#' @param method method to be used. one of "Rtsne" and "FIt-SNE" (default: "Rtsne")
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 #' @param out.prefix character; output prefix (default: NULL)
+#' @param ... parameters passed to Rtsne or fftRtsne
 #' @return If successful same as the return value of Rtsne(); otherwise NULL
 run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30,method="Rtsne",n.cores=NULL,out.prefix=NULL,...){
   ret <- NULL
   if(is.null(n.cores)){ n.cores <- 1 }
   if(method=="Rtsne"){
       tryCatch({
-        ret <- Rtsne::Rtsne(idata, pca = tSNE.usePCA, num_threads=n.cores, perplexity = tSNE.perplexity)$Y
+        ret <- Rtsne::Rtsne(idata, pca = tSNE.usePCA, num_threads=n.cores, perplexity = tSNE.perplexity,...)$Y
       },error=function(e){
         #cat("Perplexity is too large; try to use smaller perplexity 5\n")
       })
       if(is.null(ret)){
         tryCatch({
-          ret <- Rtsne::Rtsne(idata, pca = tSNE.usePCA, num_threads=n.cores, perplexity = 5)$Y
+          ret <- Rtsne::Rtsne(idata, pca = tSNE.usePCA, num_threads=n.cores, perplexity = 5,...)$Y
         },error=function(e){ print("Error occur when using perplexity 5"); print(e); e })
       }
   }else if(method=="FIt-SNE"){
@@ -429,7 +431,7 @@ run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30,method="Rtsne",n.cor
       }else{
         X <- idata
       }
-      ret <- fftRtsne(X,perplexity=tSNE.perplexity,nthreads=n.cores,out_prefix=out.prefix)
+      ret <- fftRtsne(X,perplexity=tSNE.perplexity,nthreads=n.cores,out_prefix=out.prefix,...)
   }
   return(ret)
 }
@@ -543,9 +545,33 @@ run.zinbWave <- function(obj,assay.name="exprs", vgene=NULL,out.prefix="./zinbwa
 #' @param perplexity double; perplexity parameter of tSNE (effective nearest neighbours)
 #' @param theta double; theta
 #' @param max_iter integer; max_iter
+#' @param fft_not_bh logical; fft_not_bh (default: TRUE)
+#' @param ann_not_vptree logical; (default: TRUE)
+#' @param stop_early_exag_iter integer; (default 250)
+#' @param exaggeration_factor double;
+#' @param no_momentum_during_exag logical;
+#' @param start_late_exag_iter double;
+#' @param late_exag_coeff double;
+#' @param mom_switch_iter double;
+#' @param momentum double;
+#' @param final_momentum double;
+#' @param learning_rate double;
+#' @param n_trees integer;
+#' @param search_k double;
+#' @param rand_seed double;
+#' @param nterms integer;
+#' @param intervals_per_integer integer;
+#' @param min_num_intervals integer;
+#' @param K integer;
+#' @param sigma double;
+#' @param initialization matrix
 #' @param out_prefix character; temporary files prefix for fast_tsne (default: NULL)
+#' @param load_affinities character;
 #' @param fast_tsne_path character; full path of the installed fast_tsne programe (default: NULL)
 #' @param nthreads integer; number of threads (default: 0)
+#' @param perplexity_list list;
+#' @param get_costs logical;
+#' @param ... parameter passed
 #' @details Run FIt-SNE
 #' @return a matrix with samples in rows and tSNE coordinate in columns
 #' @export
@@ -646,7 +672,7 @@ fftRtsne <- function(X,
           load_affinities = 0;
       }
   }
-  
+
   if (ann_not_vptree){
       knn_algo = 1;
   }else{
@@ -684,7 +710,7 @@ fftRtsne <- function(X,
   writeBin( as.integer(search_k), f,size=4)
   writeBin( as.integer(start_late_exag_iter), f,size=4)
   writeBin( as.numeric(late_exag_coeff), f,size=8)
-  
+
   writeBin( as.integer(nterms), f,size=4)
   writeBin( as.numeric(intervals_per_integer), f,size=8)
   writeBin( as.integer(min_num_intervals), f,size=4)
@@ -722,8 +748,10 @@ fftRtsne <- function(X,
 #' @param x matrix; samples in columns and variables in rows
 #' @param batch character; batch vector (default: NULL)
 #' @param covariates double; other covariates to adjust (default: NULL)
+#' @param ... parameters passed to lmFit
 #' @details Modified from limma::removeBatchEffect, a little different design matrix
 #' @return a matrix with dimention as input ( samples in rows and variables in columns)
+#' @importFrom limma lmFit
 #' @export
 simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 {
@@ -736,7 +764,7 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
     if (!is.null(covariates))
         covariates <- as.matrix(covariates)
     X.batch <- cbind(batch, covariates)
-    fit <- lmFit(x, X.batch, ...)
+    fit <- limma::lmFit(x, X.batch, ...)
     beta <- fit$coefficients
     beta[is.na(beta)] <- 0
     ret.V <- as.matrix(x) - beta %*% t(X.batch)

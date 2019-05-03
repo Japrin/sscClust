@@ -14,9 +14,13 @@ run.tSNE(idata, tSNE.usePCA = T, tSNE.perplexity = 30,
 
 \item{tSNE.perplexity}{perplexity parameter of tSNE (default: 30)}
 
+\item{method}{method to be used. one of "Rtsne" and "FIt-SNE" (default: "Rtsne")}
+
 \item{n.cores}{integer; number of cores used, if NULL it will be determined automatically (default: NULL)}
 
 \item{out.prefix}{character; output prefix (default: NULL)}
+
+\item{...}{parameters passed to Rtsne or fftRtsne}
 }
 \value{
 If successful same as the return value of Rtsne(); otherwise NULL

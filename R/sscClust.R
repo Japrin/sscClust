@@ -290,56 +290,7 @@ ssc.order <- function(obj,columns.order=NULL,gene.desc=NULL)
 }
 
 
-#' calculate the average expression of the specified colum
-<<<<<<< HEAD
-=======
-#' @param obj object of \code{singleCellExperiment} class
-#' @param assay.name character; which assay (default: "exprs")
-#' @param gene character; only consider the specified gnees (default: NULL)
-#' @param columns character; columns in colData(obj) to be averaged. (default: "majorCluster")
-#' @param avg character; average method. can be one of "mean", "diff" . (default: "mean")
-#' @param ret.type character; return type. can be one of "data.melt", "data.cast", "data.mtx". (default: "data.melt")
-#' @importFrom plyr ldply
-#' @importFrom data.table dcast
-#' @details multiple average methods are implemented
-#' @export
-ssc.avg.byColumn <- function(obj,assay.name="exprs",gene=NULL,column="majorCluster",
-                             avg="mean",ret.type="data.melt")
-{
-  if(!group.by %in% colnames(colData(obj))){
-    warning(sprintf("column not in the obj: %s \n",group.by))
-    return(NULL)
-  }
-  if(!is.null(gene)){
-    obj <- obj[gene,]
-  }
-  cls <- sort(unique(colData(obj)[,group.by]))
-  data.melt.df <- ldply(cls,function(x){
-    obj.in <- obj[,colData(obj)[,group.by]==x]
-    avg.in <- NULL
-    avg.in <- rowMeans(assay(obj.in,assay.name))
-    if(avg=="mean"){
-      return(data.frame(geneID=names(avg.in),cls=x,avg=avg.in))
-    }else if (avg=="diff"){
-      obj.out <- obj[,colData(obj)[,group.by]!=x]
-      avg.out <- rowMeans(assay(obj.out,assay.name))
-      return(data.frame(geneID=names(avg.out),cls=x,avg=avg.in-avg.out))
-    }
-  })
-  if(ret.type=="data.melt"){
-    return(data.melt.df)
-  }else if(ret.type=="data.dcast"){
-    dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
-  }else if(ret.type=="data.mtx"){
-    dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
-    dat.mtx <- as.matrix(dat.df[,-1])
-    rownames(dat.mtx) <- dat.df[,1]
-  }
-}
-
-
-#' calculate the average expression of cells
->>>>>>> 3b1dd25... bug fix
+#' calcualte the average expression of cells of each group
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param gene character; only consider the specified gnees (default: NULL)
@@ -1253,6 +1204,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param assay.name character; which assay (default: "exprs")
 #' @param gene, character; genes to be showed. (default: NULL)
 #' @param columns character; columns in colData(obj) to be showd. (default: NULL)
+#' @param splitBy character; columns in colData(obj). Split the dataset to mupltiple subset then plot them one by one (default: NULL)
 #' @param plotDensity logical; whether plot 2D density. (default F)
 #' @param colSet list; mapping iterms in the names to colors in the values. (default: list())
 #' @param reduced.name character; names in the reducedDimNames. (default: "iCor.tsne")
@@ -1308,18 +1260,11 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
           dat.plot <- data.frame(sample=rownames(dat.map),stringsAsFactors = F)
           if(!is.null(splitBy)){
             dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,c(cc,splitBy),drop=F]))
-<<<<<<< HEAD
             colnames(dat.plot) <- c("sample","Dim1","Dim2",cc,"splitBy")
           }else{
             dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,cc,drop=F]))
             colnames(dat.plot) <- c("sample","Dim1","Dim2",cc)
           }
-=======
-          }else{
-            dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,cc,drop=F]))
-          }
-          colnames(dat.plot) <- c("sample","Dim1","Dim2",cc,"splitBy")
->>>>>>> 3b1dd25... bug fix
           dat.plot <- dat.plot[order(dat.plot[,cc]),]
           npts <- nrow(dat.plot)
           if(is.numeric(dat.plot[,cc])){
@@ -1497,6 +1442,7 @@ ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2)
 #' identify marker genes of each cluster
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
+#' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
 #' @param batch character; covariate. (default: NULL)
 #' @param assay.bin character; binarized expression assay (default: NULL)
@@ -1513,7 +1459,8 @@ ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2)
 #' @importFrom dplyr inner_join
 #' @details identify marker genes based on aov and AUC.
 #' @export
-ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorCluster",batch=NULL,
+ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL,
+                                  group.var="majorCluster",batch=NULL,
                                   assay.bin=NULL, out.prefix=NULL,n.cores=NULL, do.plot=T,
                                   F.FDR.THRESHOLD=0.01,pairwise.P.THRESHOLD=0.01,pairwise.FC.THRESHOLD=1,
                                   verbose=F)
@@ -1521,6 +1468,17 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorClust
 #    requireNamespace("doParallel")
     requireNamespace("plyr")
     requireNamespace("dplyr")
+
+    #### downsample cells
+    if(!is.null(ncell.downsample)){
+        clust <- colData(obj)[,group.var]
+        names(clust) <- colnames(obj)
+        grp.list <- unique(clust)
+        f.cell <- unlist(sapply(grp.list,function(x){
+                             x <- names(clust[clust==x])
+                             sample(x,min(length(x),ncell.downsample)) }))
+        obj <- obj[,f.cell]
+    }
 
     clust <- colData(obj)[,group.var]
     batchV <- NULL
@@ -1622,7 +1580,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", group.var="majorClust
     .gene.table$score.q.value <- p.adjust(.gene.table$score.p.value,method = "BH")
     order.gene <- order(.gene.table$cluster,-.gene.table$AUC)
     .gene.table <- .gene.table[order.gene,,drop=F]
-    
+
     if(!is.null(out.prefix)){
         #rownames(.gene.table) <- .gene.table$geneID
         ### save .txt file
@@ -1711,7 +1669,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                                 clustering.distance="spearman",clustering.method="complete",
                                 k.row=1,k.col=1)
     }else{
-        obj <- ssc.average.cell(obj,assay.name=assay.name,columns=ave.by)
+        obj <- ssc.average.cell(obj,assay.name=assay.name,column=ave.by)
         columns <- intersect(ave.by,columns)
         columns.order <- intersect(ave.by,columns.order)
     }

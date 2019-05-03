@@ -27,11 +27,59 @@ fftRtsne(X, dims = 2, perplexity = 30, theta = 0.5,
 
 \item{max_iter}{integer; max_iter}
 
+\item{fft_not_bh}{logical; fft_not_bh (default: TRUE)}
+
+\item{ann_not_vptree}{logical; (default: TRUE)}
+
+\item{stop_early_exag_iter}{integer; (default 250)}
+
+\item{exaggeration_factor}{double;}
+
+\item{no_momentum_during_exag}{logical;}
+
+\item{start_late_exag_iter}{double;}
+
+\item{late_exag_coeff}{double;}
+
+\item{mom_switch_iter}{double;}
+
+\item{momentum}{double;}
+
+\item{final_momentum}{double;}
+
+\item{learning_rate}{double;}
+
+\item{n_trees}{integer;}
+
+\item{search_k}{double;}
+
+\item{rand_seed}{double;}
+
+\item{nterms}{integer;}
+
+\item{intervals_per_integer}{integer;}
+
+\item{min_num_intervals}{integer;}
+
+\item{K}{integer;}
+
+\item{sigma}{double;}
+
+\item{initialization}{matrix}
+
 \item{out_prefix}{character; temporary files prefix for fast_tsne (default: NULL)}
+
+\item{load_affinities}{character;}
 
 \item{fast_tsne_path}{character; full path of the installed fast_tsne programe (default: NULL)}
 
 \item{nthreads}{integer; number of threads (default: 0)}
+
+\item{perplexity_list}{list;}
+
+\item{get_costs}{logical;}
+
+\item{...}{parameter passed}
 }
 \value{
 a matrix with samples in rows and tSNE coordinate in columns

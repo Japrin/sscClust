@@ -9,7 +9,7 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
   SNN.k = 10, SNN.method = "eigen", SC3.biology = T,
   SC3.markerplot.width = 15, dpclust.rho = NULL,
   dpclust.delta = NULL, parlist = NULL, out.prefix = NULL,
-  seed = NULL, ncore = NULL)
+  seed = NULL, ncore = NULL, ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -19,7 +19,7 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{method.reduction}{character; which dimention reduction method to be used, should be one of
 "iCor", "pca" and "none". (default: "iCor")}
 
-\item{method}{character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "dpclust", "adpclust" and "SC3". (default: "kmeans")}
+\item{method}{character; clustering method to be used, should be one of "kmeans", "hclust", "dynamicTreeCut", "SNN", "dpclust", "adpclust" and "SC3". (default: "kmeans")}
 
 \item{k.batch}{integer; number of clusters to be evaluated. (default: 2:6)}
 
@@ -45,6 +45,8 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{seed}{integer; seed of random number generation. (default: NULL)}
 
 \item{ncore}{integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)}
+
+\item{...}{parameters pass to clustering methods}
 }
 \value{
 an object of \code{SingleCellExperiment} class with cluster labels added.

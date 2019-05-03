@@ -20,6 +20,8 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 
 \item{columns}{character; columns in colData(obj) to be showd. (default: NULL)}
 
+\item{splitBy}{character; columns in colData(obj). Split the dataset to mupltiple subset then plot them one by one (default: NULL)}
+
 \item{plotDensity}{logical; whether plot 2D density. (default F)}
 
 \item{colSet}{list; mapping iterms in the names to colors in the values. (default: list())}

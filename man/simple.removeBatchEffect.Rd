@@ -12,6 +12,8 @@ simple.removeBatchEffect(x, batch = NULL, covariates = NULL, ...)
 \item{batch}{character; batch vector (default: NULL)}
 
 \item{covariates}{double; other covariates to adjust (default: NULL)}
+
+\item{...}{parameters passed to lmFit}
 }
 \value{
 a matrix with dimention as input ( samples in rows and variables in columns)

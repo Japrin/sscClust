@@ -50,8 +50,8 @@ sce.Pollen
 We selected the top 1500 genes with higheast sd for clustering. There are many variable genes identification methods in the single cell RNAseq research community. For example, fit CV^2~mean relationship using a GLM model then the genes significantly higher than the fitted value are defined as highly variable genes. Here the sd method is sufficient.
 
 ```{r }
-sce.Pollen <- ssc.variableGene(sce.Pollen,method="sd",sd.n=1500)
-str(metadata(sce.Pollen)$ssc$variable.gene$sd)
+sce.Pollen <- ssc.variableGene(sce.Pollen,method="HVG.sd",sd.n=1500)
+summary(rowData(sce.Pollen)$HVG.sd)
 ```
 
 ## dimension reduction
