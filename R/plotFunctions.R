@@ -112,16 +112,34 @@ plot.density2D <- function(x,peaks=NULL)
   #pp
 }
 
-plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=T,
-                               do.clust=F,z.lo=NULL,z.hi=NULL,palatte=NULL,
+
+#' plot matrix (typically genes expression)
+#' @param dat matrix; matrix
+#' @param out.prefix character; output prefix.
+#' @param mytitle character; (default: "")
+#' @param show.number logical; (default: TRUE)
+#' @param do.clust logical or dendrogram; passed to cluster_columns and cluster_rows of Heatmap (default: FALSE)
+#' @param z.lo double; (default: NULL)
+#' @param z.hi double; (default: NULL)
+#' @param palatte character; (default: NULL)
+#' @param pdf.width double; width of the output plot (default: 22)
+#' @param pdf.height double; height of the output plot (default: 22)
+#' @param exp.name character; showd in the legend (default: "Count")
+#' @import data.table
+#' @import ggplot2
+#' @importFrom  ggpubr ggscatter
+#' @details plot matrix
+#' @export
+plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
+                               do.clust=FALSE,z.lo=NULL,z.hi=NULL,palatte=NULL,
                                pdf.width=8,pdf.height=8,exp.name="Count")
 {
-    suppressPackageStartupMessages(require("gplots"))
-    suppressPackageStartupMessages(require("ComplexHeatmap"))
-    suppressPackageStartupMessages(require("circlize"))
-    suppressPackageStartupMessages(require("gridBase"))
-    suppressPackageStartupMessages(require("RColorBrewer"))
- 
+    require("gplots")
+    require("ComplexHeatmap")
+    require("circlize")
+    require("gridBase")
+    require("RColorBrewer")
+
 	if(!is.null(out.prefix)){
         pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height)
     }
@@ -145,15 +163,15 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=T,
     if(is.null(palatte)){
         palatte <- rev(brewer.pal(n = 7,name = "RdYlBu"))
     }
-    ht <- Heatmap(dat, name = exp.name, col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
+    ht <- ComplexHeatmap::Heatmap(dat, name = exp.name, col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
                   cluster_columns=do.clust,cluster_rows=do.clust,
                   row_dend_reorder = FALSE, column_dend_reorder = FALSE,
                   column_names_gp = gpar(fontsize = 12*28/max(m,32)),row_names_gp = gpar(fontsize = 10*28/max(n,32)),
                   heatmap_legend_param = list(title = exp.name,
-                                              grid_width = unit(0.8, "cm"), 
+                                              grid_width = unit(0.8, "cm"),
                                               grid_height = unit(0.8, "cm"),
                                               #legend_width=2,
-                                              legend_height=unit(10,"cm"), 
+                                              legend_height=unit(10,"cm"),
                                               title_gp = gpar(fontsize = 16, fontface = "bold"),
                                               #color_bar = "continuous",
                                               label_gp = gpar(fontsize = 14)),
@@ -171,19 +189,19 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
     require("moduleColor")
     if(!is.null(cluster)){
         ncls <- length(unique(cluster))
-        colSet.cls <- sscClust:::auto.colSet(ncls)
+        colSet.cls <- auto.colSet(ncls)
         names(colSet.cls) <- unique(cluster)
         col.cls <- data.frame("k0"=sapply(cluster,function(x){ colSet.cls[x] }))
         branch.col <- color_branches(as.dendrogram(obj.clust),clusters=cluster,col=colSet.cls)
     }else{
         dend.cutree <- cutree(obj.clust, c(ncls,ncls), order_clusters_as_data = T)
-        colSet.cls <- sscClust:::auto.colSet(ncls)
+        colSet.cls <- auto.colSet(ncls)
         col.cls <- t(apply(dend.cutree,1,function(x){ colSet.cls[x] }))
         branch.col <- color_branches(as.dendrogram(obj.clust),k=ncls,col=colSet.cls)
         colnames(col.cls) <- c("k0","k0")
         col.cls <- col.cls[,1,drop=F]
     }
-    
+
     #str(branch.col)
     ##obj.clust$order
     pdf(sprintf("%s.branch.pdf",out.prefix),width=10,height=8)

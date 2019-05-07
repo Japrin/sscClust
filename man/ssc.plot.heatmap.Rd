@@ -9,10 +9,11 @@ ssc.plot.heatmap(obj, assay.name = "exprs", out.prefix = NULL,
   columns.order = NULL, gene.desc = NULL, colSet = list(),
   pdf.width = 16, pdf.height = 15, do.scale = TRUE, z.lo = -2.5,
   z.hi = 2.5, z.step = 1, exp.title = "Exp", do.clustering.row = T,
-  do.clustering.col = T, clustering.distance = "spearman",
-  clustering.method = "complete", k.row = 1, k.col = 1,
-  palette.name = NULL, annotation_legend_param = list(),
-  ann.bar.height = 1.5, mytitle = "", ...)
+  do.clustering.col = T, dend.col = FALSE, dend.row = FALSE,
+  clustering.distance = "spearman", clustering.method = "complete",
+  k.row = 1, k.col = 1, palette.name = NULL,
+  annotation_legend_param = list(), ann.bar.height = 1.5,
+  mytitle = "", ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -50,6 +51,10 @@ ssc.plot.heatmap(obj, assay.name = "exprs", out.prefix = NULL,
 \item{do.clustering.row}{logical; wheter order row (default: TRUE)}
 
 \item{do.clustering.col}{logical; wheter order columns (default: TRUE)}
+
+\item{dend.col}{dendrogram of the columns, 'cluster_columns' of ComplexHeatmap::Heatmap  (default: FALSE)}
+
+\item{dend.row}{dendrogram of the rows, 'cluster_rows' of ComplexHeatmap::Heatmap (default: FALSE)}
 
 \item{clustering.distance}{character; one of spearmn, pearson and euclidean (default: "spearman")}
 

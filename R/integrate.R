@@ -18,8 +18,9 @@ integrate.by.avg <- function(sce.list,
                              use.deg=TRUE,
                              gene.de.list=NULL,
                              avg.by="majorCluster",
-                             method.avg="zscore",...){
-
+                             method.avg="zscore",...)
+  {
+    require("plyr")
     if(use.deg && is.null(gene.de.list) && is.avg){
         cat(sprintf("sce.list contain average expression, gene.de.list must be not NULL!\n"))
     }
@@ -134,7 +135,7 @@ integrate.by.avg <- function(sce.list,
                            show.number = F,
                            z.lo = z.lo, z.hi = 1,exp.name="Cor")
     }
-    
+
     plot.matrix.simple(as.matrix(metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$dist),
                        out.prefix=sprintf("%s.avg.pca.dist",out.prefix),
                        do.clust=metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$branch,show.number = F,
@@ -149,25 +150,28 @@ integrate.by.avg <- function(sce.list,
     return(sce.pb)
 }
 
-#' plot genes expression in pairs of clusters to examine the correlation 
+#' plot genes expression in pairs of clusters to examine the correlation
 #' @param sce.pb object; object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param x.cluster character; cluster to be showed in x axis
 #' @param out.prefix character; output prefix.
-#' @param gene vector; genes to used to calculate the correlation and make the scatter plot (default: NULL)
+#' @param genes vector; genes to used to calculate the correlation and make the scatter plot (default: NULL)
 #' @param gene.highlight vector; genes to highlight (default: NULL)
 #' @param plot.ncol integer; number of columns in facet_wrap() (default: 7)
 #' @param plot.width double; width of the output plot (default: 22)
 #' @param plot.height double; height of the output plot (default: 22)
-#' @importFrom data.table
-#' @importFrom ggplot2
-#' @importFrom ggpubr
+#' @import data.table
+#' @import ggplot2
+#' @importFrom  ggpubr ggscatter
 #' @details used to examine the correlation between pairs of clusters
 #' @export
 plot.pairs.cor <- function(sce.pb,assay.name,x.cluster,out.prefix,
                            genes=NULL,gene.highlight=NULL,
                            plot.ncol=7,plot.width=22,plot.height=22)
 {
+    require("data.table")
+    require("ggplot2")
+    require("ggpubr")
     dat.assay <- assay(sce.pb,assay.name)
     colnames(dat.assay) <- make.names(colnames(dat.assay))
     if(!is.null(genes)){
