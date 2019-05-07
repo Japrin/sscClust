@@ -350,7 +350,8 @@ ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorClust
     dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
     dat.mtx <- as.matrix(dat.df[,-1])
     rownames(dat.mtx) <- dat.df[,1]
-    obj.ret <- ssc.build(dat.mtx,assay.name=assay.name)
+    obj.ret <- ssc.build(dat.mtx,assay.name=assay.name,display.name=rowData(obj)$display.name)
+    colData(obj.ret)[,column] <- colnames(obj.ret)
     return(obj.ret)
   }
 }
@@ -1617,6 +1618,8 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @param exp.title character; title for the expression legend (default: "Exp")
 #' @param do.clustering.row logical; wheter order row (default: TRUE)
 #' @param do.clustering.col logical; wheter order columns (default: TRUE)
+#' @param dend.col dendrogram of the columns, 'cluster_columns' of ComplexHeatmap::Heatmap  (default: FALSE)
+#' @param dend.row dendrogram of the rows, 'cluster_rows' of ComplexHeatmap::Heatmap (default: FALSE)
 #' @param clustering.distance character; one of spearmn, pearson and euclidean (default: "spearman")
 #' @param clustering.method character; method for hclust (default: "complete")
 #' @param k.row integer; number of clusters in the rows (default: 1)
@@ -1639,6 +1642,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                              colSet=list(), pdf.width=16,pdf.height=15,
                              do.scale=TRUE,z.lo=-2.5,z.hi=2.5,z.step=1,exp.title="Exp",
                              do.clustering.row=T,do.clustering.col=T,
+                             dend.col=FALSE,dend.row=FALSE,
                              clustering.distance="spearman",clustering.method="complete",k.row=1,k.col=1,
                              palette.name=NULL,
                              annotation_legend_param=list(),ann.bar.height=1.5, mytitle="",...)
@@ -1669,7 +1673,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                                 clustering.distance="spearman",clustering.method="complete",
                                 k.row=1,k.col=1)
     }else{
-        obj <- ssc.average.cell(obj,assay.name=assay.name,column=ave.by)
+        obj <- ssc.average.cell(obj,assay.name=assay.name,column=ave.by,ret.type="sce")
         columns <- intersect(ave.by,columns)
         columns.order <- intersect(ave.by,columns.order)
     }
@@ -1726,14 +1730,14 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
         rowSD <- apply(dat.plot, 1, sd, na.rm = T)
         dat.plot <- sweep(dat.plot, 1, rowM)
         dat.plot <- sweep(dat.plot, 1, rowSD, "/")
-        dat.plot[dat.plot < z.lo] <- z.lo
-        dat.plot[dat.plot > z.hi] <- z.hi
+        if(!is.null(z.lo)){ dat.plot[dat.plot < z.lo] <- z.lo }
+        if(!is.null(z.hi)){ dat.plot[dat.plot > z.hi] <- z.hi }
     }else{
         ###tmp.var <- pretty(abs(dat.plot),n=8)
         tmp.var <- pretty((dat.plot),n=8)
-        z.lo <- tmp.var[1]
-        z.hi <- tmp.var[length(tmp.var)]
-        z.step <- tmp.var[2]-tmp.var[1]
+        if(is.null(z.lo)){ z.lo <- tmp.var[1] }
+        if(is.null(z.hi)) { z.hi <- tmp.var[length(tmp.var)] }
+        if(is.null(z.step)) { z.step <- tmp.var[2]-tmp.var[1] }
     }
 
     ##### plot
@@ -1761,8 +1765,9 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                 row_names_gp = grid::gpar(fontsize = 10*28/max(n,32)),
                 show_heatmap_legend = T, row_names_max_width = unit(10,"cm"),
                 top_annotation_height = top_annotation_height,
-                cluster_columns = FALSE,
-                cluster_rows = FALSE,
+                cluster_columns = dend.col,
+                cluster_rows = dend.row,
+                row_dend_reorder = FALSE, column_dend_reorder = FALSE,
                 heatmap_legend_param = list(grid_width = unit(0.8, "cm"),
                                             grid_height = unit(0.8, "cm"),
                                             at = seq(z.lo,z.hi,z.step),
@@ -1779,8 +1784,5 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     }
     if(!is.null(out.prefix)){ dev.off() }
 }
-
-
-
 
 

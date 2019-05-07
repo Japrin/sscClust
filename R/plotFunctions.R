@@ -111,3 +111,91 @@ plot.density2D <- function(x,peaks=NULL)
   ##dev.off()
   #pp
 }
+
+plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=T,
+                               do.clust=F,z.lo=NULL,z.hi=NULL,palatte=NULL,
+                               pdf.width=8,pdf.height=8,exp.name="Count")
+{
+    suppressPackageStartupMessages(require("gplots"))
+    suppressPackageStartupMessages(require("ComplexHeatmap"))
+    suppressPackageStartupMessages(require("circlize"))
+    suppressPackageStartupMessages(require("gridBase"))
+    suppressPackageStartupMessages(require("RColorBrewer"))
+ 
+	if(!is.null(out.prefix)){
+        pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height)
+    }
+    opar <- par(mar=c(4,2,4,4))
+    plot.new()
+    title(main = mytitle,cex.main=2)
+    #legend("topright",legend=names(colSet),fill=colSet,border=colSet,cex=1.5,inset=c(-0.03,0),xpd=T)
+    ### Integrating Grid Graphics Output with Base Graphics Output
+    vps <- baseViewports()
+    pushViewport(vps$inner, vps$figure, vps$plot)
+    tmp.var <- pretty((dat),n=8)
+    if(is.null(z.lo)){ z.lo <- tmp.var[1] }
+    if(is.null(z.hi)){ z.hi <- tmp.var[length(tmp.var)] }
+    if(show.number){
+        my.cell_fun <- function(j, i, x, y, w, h, col) { grid.text(dat[i, j], x, y) }
+    }else{
+        my.cell_fun <- NULL
+    }
+    m <- ncol(dat)
+    n <- nrow(dat)
+    if(is.null(palatte)){
+        palatte <- rev(brewer.pal(n = 7,name = "RdYlBu"))
+    }
+    ht <- Heatmap(dat, name = exp.name, col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
+                  cluster_columns=do.clust,cluster_rows=do.clust,
+                  row_dend_reorder = FALSE, column_dend_reorder = FALSE,
+                  column_names_gp = gpar(fontsize = 12*28/max(m,32)),row_names_gp = gpar(fontsize = 10*28/max(n,32)),
+                  heatmap_legend_param = list(title = exp.name,
+                                              grid_width = unit(0.8, "cm"), 
+                                              grid_height = unit(0.8, "cm"),
+                                              #legend_width=2,
+                                              legend_height=unit(10,"cm"), 
+                                              title_gp = gpar(fontsize = 16, fontface = "bold"),
+                                              #color_bar = "continuous",
+                                              label_gp = gpar(fontsize = 14)),
+                  cell_fun = my.cell_fun)
+    ComplexHeatmap::draw(ht, newpage= FALSE)
+    if(!is.null(out.prefix)){
+      dev.off()
+    }
+    #par(opar)
+}
+
+plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
+{
+    require("dendextend")
+    require("moduleColor")
+    if(!is.null(cluster)){
+        ncls <- length(unique(cluster))
+        colSet.cls <- sscClust:::auto.colSet(ncls)
+        names(colSet.cls) <- unique(cluster)
+        col.cls <- data.frame("k0"=sapply(cluster,function(x){ colSet.cls[x] }))
+        branch.col <- color_branches(as.dendrogram(obj.clust),clusters=cluster,col=colSet.cls)
+    }else{
+        dend.cutree <- cutree(obj.clust, c(ncls,ncls), order_clusters_as_data = T)
+        colSet.cls <- sscClust:::auto.colSet(ncls)
+        col.cls <- t(apply(dend.cutree,1,function(x){ colSet.cls[x] }))
+        branch.col <- color_branches(as.dendrogram(obj.clust),k=ncls,col=colSet.cls)
+        colnames(col.cls) <- c("k0","k0")
+        col.cls <- col.cls[,1,drop=F]
+    }
+    
+    #str(branch.col)
+    ##obj.clust$order
+    pdf(sprintf("%s.branch.pdf",out.prefix),width=10,height=8)
+    layout(matrix(c(1,2),nrow = 2),heights = c(0.8,0.2))
+    par(mar=c(0,4,4,2),xpd=T)
+    #plot(branch.col)
+    plot(obj.clust,sub="",xlab="",hang=-1,cex=1.0*50/max(length(obj.clust$labels),32))
+    par(mar=c(5,4,0,2))
+    plotHclustColors(obj.clust, colors=col.cls, cex.rowLabels = 1.1)
+    dev.off()
+    return(list("obj.clust"=obj.clust,"branch"=branch.col))
+}
+
+
+
