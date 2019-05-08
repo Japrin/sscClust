@@ -59,6 +59,8 @@ integrate.by.avg <- function(sce.list,
     }
 
     ### cal the average
+    RhpcBLASctl::omp_set_num_threads(1)
+    doParallel::registerDoParallel(cores = ncores)
     sce.avg.list <- llply(seq_along(sce.list),function(i){
                              aid <- names(sce.list)[i]
                              obj <- sce.list[[i]][gene.common,]
@@ -71,7 +73,7 @@ integrate.by.avg <- function(sce.list,
                                  colnames(obj.avg) <- sprintf("%s.%s",aid,colnames(obj.avg))
                              }
                              return(obj.avg)
-    },.parallel = F)
+    },.parallel = T)
     names(sce.avg.list) <- names(sce.list)
 
     dat.avg.mtx <- NULL
