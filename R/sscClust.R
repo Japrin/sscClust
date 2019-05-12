@@ -1668,8 +1668,8 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     #### sort
     if(is.null(ave.by)){
         obj <- ssc.assay.hclust(obj,assay.name=assay.name,
-                                order.col=do.clustering.col,
-                                order.row=do.clustering.row,
+                                order.col=if(is.logical(dend.col) && FALSE==dend.col) do.clustering.col else FALSE,
+                                order.row=if(is.logical(dend.row) && FALSE==dend.row) do.clustering.row else FALSE,
                                 clustering.distance="spearman",clustering.method="complete",
                                 k.row=1,k.col=1)
     }else{

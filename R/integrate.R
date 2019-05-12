@@ -42,10 +42,11 @@ integrate.by.avg <- function(sce.list,
         if(is.null(gene.de.list)){
             gene.de.list <- list()
             for(i in seq_along(sce.list)){
-                de.out <- ssc.clusterMarkerGene(sce.list[[i]],n.cores=ncores,...)
-                ###de.out <- ssc.clusterMarkerGene(sce.list[[i]],n.cores=ncores)
+                de.out <- ssc.clusterMarkerGene(sce.list[[i]],assay.name=assay.name,n.cores=ncores,group.var=avg.by,...)
+                ##de.out <- ssc.clusterMarkerGene(sce.list[[i]],assay.name=assay.name,n.cores=ncores,group.var=avg.by)
                 gene.de.list[[i]] <- de.out$gene.table
             }
+            names(gene.de.list) <- names(sce.list)
         }
         gene.de.common <- c()
         for(i in seq_along(gene.de.list)){
@@ -97,7 +98,7 @@ integrate.by.avg <- function(sce.list,
                             pca.npc=15,seed=9997)
 
     #ssc.plot.pca(sce.pb)
-    m <- regexec("^(.+?)\\.[A-Z0-9]",colnames(sce.pb),perl=T)
+    m <- regexec("^(.+?)\\.",colnames(sce.pb),perl=T)
     mm <- regmatches(colnames(sce.pb),m)
     colData(sce.pb)[,avg.by] <- colnames(sce.pb)
     colData(sce.pb)[,"dataset.id"] <- sapply(mm,"[",2)
@@ -146,9 +147,7 @@ integrate.by.avg <- function(sce.list,
 
     #### heatmap show average expression of specified genes
     ###return(list("sce.pb"=sce.pb,"branch.out"=branch.out))
-    if(use.deg && is.null(gene.de.list)){
-        metadata(sce.pb)$ssc$gene.de.list <- gene.de.list
-    }
+    metadata(sce.pb)$ssc$gene.de.list <- gene.de.list
     return(sce.pb)
 }
 
