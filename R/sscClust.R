@@ -295,6 +295,7 @@ ssc.order <- function(obj,columns.order=NULL,gene.desc=NULL)
 #' @param assay.name character; which assay (default: "exprs")
 #' @param gene character; only consider the specified gnees (default: NULL)
 #' @param column character; columns in colData(obj) to be averaged. (default: "majorCluster")
+#' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param avg character; average method. can be one of "mean", "diff", "zscore" . (default: "mean")
 #' @param ret.type character; return type. can be one of "data.melt", "data.cast", "data.mtx". (default: "data.melt")
 #' @importFrom plyr ldply
@@ -304,7 +305,7 @@ ssc.order <- function(obj,columns.order=NULL,gene.desc=NULL)
 #' @importFrom data.table dcast
 #' @details multiple average methods are implemented
 #' @export
-ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorCluster",
+ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorCluster",ncell.downsample=NULL,
                              avg="mean",ret.type="data.melt")
 {
   if(!column %in% colnames(colData(obj))){
@@ -314,6 +315,18 @@ ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorClust
   if(!is.null(gene)){
     obj <- obj[gene,]
   }
+
+  #### downsample cells
+  if(!is.null(ncell.downsample)){
+	clust <- colData(obj)[,column]
+	names(clust) <- colnames(obj)
+	grp.list <- unique(clust)
+	f.cell <- unlist(sapply(grp.list,function(x){
+						 x <- names(clust[clust==x])
+						 sample(x,min(length(x),ncell.downsample)) }))
+	obj <- obj[,f.cell]
+  }
+
   cls <- sort(unique(colData(obj)[,column]))
   data.melt.df <- ldply(cls,function(x){
     obj.in <- obj[,colData(obj)[,column]==x]
@@ -332,8 +345,10 @@ ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorClust
       avg.out <- Matrix::rowMeans(assay(obj.out,assay.name))
       ##sd.r <- matrixStats::rowSds(assay(obj,assay.name))
       sd.r <- DelayedMatrixStats::rowSds(DelayedArray(assay(obj,assay.name)))
-      return(data.frame(geneID=names(avg.out),cls=x,avg=(avg.in-avg.out)/sd.r,
-                        stringsAsFactors = F))
+      dat.ret <- data.frame(geneID=names(avg.out),cls=x,avg=(avg.in-avg.out)/sd.r,
+							stringsAsFactors = F)
+	  dat.ret$avg[is.na(dat.ret$avg)] <- 0
+	  return(dat.ret)
     }
   })
   if(ret.type=="data.melt"){
@@ -463,11 +478,12 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
   row.sd <- apply(assay(obj,assay.name),1,sd)
   col.sd <- apply(assay(obj,assay.name),2,sd)
   col.zero <- which(col.sd==0)
+  if(any(is.na(row.sd))){ warning(sprintf("expression data contians na value\n")) }
   if(length(col.zero>0)){
     warning(sprintf("expression data contains colum(s) with sd equal to 0:\n%s\n",
                     paste(head(colnames(obj)[col.zero]),collapse = ",")))
   }
-  obj <- obj[row.sd>0,]
+  obj <- obj[!is.na(row.sd) & row.sd>0,]
   if(!method.vgene %in% colnames(rowData(obj)) ){
     stop(sprintf("No variable genes identified by method %s !",method.vgene))
   }
