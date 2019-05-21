@@ -183,10 +183,16 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
     #par(opar)
 }
 
+#' plot matrix (typically genes expression)
+#' @param obj.clust object;
+#' @param out.prefix character; output prefix.
+#' @param ncls integer; (default: 1)
+#' @param cluster integer vector; (default: NULL)
+#' @importFrom  dendextend color_branches
+#' @importFrom moduleColor plotHclustColors
+#' @details plot dendrogram
 plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 {
-    require("dendextend")
-    require("moduleColor")
     if(!is.null(cluster)){
         ncls <- length(unique(cluster))
         colSet.cls <- auto.colSet(ncls)
@@ -202,15 +208,13 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
         col.cls <- col.cls[,1,drop=F]
     }
 
-    #str(branch.col)
-    ##obj.clust$order
     pdf(sprintf("%s.branch.pdf",out.prefix),width=10,height=8)
     layout(matrix(c(1,2),nrow = 2),heights = c(0.8,0.2))
     par(mar=c(0,4,4,2),xpd=T)
     #plot(branch.col)
     plot(obj.clust,sub="",xlab="",hang=-1,cex=1.0*50/max(length(obj.clust$labels),32))
     par(mar=c(5,4,0,2))
-    plotHclustColors(obj.clust, colors=col.cls, cex.rowLabels = 1.1)
+    moduleColor::plotHclustColors(obj.clust, colors=col.cls, cex.rowLabels = 1.1)
     dev.off()
     return(list("obj.clust"=obj.clust,"branch"=branch.col))
 }

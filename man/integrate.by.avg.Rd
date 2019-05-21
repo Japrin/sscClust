@@ -6,7 +6,8 @@
 \usage{
 integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
   is.avg = FALSE, ncores = 6, use.deg = TRUE, gene.de.list = NULL,
-  avg.by = "majorCluster", method.avg = "zscore", ...)
+  avg.by = "majorCluster", n.downsample = NULL, topGene.lo = -1.5,
+  topGene.hi = 1.5, method.avg = "zscore", ...)
 }
 \arguments{
 \item{sce.list}{list; list of object of \code{singleCellExperiment} class}
@@ -24,6 +25,12 @@ integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
 \item{gene.de.list}{list; if not NULL, each element is a data.frame with "geneID" column (default: NULL)}
 
 \item{avg.by}{character; calculate the average expression of cells group by the specifid column (default: "majorCluster")}
+
+\item{n.downsample}{integer; number of cells in each cluster to downsample to (default: NULL)}
+
+\item{topGene.lo}{double; for top gene heatmap.(default: -1.5)}
+
+\item{topGene.hi}{double; for top gene heatmap.(default: 1.5)}
 
 \item{method.avg}{character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")}
 

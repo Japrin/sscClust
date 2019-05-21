@@ -5,7 +5,8 @@
 \title{calcualte the average expression of cells of each group}
 \usage{
 ssc.average.cell(obj, assay.name = "exprs", gene = NULL,
-  column = "majorCluster", avg = "mean", ret.type = "data.melt")
+  column = "majorCluster", ncell.downsample = NULL, avg = "mean",
+  ret.type = "data.melt")
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -15,6 +16,8 @@ ssc.average.cell(obj, assay.name = "exprs", gene = NULL,
 \item{gene}{character; only consider the specified gnees (default: NULL)}
 
 \item{column}{character; columns in colData(obj) to be averaged. (default: "majorCluster")}
+
+\item{ncell.downsample}{integer; for each group, number of cells downsample to. (default: NULL)}
 
 \item{avg}{character; average method. can be one of "mean", "diff", "zscore" . (default: "mean")}
 

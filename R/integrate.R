@@ -9,6 +9,8 @@
 #' @param avg.by character; calculate the average expression of cells group by the specifid column (default: "majorCluster")
 #' @param n.downsample integer; number of cells in each cluster to downsample to (default: NULL)
 #' @param method.avg character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")
+#' @param topGene.lo double; for top gene heatmap.(default: -1.5)
+#' @param topGene.hi double; for top gene heatmap.(default: 1.5)
 #' @param ... parameters passed to ssc.clusterMarkerGene
 #' @importFrom plyr llply
 #' @details method to calculate the average expression can be one of "mean", "zscore"
@@ -20,6 +22,7 @@ integrate.by.avg <- function(sce.list,
                              gene.de.list=NULL,
                              avg.by="majorCluster",
 							 n.downsample=NULL,
+                             topGene.lo=-1.5,topGene.hi=1.5,
                              method.avg="zscore",...)
   {
     require("plyr")
@@ -99,9 +102,6 @@ integrate.by.avg <- function(sce.list,
         }
     }
 
-    #### correlation between clusters
-    dat.cor.mtx <- cor(dat.avg.mtx,method="pearson")
-
     ###  clustering the pseudo bulk data
     #all(rownames(dat.avg.mtx)==rownames(sce.avg.list[[1]]))
 	loginfo(sprintf("cluster the pseudo-bulk samples..."))
@@ -147,6 +147,8 @@ integrate.by.avg <- function(sce.list,
             out.prefix=sprintf("%s.dynamicTreeCut",out.prefix))
     metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$branch <- branch.out$branch
 
+    #### correlation between clusters
+    dat.cor.mtx <- cor(assay(sce.pb),method="pearson")
     for(z.lo in c(0,0.5,-0.5,-1)){
         plot.matrix.simple(dat.cor.mtx,
                            out.prefix=sprintf("%s.avg.%s.cor.zlo.%s",out.prefix,"pearson",z.lo),
@@ -165,21 +167,28 @@ integrate.by.avg <- function(sce.list,
 	##### top de genes
 	if(!is.null(gene.de.list)){
 		gene.desc.top <- as.data.table(ldply(names(gene.de.list),function(aid){
-							   gene.de.list[[aid]]$Group <- sprintf("%s.%s",aid,gene.de.list[[aid]][["cluster"]])
-							   return(gene.de.list[[aid]][,c("geneID","geneSymbol","AUC","cluster","Group"),with=F])
+							   gene.de.list[[aid]]$Group <- sprintf("%s.%s",aid,
+                                                                    gene.de.list[[aid]][["cluster"]])
+                               idx.ef <- if("AUC" %in% colnames(gene.de.list[[aid]])) "AUC" else "logFC"
+                               dat.ret <- gene.de.list[[aid]][,c("geneID","geneSymbol",idx.ef,
+                                                                 "cluster","Group"),with=F]
+                               colnames(dat.ret)[3] <- "effect"
+							   return(dat.ret)
 							   }))
 		obj.hclust <- metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto
-		gene.desc.top$Group <- factor(gene.desc.top$Group,levels=obj.hclust$hclust$labels[obj.hclust$hclust$order])
+		gene.desc.top$Group <- factor(gene.desc.top$Group,
+                                      levels=obj.hclust$hclust$labels[obj.hclust$hclust$order])
 		f.gene <- !duplicated(gene.desc.top$geneID) & gene.desc.top$geneID %in% rownames(sce.pb)
-		gene.desc.top <- gene.desc.top[f.gene,][,head(.SD,n=5),by=c("Group")][order(Group,-AUC),]
+		gene.desc.top <- gene.desc.top[f.gene,][,head(.SD,n=5),by=c("Group")][order(Group,-effect),]
 
 		ssc.plot.heatmap(sce.pb,out.prefix=sprintf("%s.gene.top",out.prefix),
 							   columns="pca.dynamicTreeCut.kauto",
 							   gene.desc=gene.desc.top,
 							   pdf.width=20,pdf.height=15,do.scale=F,
-							   z.lo=-1.5,z.hi=1.5,
+							   z.lo=topGene.lo,z.hi=topGene.hi,
 							   do.clustering.row=F,
 							   do.clustering.col=F,
+                               palette.name="RdBu",
 							   dend.col=metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$branch
 							   )
 	}	

@@ -1534,18 +1534,13 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
     }
     ### AUC
     .gene.table <- plyr::ldply(rownames(dat.to.test),function(x){
-        getAUC(dat.to.test[x,],clust,use.rank = F)
+        getAUC(dat.to.test[x,],clust,use.rank = F,geneID=x)
     },.progress = "none",.parallel=T)
-    colnames(.gene.table) <- c("AUC","cluster","score.p.value")
-    #print("str(.gene.table)")
-    #print(str(.gene.table))
-    if(is.character(.gene.table$AUC)){ .gene.table$AUC <- as.numeric(.gene.table$AUC) }
-    if(is.character(.gene.table$score.p.value)){ .gene.table$score.p.value <- as.numeric(.gene.table$score.p.value) }
-    if(is.numeric(.gene.table$cluster)){ .gene.table$cluster <- sprintf("C%s",.gene.table$cluster) }
-    ##.gene.table$score.q.value <- p.adjust(.gene.table$score.p.value,method = "BH")
-                                    ####geneSymbol=if(original.labels) rownames(dat.to.test) else entrezToXXX(rownames(dat.to.test)),
+    #if(is.character(.gene.table$AUC)){ .gene.table$AUC <- as.numeric(.gene.table$AUC) }
+    #if(is.character(.gene.table$score.p.value)){ .gene.table$score.p.value <- as.numeric(.gene.table$score.p.value) }
+    #if(is.numeric(.gene.table$cluster)){ .gene.table$cluster <- sprintf("C%s",.gene.table$cluster) }
     .gene.table$score.q.value <- 1
-    .gene.table <- cbind(data.frame(geneID=rownames(dat.to.test),
+    .gene.table <- merge(data.frame(geneID=rownames(dat.to.test),
                                     geneSymbol=gid.mapping[rownames(dat.to.test)],
                                     stringsAsFactors = F),
                          .gene.table)
@@ -1613,6 +1608,70 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
     }
     return(list(gene.table=.gene.table,aov.res=.aov.res))
 }
+
+
+#' identify differential genes of each cluster (comparing the cluster with all others), using limma
+#' @param obj object of \code{singleCellExperiment} class
+#' @param assay.name character; which assay (default: "exprs")
+#' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
+#' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
+#' @param batch character; covariate. (default: NULL)
+#' @param out.prefix character; output prefix. (default: NULL)
+#' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @param do.plot logical; whether plot. (default: TRUE)
+#' @param T.fdr numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)
+#' @param T.logFC numeric; threshold of the absoute diff (default: 1)
+#' @param verbose logical; whether output all genes' result. (default: FALSE)
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom limma lmFit eBayes topTable
+#' @importFrom doParallel registerDoParallel
+#' @importFrom plyr ldply llply
+#' @details identify differential genes using limma
+#' @export
+ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
+                                  group.var="majorCluster",batch=NULL,
+                                  out.prefix=NULL,n.cores=NULL, do.plot=T,
+                                  T.fdr=0.01,T.logFC=1,
+                                  verbose=F)
+{
+#    requireNamespace("doParallel")
+    requireNamespace("plyr")
+    requireNamespace("dplyr")
+
+    clust <- colData(obj)[,group.var]
+    grp.list <- unique(clust)
+    batchV <- NULL
+    if(!is.null(batch)){
+        batchV <- colData(obj)[,batch]
+    }
+    if(length(unique(clust))<2 || is.null(obj) || !all(table(clust) > 1)){
+        cat("WARN: clusters<2 or no obj provided or not all clusters have more than 1 samples\n")
+        return(NULL)
+    }
+
+    if(is.null(names(rowData(obj)$display.name))){ names(rowData(obj)$display.name) <- row.names(obj) }
+    gid.mapping <- rowData(obj)$display.name
+    if(is.null(names(gid.mapping))){ names(gid.mapping) <- row.names(obj) }
+
+    RhpcBLASctl::omp_set_num_threads(1)
+    doParallel::registerDoParallel(cores = n.cores)
+
+    out <- llply(grp.list,function(x){
+        xlabel <- clust
+        xlabel[xlabel!=x] <- "_control"
+        out.limma <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
+                                      out.prefix=out.prefix,ncell.downsample=ncell.downsample,
+                                      T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
+                                      gid.mapping=gid.mapping, do.voom=F)
+    },.parallel=T)
+    names(out) <- grp.list
+
+    all.table <- data.table(ldply(grp.list,function(x){ out[[x]]$all }))
+    sig.table <- data.table(ldply(grp.list,function(x){ out[[x]]$sig }))
+
+    return(list(all=all.table,sig=sig.table))
+}
+
 
 
 #' plot heatmap

@@ -66,6 +66,7 @@ cor.BLAS <- function(x,y=NULL,method="pearson",nthreads=NULL)
 
 #' dispaly message with time stamp
 #' @param msg characters; message to display
+#' @export
 loginfo <- function(msg) {
   timestamp <- sprintf("%s", Sys.time())
   msg <- paste0("[",timestamp, "] ", msg,"\n")
@@ -178,14 +179,14 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
     }
     dat.ret <- NULL
     if(!is.null(mod) && mod=="cluster.specific") {
-      dat.ret <- structure(c(t.res.f,t.res.hsd,t.res.hsd.minP,t.res.hsd.minPDiff,t.res.hsd.minPCmp,
+      dat.ret <- structure(c(v,t.res.f,t.res.hsd,t.res.hsd.minP,t.res.hsd.minPDiff,t.res.hsd.minPCmp,
                              t.res.spe,is.clusterSpecific,t.res.spe.lable,t.res.spe.direction),
-                           names=c("F","F.pvalue",paste0("HSD.diff.",hsd.name),paste0("HSD.padj.",hsd.name),
+                           names=c("geneID","F","F.pvalue",paste0("HSD.diff.",hsd.name),paste0("HSD.padj.",hsd.name),
                                    "HSD.padj.min","HSD.padj.min.diff","HSD.padj.min.cmp",
                                    paste0("cluster.specific.",clustNames),"is.clusterSpecific","cluster.lable","cluster.direction"))
     }else{
-      dat.ret <- structure(c(t.res.f,t.res.hsd,t.res.hsd.minP,t.res.hsd.minPDiff,t.res.hsd.minPCmp),
-                           names=c("F","F.pvalue",paste0("HSD.diff.",hsd.name),paste0("HSD.padj.",hsd.name),
+      dat.ret <- structure(c(v,t.res.f,t.res.hsd,t.res.hsd.minP,t.res.hsd.minPDiff,t.res.hsd.minPCmp),
+                           names=c("geneID","F","F.pvalue",paste0("HSD.diff.",hsd.name),paste0("HSD.padj.",hsd.name),
                                    "HSD.padj.min","HSD.padj.min.diff","HSD.padj.min.cmp"))
     }
     return(dat.ret)
@@ -200,8 +201,10 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
   f.cnames.na <- which(is.na(cnames))
   cnames[f.cnames.na] <- rownames(xdata)[f.cnames.na]
   ret.df <- data.frame(geneID=rownames(xdata),geneSymbol=cnames,stringsAsFactors=F)
-  ret.df <- cbind(ret.df,ret)
-  rownames(ret.df) <- rownames(xdata)
+  ret.df <- merge(ret.df,ret,on="geneID")
+  rownames(ret.df) <- ret.df$geneID
+  ##ret.df <- cbind(ret.df,ret)
+  #rownames(ret.df) <- rownames(xdata)
   #print(str(ret.df))
   ## type conversion
   if(is.null(mod)){
@@ -239,7 +242,8 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
 #' @param gene numeric; expression profile of one gene across samples
 #' @param labels character; clusters of the samples belong to
 #' @param use.rank logical; using the expression value itself or convert to rank value. (default: TRUE)
-getAUC <- function(gene, labels,use.rank=T)
+#' @param geneID character; geneID
+getAUC <- function(gene, labels,use.rank=T,geneID="GeneX")
 {
     requireNamespace("ROCR")
 
@@ -265,7 +269,8 @@ getAUC <- function(gene, labels,use.rank=T)
     val <- unlist(performance(pred,"auc")@y.values)
     pval <- suppressWarnings(wilcox.test(score[truth == 1],
                                          score[truth == 0])$p.value)
-    return(c(val,posgroup,pval))
+	return(data.frame("geneID"=geneID,"AUC"=val,"cluster"=posgroup,"score.p.value"=pval,stringsAsFactors=F))
+    #return(c(val,posgroup,pval))
 }
 
 #' For each gene, calculate the frequency of cells in each clusters are expressed.
@@ -771,5 +776,114 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
     return(ret.V)
 }
 
+#' run limma, given an expression matrix
+#' @param xdata data frame or matrix; rows for genes and columns for samples
+#' @param xlabel factor; cluster label of the samples, with length equal to the number of columns in xdata
+#' @param batch factor; covariate. (default: NULL)
+#' @param out.prefix character; if not NULL, write the result to the file(s). (default: NULL)
+#' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
+#' @param T.fdr numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)
+#' @param T.logFC numeric; threshold of the absoute diff (default: 1)
+#' @param verbose logical; verbose (default: F)
+#' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
+#' @param do.voom logical; perform voom transfromation (default: FALSE)
+#' @details diffeerentially expressed genes dectection using limma
+#' @return a matrix with dimention as input ( samples in rows and variables in columns)
+#' @importFrom limma lmFit eBayes topTable
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @export
+run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsample=NULL,
+                             T.fdr=0.05,T.logFC=1,verbose=F,n.cores=NULL,
+                             gid.mapping=NULL, do.voom=F)
+{
+	suppressPackageStartupMessages(require("limma"))
+	suppressPackageStartupMessages(require("dplyr"))
+	suppressPackageStartupMessages(require("BiocParallel"))
 
+    if(ncol(xdata)!=length(xlabel)){
+        warning(sprintf("xdata and xlabel is not consistent!\n"))
+        return(NULL)
+    }
+    names(xlabel) <- colnames(xdata)
+    if(!is.null(ncell.downsample)){
+        grp.list <- unique(xlabel)
+        f.cell <- unlist(lapply(grp.list,function(x){
+                             x <- names(xlabel[xlabel==x])
+                             sample(x,min(length(x),ncell.downsample)) }))
+        xlabel <- xlabel[f.cell]
+        if(!is.null(batch)){
+            names(batch) <- colnames(xdata)
+            batch <- batch[f.cell]
+        }
+        xdata <- xdata[,f.cell]
+    }
+    xdata <- as.matrix(xdata)
+    f.gene <- rowVars(xdata)>0
+    xdata <- xdata[f.gene,]
+    if(is.null(batch)){
+        design.df <- data.frame(cellID=colnames(xdata), group=factor(xlabel), stringsAsFactors=F)
+	    design <- model.matrix(~group,data=design.df)
+    }else{
+        design.df <- data.frame(cellID=colnames(xdata), group=factor(xlabel), batch=batch, stringsAsFactors=F)
+	    design <- model.matrix(~batch+group,data=design.df)
+    }
+    group.label <- gsub("^group","",colnames(design)[ncol(design)])
+	colnames(design)[ncol(design)]<-"II"
+
+    RhpcBLASctl::omp_set_num_threads(1)
+	register(MulticoreParam(if(!is.null(n.cores)) n.cores else multicoreWorkers()))
+    if(do.voom){
+        if(!is.null(out.prefix)){
+            pdf(sprintf("%s.voom.pdf",out.prefix),width = 7,height = 7)
+            v <- voom(xdata, design, plot=TRUE)
+            dev.off()
+        }
+	    fit <- lmFit(v, design)
+    }else{
+	    fit <- lmFit(xdata, design)
+    }
+	fit <- eBayes(fit)
+	all.table  <- topTable(fit, coef = "II", n = Inf, sort = "p", p = 1)
+	all.table <- cbind(data.table(geneID=rownames(all.table),
+                                  geneSymbol=if(is.null(gid.mapping)) rownames(all.table) else gid.mapping[rownames(all.table)],
+                                  cluster=group.label,
+                                  stringsAsFactors = F),
+                       all.table)
+
+    .getMean <- function(inDat,str.note=NULL){
+        .Grp.mean <- t(apply(inDat,1,function(x){
+                                 .mexp <- aggregate(x ~ design.df$group, FUN = mean)
+                                 structure(.mexp[,2],names=sprintf("mean.%s",.mexp[,1])) }))
+        if(!is.null(str.note)){
+            colnames(.Grp.mean) <- sprintf("%s.%s",colnames(.Grp.mean),str.note)
+        }
+        .Grp.mean.df <- data.table(geneID=rownames(.Grp.mean),stringsAsFactors = F)
+        .Grp.mean.df <- cbind(.Grp.mean.df,.Grp.mean)
+    }
+    if(verbose){
+        if(!is.null(batch)){
+             beta <- fit$coefficients
+             beta[is.na(beta)] <- 0
+             idx.batch <- grep("^batch",colnames(design),value = T)
+             xdata.rmBE <- as.matrix(xdata) - beta[,idx.batch,drop=F] %*% t(design[,idx.batch,drop=F])
+            .Grp.mean.df <- .getMean(xdata.rmBE,str.note="rmBE")
+            all.table <- merge(all.table,.Grp.mean.df)
+        }else{
+            .Grp.mean.df <- .getMean(xdata)
+            all.table <- merge(all.table,.Grp.mean.df)
+        }
+    }
+
+    all.table <- all.table[order(adj.P.Val,-logFC),]
+    #print(head(all.table))
+    sig.table <- all.table[adj.P.Val<T.fdr & abs(logFC)>T.logFC,]
+    if(!is.null(out.prefix))
+    {
+        write.table(all.table,sprintf("%s.limma.all.txt",output.prefix),row.names = F,quote = F,sep = "\t")
+        write.table(sig.table,sprintf("%s.limma.sig.txt",output.prefix),row.names = F,quote = F,sep = "\t")
+    }
+	ret.dat <- list(all=all.table,sig=sig.table)
+    return(ret.dat)
+}
 

@@ -4,7 +4,7 @@
 \alias{getAUC}
 \title{calculate the AUC of one gene, using it as a classifier. code from SC3}
 \usage{
-getAUC(gene, labels, use.rank = T)
+getAUC(gene, labels, use.rank = T, geneID = "GeneX")
 }
 \arguments{
 \item{gene}{numeric; expression profile of one gene across samples}
@@ -12,6 +12,8 @@ getAUC(gene, labels, use.rank = T)
 \item{labels}{character; clusters of the samples belong to}
 
 \item{use.rank}{logical; using the expression value itself or convert to rank value. (default: TRUE)}
+
+\item{geneID}{character; geneID}
 }
 \description{
 calculate the AUC of one gene, using it as a classifier. code from SC3
