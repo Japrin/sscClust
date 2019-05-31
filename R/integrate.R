@@ -11,6 +11,7 @@
 #' @param method.avg character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")
 #' @param topGene.lo double; for top gene heatmap.(default: -1.5)
 #' @param topGene.hi double; for top gene heatmap.(default: 1.5)
+#' @param topGene.step double; for top gene heatmap.(default: 1)
 #' @param ... parameters passed to ssc.clusterMarkerGene
 #' @importFrom plyr llply
 #' @details method to calculate the average expression can be one of "mean", "zscore"
@@ -22,7 +23,7 @@ integrate.by.avg <- function(sce.list,
                              gene.de.list=NULL,
                              avg.by="majorCluster",
 							 n.downsample=NULL,
-                             topGene.lo=-1.5,topGene.hi=1.5,
+                             topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,
                              method.avg="zscore",...)
   {
     require("plyr")
@@ -185,7 +186,7 @@ integrate.by.avg <- function(sce.list,
 							   columns="pca.dynamicTreeCut.kauto",
 							   gene.desc=gene.desc.top,
 							   pdf.width=20,pdf.height=15,do.scale=F,
-							   z.lo=topGene.lo,z.hi=topGene.hi,
+							   z.lo=topGene.lo,z.hi=topGene.hi,z.step=topGene.step,
 							   do.clustering.row=F,
 							   do.clustering.col=F,
                                palette.name="RdBu",

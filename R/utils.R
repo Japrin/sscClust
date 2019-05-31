@@ -887,3 +887,39 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     return(ret.dat)
 }
 
+#' run dynamicTreeCut::cutreeDynamic on rows of the given matrix
+#' @param data data frame or matrix;
+#' @param deepSplit integer; passed to dynamicTreeCut::cutreeDynamic
+#' @param minClusterSize integer; passed to dynamicTreeCut::cutreeDynamic
+#' @param ... parameters passed to dynamicTreeCut::cutreeDynamic
+#' @details dynamicTreeCut::cutreeDynamic on rows of the given matrix
+#' @return a matrix with dimention as input ( samples in rows and variables in columns)
+#' @importFrom stats dist hclust
+#' @importFrom dynamicTreeCut cutreeDynamic
+#' @importFrom dendextend color_branches
+#' @export
+run.cutreeDynamic <- function(dat,method.hclust="ward.D2",deepSplit=4, minClusterSize=2,...){
+    obj.distM <- stats::dist(dat)
+    obj.hclust <- stats::hclust(obj.distM,method.hclust)
+    ##### if method.hclust=="complete", some clusters from cutreeDynamic are not consistent with the dendrogram
+    cluster.label <- dynamicTreeCut::cutreeDynamic(obj.hclust,distM=as.matrix(obj.distM),
+                                                method = "hybrid",
+                                                deepSplit=deepSplit,minClusterSize=minClusterSize,
+                                                ...)
+    obj.dend <- as.dendrogram(obj.hclust)
+    ncls <- length(unique(cluster.label))
+    colSet.cls <- auto.colSet(ncls)
+    names(colSet.cls) <- unique(cluster.label[order.dendrogram(obj.dend)])
+    col.cls <- data.frame("k0"=sapply(cluster.label,function(x){ colSet.cls[as.character(x)] }))
+
+    #print(colSet.cls)
+    #print(table(cluster.label))
+
+    obj.branch <- color_branches(obj.dend,
+                                 clusters=cluster.label[order.dendrogram(obj.dend)],
+                                 col=colSet.cls)
+
+    ###aa <- plot.branch(obj.hclust,"test.01",cluster=cluster.label)
+
+    return(list("hclust"=obj.hclust,"dist"=obj.distM,"cluster"=cluster.label,"branch"=obj.branch))
+}

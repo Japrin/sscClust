@@ -118,7 +118,12 @@ plot.density2D <- function(x,peaks=NULL)
 #' @param out.prefix character; output prefix.
 #' @param mytitle character; (default: "")
 #' @param show.number logical; (default: TRUE)
-#' @param do.clust logical or dendrogram; passed to cluster_columns and cluster_rows of Heatmap (default: FALSE)
+#' @param do.clust logical, character or dendrogram; passed to both cluster_columns and cluster_rows of Heatmap. Higher priority than clust.row and clust.column (default: NULL)
+#' @param clust.row logical, character or dendrogram; passed to cluster_rows of Heatmap (default: FALSE)
+#' @param clust.column logical, character or dendrogram; passed to cluster_columns of Heatmap (default: FALSE)
+#' @param waterfall.row logical, order rows to make plot like waterfall (default: FALSE)
+#' @param waterfall.column logical, order rows to make plot like waterfall (default: FALSE)
+#' @param show.dendrogram logical, whetehr show the dendrogram (default: FALSE)
 #' @param z.lo double; (default: NULL)
 #' @param z.hi double; (default: NULL)
 #' @param palatte character; (default: NULL)
@@ -127,11 +132,15 @@ plot.density2D <- function(x,peaks=NULL)
 #' @param exp.name character; showd in the legend (default: "Count")
 #' @import data.table
 #' @import ggplot2
-#' @importFrom  ggpubr ggscatter
+#' @importFrom ggpubr ggscatter
+#' @importFrom stats dist
+#' @importFrom dynamicTreeCut cutreeDynamic
 #' @details plot matrix
 #' @export
 plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
-                               do.clust=FALSE,z.lo=NULL,z.hi=NULL,palatte=NULL,
+                               do.clust=NULL,z.lo=NULL,z.hi=NULL,palatte=NULL,
+                               clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
+                               waterfall.row=FALSE,waterfall.column=FALSE,
                                pdf.width=8,pdf.height=8,exp.name="Count")
 {
     require("gplots")
@@ -139,6 +148,46 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
     require("circlize")
     require("gridBase")
     require("RColorBrewer")
+
+    #### ordering the matrix
+    if(!is.null(do.clust)){
+        clust.row <- do.clust
+        clust.column <- do.clust
+    }
+    scoreVec = function(x) {
+        score = 0
+        x <- x^100
+        x <- x/sum(x)
+        m <- length(x)
+        for (i in 1:m){
+            if (x[i]) {
+                score = score + 1.5^(-i) * (x[i])
+                ##score = score + 10^( - (i/m) * 100/x[i])
+            }
+        }
+        return(score)
+    }
+    dat.ordered <- dat
+    if(clust.row=="cutreeDynamic"){
+        res.clust.row <- run.cutreeDynamic(dat,method.hclust="ward.D2",deepSplit=1)
+        dat.ordered <- dat[res.clust.row$hclust$order,]
+        clust.row <- res.clust.row$branch
+    }
+    if(clust.column=="cutreeDynamic"){
+        res.clust.column <- run.cutreeDynamic(t(dat),method.hclust="ward.D2",deepSplit=1)
+        dat.ordered <- dat[,res.clust.column$hclust$order]
+        clust.column <- res.clust.column$branch
+    }
+    if(waterfall.column){
+        scoresC <- apply(dat.ordered, 2, scoreVec)
+        dat <- dat[,order(scoresC,decreasing = T)]
+        ###dat.ordered <- dat.ordered[,order(scoresC,decreasing = T)]
+    }
+    if(waterfall.row){
+        scoresR <- apply(dat.ordered, 1, scoreVec)
+        dat <- dat[order(scoresR,decreasing = T),]
+        ###dat.ordered <- dat.ordered[order(scoresR,decreasing = T),]
+    }
 
 	if(!is.null(out.prefix)){
         pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height)
@@ -163,10 +212,16 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
     if(is.null(palatte)){
         palatte <- rev(brewer.pal(n = 7,name = "RdYlBu"))
     }
-    ht <- ComplexHeatmap::Heatmap(dat, name = exp.name, col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
-                  cluster_columns=do.clust,cluster_rows=do.clust,
+    ht <- ComplexHeatmap::Heatmap(dat, name = exp.name,
+                  col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
+                  cluster_columns=clust.column,cluster_rows=clust.row,
                   row_dend_reorder = FALSE, column_dend_reorder = FALSE,
-                  column_names_gp = gpar(fontsize = 12*28/max(m,32)),row_names_gp = gpar(fontsize = 10*28/max(n,32)),
+                  column_names_gp = gpar(fontsize = 12*28/max(m,32)),
+                  row_names_gp = gpar(fontsize = 10*28/max(n,32)),
+                  row_dend_width = unit(4, "cm"),
+                  column_dend_height = unit(4, "cm"),
+                  show_row_dend = show.dendrogram,
+                  show_column_dend = show.dendrogram,
                   heatmap_legend_param = list(title = exp.name,
                                               grid_width = unit(0.8, "cm"),
                                               grid_height = unit(0.8, "cm"),
@@ -188,34 +243,45 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
 #' @param out.prefix character; output prefix.
 #' @param ncls integer; (default: 1)
 #' @param cluster integer vector; (default: NULL)
-#' @importFrom  dendextend color_branches
+#' @importFrom  dendextend color_branches set
 #' @importFrom moduleColor plotHclustColors
 #' @details plot dendrogram
 plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 {
+    obj.dend <- as.dendrogram(obj.clust)
     if(!is.null(cluster)){
         ncls <- length(unique(cluster))
         colSet.cls <- auto.colSet(ncls)
-        names(colSet.cls) <- unique(cluster)
-        col.cls <- data.frame("k0"=sapply(cluster,function(x){ colSet.cls[x] }))
-        branch.col <- color_branches(as.dendrogram(obj.clust),clusters=cluster,col=colSet.cls)
+        names(colSet.cls) <- unique(cluster[order.dendrogram(obj.dend)])
+        col.cls <- data.frame("k0"=sapply(cluster,function(x){ colSet.cls[as.character(x)] }),
+                                stringsAsFactors=F)
+        branch.col <- color_branches(obj.dend,
+                                     clusters=cluster[order.dendrogram(obj.dend)],
+                                     col=colSet.cls)
     }else{
         dend.cutree <- cutree(obj.clust, c(ncls,ncls), order_clusters_as_data = T)
         colSet.cls <- auto.colSet(ncls)
         col.cls <- t(apply(dend.cutree,1,function(x){ colSet.cls[x] }))
-        branch.col <- color_branches(as.dendrogram(obj.clust),k=ncls,col=colSet.cls)
+        branch.col <- color_branches(obj.dend,k=ncls,col=colSet.cls)
         colnames(col.cls) <- c("k0","k0")
         col.cls <- col.cls[,1,drop=F]
     }
+    
+    branch.col <- branch.col %>%
+        dendextend::set("branches_lwd", 1.5) %>%
+        dendextend::set("labels_colors",col.cls$k0[order.dendrogram(obj.dend)]) %>%
+        dendextend::set("labels_cex", 1*50/max(length(obj.clust$labels),32))
 
-    pdf(sprintf("%s.branch.pdf",out.prefix),width=10,height=8)
+    pdf(sprintf("%s.branch.pdf",out.prefix),width=12,height=8)
     layout(matrix(c(1,2),nrow = 2),heights = c(0.8,0.2))
-    par(mar=c(0,4,4,2),xpd=T)
-    #plot(branch.col)
-    plot(obj.clust,sub="",xlab="",hang=-1,cex=1.0*50/max(length(obj.clust$labels),32))
+    par(mar=c(15,4,4,2),xpd=T)
+    plot(branch.col)
+    #par(mar=c(0,4,4,2),xpd=T)
+    #plot(obj.clust,sub="",xlab="",hang=-1,cex=1.0*50/max(length(obj.clust$labels),32))
     par(mar=c(5,4,0,2))
     moduleColor::plotHclustColors(obj.clust, colors=col.cls, cex.rowLabels = 1.1)
     dev.off()
+
     return(list("obj.clust"=obj.clust,"branch"=branch.col))
 }
 
