@@ -127,6 +127,10 @@ plot.density2D <- function(x,peaks=NULL)
 #' @param z.lo double; (default: NULL)
 #' @param z.hi double; (default: NULL)
 #' @param palatte character; (default: NULL)
+#' @param row.ann.dat data.frame; data for row annotation; (default: NULL)
+#' @param row.split vector; used for row; (default: NULL)
+#' @param returnHT logical; whether return HT; (default: FALSE)
+#' @param par.legend list; lengend parameters, used to overwrite the default setting; (default: list())
 #' @param pdf.width double; width of the output plot (default: 22)
 #' @param pdf.height double; height of the output plot (default: 22)
 #' @param exp.name character; showd in the legend (default: "Count")
@@ -141,6 +145,8 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
                                do.clust=NULL,z.lo=NULL,z.hi=NULL,palatte=NULL,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
                                waterfall.row=FALSE,waterfall.column=FALSE,
+                               row.ann.dat=NULL,row.split=NULL,returnHT=FALSE,
+                               par.legend=list(),
                                pdf.width=8,pdf.height=8,exp.name="Count")
 {
     require("gplots")
@@ -181,24 +187,23 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
     if(waterfall.column){
         scoresC <- apply(dat.ordered, 2, scoreVec)
         dat <- dat[,order(scoresC,decreasing = T)]
-        ###dat.ordered <- dat.ordered[,order(scoresC,decreasing = T)]
     }
     if(waterfall.row){
         scoresR <- apply(dat.ordered, 1, scoreVec)
         dat <- dat[order(scoresR,decreasing = T),]
-        ###dat.ordered <- dat.ordered[order(scoresR,decreasing = T),]
+        if(!is.null(row.ann.dat)){ row.ann.dat <- row.ann.dat[order(scoresR,decreasing = T),] }
     }
 
 	if(!is.null(out.prefix)){
         pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height)
+        opar <- par(mar=c(4,2,4,4))
+        plot.new()
+        title(main = mytitle,cex.main=2)
+        #legend("topright",legend=names(colSet),fill=colSet,border=colSet,cex=1.5,inset=c(-0.03,0),xpd=T)
+        ### Integrating Grid Graphics Output with Base Graphics Output
+        vps <- baseViewports()
+        pushViewport(vps$inner, vps$figure, vps$plot)
     }
-    opar <- par(mar=c(4,2,4,4))
-    plot.new()
-    title(main = mytitle,cex.main=2)
-    #legend("topright",legend=names(colSet),fill=colSet,border=colSet,cex=1.5,inset=c(-0.03,0),xpd=T)
-    ### Integrating Grid Graphics Output with Base Graphics Output
-    vps <- baseViewports()
-    pushViewport(vps$inner, vps$figure, vps$plot)
     tmp.var <- pretty((dat),n=8)
     if(is.null(z.lo)){ z.lo <- tmp.var[1] }
     if(is.null(z.hi)){ z.hi <- tmp.var[length(tmp.var)] }
@@ -212,6 +217,19 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
     if(is.null(palatte)){
         palatte <- rev(brewer.pal(n = 7,name = "RdYlBu"))
     }
+    par.legend.used <- list(title = exp.name,
+                               grid_width = unit(0.8, "cm"),
+                               grid_height = unit(0.8, "cm"),
+                               #legend_width=2,
+                               legend_height=unit(10,"cm"),
+                               title_gp = gpar(fontsize = 16, fontface = "bold"),
+                               #color_bar = "continuous",
+                               label_gp = gpar(fontsize = 14))
+    if(length(par.legend)>0){
+        for(ipar in names(par.legend)){
+            par.legend.used[[ipar]] <- par.legend[[ipar]]
+        }
+    }
     ht <- ComplexHeatmap::Heatmap(dat, name = exp.name,
                   col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
                   cluster_columns=clust.column,cluster_rows=clust.row,
@@ -222,20 +240,31 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
                   column_dend_height = unit(4, "cm"),
                   show_row_dend = show.dendrogram,
                   show_column_dend = show.dendrogram,
-                  heatmap_legend_param = list(title = exp.name,
-                                              grid_width = unit(0.8, "cm"),
-                                              grid_height = unit(0.8, "cm"),
-                                              #legend_width=2,
-                                              legend_height=unit(10,"cm"),
-                                              title_gp = gpar(fontsize = 16, fontface = "bold"),
-                                              #color_bar = "continuous",
-                                              label_gp = gpar(fontsize = 14)),
+                  heatmap_legend_param = par.legend.used,
                   cell_fun = my.cell_fun)
-    ComplexHeatmap::draw(ht, newpage= FALSE)
-    if(!is.null(out.prefix)){
-      dev.off()
+    if(!is.null(row.ann.dat)){
+        for(idx in colnames(row.ann.dat)){
+            idx.col <- NULL
+            if(is.logical(row.ann.dat[[idx]])){
+                row.ann.dat[[idx]] <- as.character(row.ann.dat[[idx]])
+                idx.col <- c("TRUE" = "red", "FALSE" = "blue")
+            }else if(is.character(row.ann.dat[[idx]])){
+                idx.levels <- sort(unique(row.ann.dat[[idx]]))
+                idx.col <- structure(sscClust:::auto.colSet(length(idx.levels)),names=idx.levels)
+            }
+            vv <- row.ann.dat[[idx]]
+            names(vv) <- rownames(dat)
+            ht <- ht + ComplexHeatmap::Heatmap(vv,name=idx,col=idx.col,
+                                               row_names_gp = gpar(fontsize = 10*28/max(n,32)))
+        }
     }
-    #par(opar)
+
+    if(!is.null(out.prefix)){
+        ComplexHeatmap::draw(ht, newpage= FALSE,merge_legends = TRUE,split=row.split)
+        dev.off()
+        #par(opar)
+    }
+    if(returnHT){ return(ht) }
 }
 
 #' plot matrix (typically genes expression)

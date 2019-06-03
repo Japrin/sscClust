@@ -821,11 +821,16 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     xdata <- as.matrix(xdata)
     f.gene <- rowVars(xdata)>0
     xdata <- xdata[f.gene,]
+	if("_control" %in% xlabel){
+		x.levels <- c("_control",setdiff(unique(sort(xlabel)),"_control"))
+	}else{
+		x.levels <- unique(sort(xlabel))
+	}
     if(is.null(batch)){
-        design.df <- data.frame(cellID=colnames(xdata), group=factor(xlabel), stringsAsFactors=F)
+        design.df <- data.frame(cellID=colnames(xdata), group=factor(xlabel,levels=x.levels), stringsAsFactors=F)
 	    design <- model.matrix(~group,data=design.df)
     }else{
-        design.df <- data.frame(cellID=colnames(xdata), group=factor(xlabel), batch=batch, stringsAsFactors=F)
+        design.df <- data.frame(cellID=colnames(xdata), group=factor(xlabel,levels=x.levels), batch=batch, stringsAsFactors=F)
 	    design <- model.matrix(~batch+group,data=design.df)
     }
     group.label <- gsub("^group","",colnames(design)[ncol(design)])
@@ -880,8 +885,8 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     sig.table <- all.table[adj.P.Val<T.fdr & abs(logFC)>T.logFC,]
     if(!is.null(out.prefix))
     {
-        write.table(all.table,sprintf("%s.limma.all.txt",output.prefix),row.names = F,quote = F,sep = "\t")
-        write.table(sig.table,sprintf("%s.limma.sig.txt",output.prefix),row.names = F,quote = F,sep = "\t")
+        write.table(all.table,sprintf("%s.limma.all.txt",out.prefix),row.names = F,quote = F,sep = "\t")
+        write.table(sig.table,sprintf("%s.limma.sig.txt",out.prefix),row.names = F,quote = F,sep = "\t")
     }
 	ret.dat <- list(all=all.table,sig=sig.table)
     return(ret.dat)

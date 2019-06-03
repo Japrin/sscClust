@@ -1238,8 +1238,10 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param brewer.palette character; which palette to use. (default: "YlOrRd")
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
 #' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )
+#' @param label double; label size. if NULL, no label showed. (default: NULL )
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend coord_cartesian
+#' @importFrom ggrepel geom_text_repel
 #' @importFrom cowplot save_plot plot_grid
 #' @importFrom utils read.table
 #' @importFrom RColorBrewer brewer.pal
@@ -1252,7 +1254,7 @@ ssc.run <- function(obj, assay.name="exprs",
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,splitBy=NULL,
                              plotDensity=F, colSet=list(),
                              reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,size=NULL,
-                             brewer.palette="YlOrRd",adjB=NULL,clamp=NULL,
+                             brewer.palette="YlOrRd",adjB=NULL,clamp=NULL,label=NULL,
                              out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
   #requireNamespace("ggplot2")
@@ -1293,6 +1295,10 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
             geom_point(aes_string(colour=cc),
                        show.legend=if(!is.numeric(dat.plot[,cc]) && nvalues>40) F else NA,
                        size=if(is.null(size)) auto.point.size(npts)*1.1 else size)
+          if(!is.null(label)){
+              dat.plot.label <- as.data.table(dat.plot)[,.(Dim1=mean(.SD$Dim1),Dim2=mean(.SD$Dim2)),by=cc]
+              p <- p + ggrepel::geom_text_repel(aes_string("Dim1", "Dim2", label = cc),size=label,data=dat.plot.label)
+          }
           if(!is.null(splitBy)){
             p <- p + ggplot2::facet_wrap(~splitBy)
           }
@@ -1616,6 +1622,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @param assay.name character; which assay (default: "exprs")
 #' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
+#' @param group.list character; DEG of groups to calculate. If NULL, all groups. (default: "NULL")
 #' @param batch character; covariate. (default: NULL)
 #' @param out.prefix character; output prefix. (default: NULL)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
@@ -1630,7 +1637,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @details identify differential genes using limma
 #' @export
 ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
-                                  group.var="majorCluster",batch=NULL,
+                                  group.var="majorCluster",group.list=NULL,batch=NULL,
                                   out.prefix=NULL,n.cores=NULL, do.plot=T,
                                   T.fdr=0.01,T.logFC=1,
                                   verbose=F)
@@ -1640,13 +1647,18 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     requireNamespace("dplyr")
 
     clust <- colData(obj)[,group.var]
-    grp.list <- unique(clust)
+    if(is.null(group.list)){ group.list <- unique(clust) }
     batchV <- NULL
     if(!is.null(batch)){
         batchV <- colData(obj)[,batch]
     }
-    if(length(unique(clust))<2 || is.null(obj) || !all(table(clust) > 1)){
+    stat.clust <- table(clust)
+    if(length(unique(clust))<2 || is.null(obj) ){
         cat("WARN: clusters<2 or no obj provided or not all clusters have more than 1 samples\n")
+        return(NULL)
+    }
+    if(!all(stat.clust[group.list]>2)){
+        cat("WARN: not all clusters specified have more than 2 samples\n")
         return(NULL)
     }
 
@@ -1656,19 +1668,19 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 
     RhpcBLASctl::omp_set_num_threads(1)
     doParallel::registerDoParallel(cores = n.cores)
-
-    out <- llply(grp.list,function(x){
+    out <- llply(group.list,function(x){
         xlabel <- clust
         xlabel[xlabel!=x] <- "_control"
         out.limma <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
-                                      out.prefix=out.prefix,ncell.downsample=ncell.downsample,
+                                      out.prefix=sprintf("%s.%s",out.prefix,x),
+                                      ncell.downsample=ncell.downsample,
                                       T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
                                       gid.mapping=gid.mapping, do.voom=F)
     },.parallel=T)
-    names(out) <- grp.list
+    names(out) <- group.list
 
-    all.table <- data.table(ldply(grp.list,function(x){ out[[x]]$all }))
-    sig.table <- data.table(ldply(grp.list,function(x){ out[[x]]$sig }))
+    all.table <- data.table(ldply(group.list,function(x){ out[[x]]$all }))
+    sig.table <- data.table(ldply(group.list,function(x){ out[[x]]$sig }))
 
     return(list(all=all.table,sig=sig.table))
 }
@@ -1790,8 +1802,9 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
         g.show.legend <- T
         ha.col <- ComplexHeatmap::HeatmapAnnotation(df = annDF, col = colSet,
                                     show_legend = g.show.legend,
+									simple_anno_size = unit(ann.bar.height, "cm"),
                                     annotation_legend_param = annotation_legend_param)
-        top_annotation_height <- unit(ann.bar.height * ncol(annDF), "cm")
+        ###top_annotation_height <- unit(ann.bar.height * ncol(annDF), "cm")
     }
 
     obj <- ssc.order(obj,columns.order=NULL,gene.desc=gene.desc)
@@ -1840,7 +1853,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                 column_names_gp = grid::gpar(fontsize = 12*28/max(m,32)),
                 row_names_gp = grid::gpar(fontsize = 10*28/max(n,32)),
                 show_heatmap_legend = T, row_names_max_width = unit(10,"cm"),
-                top_annotation_height = top_annotation_height,
+                ###top_annotation_height = top_annotation_height,
                 cluster_columns = dend.col,
                 cluster_rows = dend.row,
                 row_dend_reorder = FALSE, column_dend_reorder = FALSE,
