@@ -8,8 +8,8 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
   splitBy = NULL, plotDensity = F, colSet = list(),
   reduced.name = "iCor.tsne", reduced.dim = c(1, 2), xlim = NULL,
   ylim = NULL, size = NULL, brewer.palette = "YlOrRd", adjB = NULL,
-  clamp = NULL, out.prefix = NULL, p.ncol = 3, width = NA,
-  height = NA, base_aspect_ratio = 1.1, peaks = NULL)
+  clamp = NULL, label = NULL, out.prefix = NULL, p.ncol = 3,
+  width = NA, height = NA, base_aspect_ratio = 1.1, peaks = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -41,6 +41,8 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 \item{adjB}{character; batch column of the colData(obj). (default: NULL)}
 
 \item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )}
+
+\item{label}{double; label size. if NULL, no label showed. (default: NULL )}
 
 \item{out.prefix}{character; output prefix. (default: NULL)}
 

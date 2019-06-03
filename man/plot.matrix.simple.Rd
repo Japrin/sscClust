@@ -5,8 +5,10 @@
 \title{plot matrix (typically genes expression)}
 \usage{
 \method{plot}{matrix.simple}(dat, out.prefix = NULL, mytitle = "",
-  show.number = TRUE, do.clust = FALSE, z.lo = NULL, z.hi = NULL,
-  palatte = NULL, pdf.width = 8, pdf.height = 8,
+  show.number = TRUE, do.clust = NULL, z.lo = NULL, z.hi = NULL,
+  palatte = NULL, clust.row = FALSE, clust.column = FALSE,
+  show.dendrogram = FALSE, waterfall.row = FALSE,
+  waterfall.column = FALSE, pdf.width = 8, pdf.height = 8,
   exp.name = "Count")
 }
 \arguments{
@@ -18,13 +20,23 @@
 
 \item{show.number}{logical; (default: TRUE)}
 
-\item{do.clust}{logical or dendrogram; passed to cluster_columns and cluster_rows of Heatmap (default: FALSE)}
+\item{do.clust}{logical, character or dendrogram; passed to both cluster_columns and cluster_rows of Heatmap. Higher priority than clust.row and clust.column (default: NULL)}
 
 \item{z.lo}{double; (default: NULL)}
 
 \item{z.hi}{double; (default: NULL)}
 
 \item{palatte}{character; (default: NULL)}
+
+\item{clust.row}{logical, character or dendrogram; passed to cluster_rows of Heatmap (default: FALSE)}
+
+\item{clust.column}{logical, character or dendrogram; passed to cluster_columns of Heatmap (default: FALSE)}
+
+\item{show.dendrogram}{logical, whetehr show the dendrogram (default: FALSE)}
+
+\item{waterfall.row}{logical, order rows to make plot like waterfall (default: FALSE)}
+
+\item{waterfall.column}{logical, order rows to make plot like waterfall (default: FALSE)}
 
 \item{pdf.width}{double; width of the output plot (default: 22)}
 

@@ -1291,7 +1291,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
           }
           p <- ggplot2::ggplot(dat.plot,aes(Dim1,Dim2)) +
             geom_point(aes_string(colour=cc),
-                       show.legend=if(!is.numeric(dat.plot[,cc]) && nvalues>30) F else NA,
+                       show.legend=if(!is.numeric(dat.plot[,cc]) && nvalues>40) F else NA,
                        size=if(is.null(size)) auto.point.size(npts)*1.1 else size)
           if(!is.null(splitBy)){
             p <- p + ggplot2::facet_wrap(~splitBy)
@@ -1302,7 +1302,8 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
             p <- p + scale_colour_manual(values = colSet[[cc]])
           }
           p <- p + theme_bw() + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE) +
-            ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size=4)))
+            ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size=if(nvalues<=26) 4 else 2.0),
+                                                           label.theme = element_text(size=8)))
 
           return(p)
         })
