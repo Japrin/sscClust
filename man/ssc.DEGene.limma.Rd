@@ -5,9 +5,9 @@
 \title{identify differential genes of each cluster (comparing the cluster with all others), using limma}
 \usage{
 ssc.DEGene.limma(obj, assay.name = "exprs", ncell.downsample = NULL,
-  group.var = "majorCluster", batch = NULL, out.prefix = NULL,
-  n.cores = NULL, do.plot = T, T.fdr = 0.01, T.logFC = 1,
-  verbose = F)
+  group.var = "majorCluster", group.list = NULL, batch = NULL,
+  out.prefix = NULL, n.cores = NULL, do.plot = T, T.fdr = 0.01,
+  T.logFC = 1, verbose = F)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -17,6 +17,8 @@ ssc.DEGene.limma(obj, assay.name = "exprs", ncell.downsample = NULL,
 \item{ncell.downsample}{integer; for each group, number of cells downsample to. (default: NULL)}
 
 \item{group.var}{character; column in the colData(obj) used for grouping. (default: "majorCluster")}
+
+\item{group.list}{character; DEG of groups to calculate. If NULL, all groups. (default: "NULL")}
 
 \item{batch}{character; covariate. (default: NULL)}
 

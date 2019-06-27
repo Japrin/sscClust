@@ -6,8 +6,10 @@
 \usage{
 integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
   is.avg = FALSE, ncores = 6, use.deg = TRUE, gene.de.list = NULL,
-  avg.by = "majorCluster", n.downsample = NULL, topGene.lo = -1.5,
-  topGene.hi = 1.5, topGene.step = 1, method.avg = "zscore", ...)
+  avg.by = "majorCluster", n.downsample = NULL,
+  par.clust = list(deepSplit = 4, minClusterSize = 2, method =
+  "dynamicTreeCut"), topGene.lo = -1.5, topGene.hi = 1.5,
+  topGene.step = 1, method.avg = "zscore", ...)
 }
 \arguments{
 \item{sce.list}{list; list of object of \code{singleCellExperiment} class}

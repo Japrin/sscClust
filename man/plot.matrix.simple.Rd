@@ -8,8 +8,9 @@
   show.number = TRUE, do.clust = NULL, z.lo = NULL, z.hi = NULL,
   palatte = NULL, clust.row = FALSE, clust.column = FALSE,
   show.dendrogram = FALSE, waterfall.row = FALSE,
-  waterfall.column = FALSE, pdf.width = 8, pdf.height = 8,
-  exp.name = "Count")
+  waterfall.column = FALSE, row.ann.dat = NULL, row.split = NULL,
+  returnHT = FALSE, par.legend = list(), pdf.width = 8,
+  pdf.height = 8, exp.name = "Count")
 }
 \arguments{
 \item{dat}{matrix; matrix}
@@ -37,6 +38,14 @@
 \item{waterfall.row}{logical, order rows to make plot like waterfall (default: FALSE)}
 
 \item{waterfall.column}{logical, order rows to make plot like waterfall (default: FALSE)}
+
+\item{row.ann.dat}{data.frame; data for row annotation; (default: NULL)}
+
+\item{row.split}{vector; used for row; (default: NULL)}
+
+\item{returnHT}{logical; whether return HT; (default: FALSE)}
+
+\item{par.legend}{list; lengend parameters, used to overwrite the default setting; (default: list())}
 
 \item{pdf.width}{double; width of the output plot (default: 22)}
 

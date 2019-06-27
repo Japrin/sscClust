@@ -23,6 +23,7 @@ integrate.by.avg <- function(sce.list,
                              gene.de.list=NULL,
                              avg.by="majorCluster",
 							 n.downsample=NULL,
+							 par.clust=list(deepSplit=4, minClusterSize=2,method="dynamicTreeCut"),
                              topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,
                              method.avg="zscore",...)
   {
@@ -120,12 +121,8 @@ integrate.by.avg <- function(sce.list,
     colData(sce.pb)
 
     #### clustering the clusters
-    #sce.pb <- ssc.clust(sce.pb, method.reduction="pca",
-    #                method="hclust", k.batch=c(0),k.max=40,
-    #                nboot=1000,seed = 9997)
-    sce.pb <- ssc.clust(sce.pb, method.reduction="pca",
-                    method="dynamicTreeCut",
-                    deepSplit=4, minClusterSize=2, seed = 9997)
+	sce.pb <- do.call(ssc.clust,c(list(obj=sce.pb,method.reduction="pca", seed=9997),
+								 par.clust))
 
 	loginfo(sprintf("make some plots ..."))
     
