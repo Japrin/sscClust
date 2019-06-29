@@ -6,7 +6,7 @@
 \usage{
 run.limma.matrix(xdata, xlabel, batch = NULL, out.prefix = NULL,
   ncell.downsample = NULL, T.fdr = 0.05, T.logFC = 1, verbose = F,
-  n.cores = NULL, gid.mapping = NULL, do.voom = F)
+  n.cores = NULL, group = NULL, gid.mapping = NULL, do.voom = F)
 }
 \arguments{
 \item{xdata}{data frame or matrix; rows for genes and columns for samples}
@@ -26,6 +26,8 @@ run.limma.matrix(xdata, xlabel, batch = NULL, out.prefix = NULL,
 \item{verbose}{logical; verbose (default: F)}
 
 \item{n.cores}{integer; number of cores used, if NULL it will be determined automatically (default: NULL)}
+
+\item{group}{character; group of interest, if NULL the last group will be used (default: NULL)}
 
 \item{gid.mapping}{named character; gene id to gene symbol mapping. (default: NULL)}
 

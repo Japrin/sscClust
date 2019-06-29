@@ -1670,10 +1670,10 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     doParallel::registerDoParallel(cores = n.cores)
     out <- llply(group.list,function(x){
         xlabel <- clust
-        xlabel[xlabel!=x] <- "_control"
+        ##xlabel[xlabel!=x] <- "_control"
         out.limma <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
-                                      out.prefix=sprintf("%s.%s",out.prefix,x),
-                                      ncell.downsample=ncell.downsample,
+                                      out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
+                                      ncell.downsample=ncell.downsample,group=x,
                                       T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
                                       gid.mapping=gid.mapping, do.voom=F)
     },.parallel=T)
@@ -1684,7 +1684,6 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 
     return(list(all=all.table,sig=sig.table))
 }
-
 
 
 #' plot heatmap

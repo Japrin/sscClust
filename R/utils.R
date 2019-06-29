@@ -786,6 +786,7 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 #' @param T.logFC numeric; threshold of the absoute diff (default: 1)
 #' @param verbose logical; verbose (default: F)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @param group character; group of interest, if NULL the last group will be used (default: NULL)
 #' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
 #' @param do.voom logical; perform voom transfromation (default: FALSE)
 #' @details diffeerentially expressed genes dectection using limma
@@ -794,7 +795,7 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @export
 run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsample=NULL,
-                             T.fdr=0.05,T.logFC=1,verbose=F,n.cores=NULL,
+                             T.fdr=0.05,T.logFC=1,verbose=F,n.cores=NULL,group=NULL,
                              gid.mapping=NULL, do.voom=F)
 {
 	suppressPackageStartupMessages(require("limma"))
@@ -821,20 +822,36 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     xdata <- as.matrix(xdata)
     f.gene <- rowVars(xdata)>0
     xdata <- xdata[f.gene,]
+    #### 
 	if("_control" %in% xlabel){
 		x.levels <- c("_control",setdiff(unique(sort(xlabel)),"_control"))
 	}else{
 		x.levels <- unique(sort(xlabel))
 	}
+    if(!is.null(group)){
+        x.levels <- c(setdiff(x.levels,group),group)
+    }
+
     if(is.null(batch)){
-        design.df <- data.frame(cellID=colnames(xdata), group=factor(xlabel,levels=x.levels), stringsAsFactors=F)
+        design.df <- data.frame(cellID=colnames(xdata),
+                                group=factor(xlabel,levels=x.levels,
+                                             labels=c(sprintf("G%04d",seq_len(length(x.levels)-1)),"II")),
+                                xlabel=xlabel,
+                                stringsAsFactors=F)
 	    design <- model.matrix(~group,data=design.df)
     }else{
-        design.df <- data.frame(cellID=colnames(xdata), group=factor(xlabel,levels=x.levels), batch=batch, stringsAsFactors=F)
+        design.df <- data.frame(cellID=colnames(xdata),
+                                group=factor(xlabel,levels=x.levels,
+                                             labels=c(sprintf("G%04d",seq_len(length(x.levels)-1)),"II")),
+                                batch=factor(batch,levels=unique(sort(batch)),
+                                             labels=sprintf("B%04d",seq_along(unique(sort(batch))))),
+                                xlabel=xlabel,
+                                stringsAsFactors=F)
 	    design <- model.matrix(~batch+group,data=design.df)
     }
-    group.label <- gsub("^group","",colnames(design)[ncol(design)])
+    group.label <- x.levels[length(x.levels)]
 	colnames(design)[ncol(design)]<-"II"
+    colnames(design) <- gsub("[)(]","",colnames(design))
 
     RhpcBLASctl::omp_set_num_threads(1)
 	register(MulticoreParam(if(!is.null(n.cores)) n.cores else multicoreWorkers()))
@@ -848,8 +865,21 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     }else{
 	    fit <- lmFit(xdata, design)
     }
-	fit <- eBayes(fit)
-	all.table  <- topTable(fit, coef = "II", n = Inf, sort = "p", p = 1)
+    fit.00 <- fit
+
+    col.group <- grep("^group",colnames(design),value=T)
+    if(length(x.levels)>2){
+        contrast.str  <-  sprintf("II-(%s)/%d",
+                                  paste(col.group,collapse="+"),
+                                  length(col.group))
+        contrasts.matrix <- makeContrasts(contrasts=contrast.str,levels=design)
+        fit <- contrasts.fit(fit,contrasts=contrasts.matrix)
+        fit <- eBayes(fit)
+	    all.table  <- topTable(fit, n = Inf, sort = "p", p = 1)
+    }else{
+	    fit <- eBayes(fit)
+	    all.table  <- topTable(fit, coef = "II", n = Inf, sort = "p", p = 1)
+    }
 	all.table <- cbind(data.table(geneID=rownames(all.table),
                                   geneSymbol=if(is.null(gid.mapping)) rownames(all.table) else gid.mapping[rownames(all.table)],
                                   cluster=group.label,
@@ -858,7 +888,7 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 
     .getMean <- function(inDat,str.note=NULL){
         .Grp.mean <- t(apply(inDat,1,function(x){
-                                 .mexp <- aggregate(x ~ design.df$group, FUN = mean)
+                                 .mexp <- aggregate(x ~ design.df$xlabel, FUN = mean)
                                  structure(.mexp[,2],names=sprintf("mean.%s",.mexp[,1])) }))
         if(!is.null(str.note)){
             colnames(.Grp.mean) <- sprintf("%s.%s",colnames(.Grp.mean),str.note)
@@ -868,10 +898,10 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     }
     if(verbose){
         if(!is.null(batch)){
-             beta <- fit$coefficients
-             beta[is.na(beta)] <- 0
+             betaV <- fit.00$coefficients
+             betaV[is.na(betaV)] <- 0
              idx.batch <- grep("^batch",colnames(design),value = T)
-             xdata.rmBE <- as.matrix(xdata) - beta[,idx.batch,drop=F] %*% t(design[,idx.batch,drop=F])
+             xdata.rmBE <- as.matrix(xdata) - betaV[,idx.batch,drop=F] %*% t(design[,idx.batch,drop=F])
             .Grp.mean.df <- .getMean(xdata.rmBE,str.note="rmBE")
             all.table <- merge(all.table,.Grp.mean.df)
         }else{
@@ -880,7 +910,7 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
         }
     }
 
-    all.table <- all.table[order(adj.P.Val,-logFC),]
+    all.table <- all.table[order(adj.P.Val,-t,-logFC),]
     #print(head(all.table))
     sig.table <- all.table[adj.P.Val<T.fdr & abs(logFC)>T.logFC,]
     if(!is.null(out.prefix))
