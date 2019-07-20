@@ -355,16 +355,20 @@ ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorClust
     return(data.melt.df)
   }else if(ret.type=="data.dcast"){
     dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
+    rownames(dat.df) <- dat.df[,1]
+    dat.df <- dat.df[rownames(obj),]
     return(dat.df)
   }else if(ret.type=="data.mtx"){
     dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
     dat.mtx <- as.matrix(dat.df[,-1])
     rownames(dat.mtx) <- dat.df[,1]
+    dat.mtx <- dat.mtx[rownames(obj),]
     return(dat.mtx)
   }else if(ret.type=="sce"){
     dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
     dat.mtx <- as.matrix(dat.df[,-1])
     rownames(dat.mtx) <- dat.df[,1]
+    dat.mtx <- dat.mtx[rownames(obj),]
     obj.ret <- ssc.build(dat.mtx,assay.name=assay.name,display.name=rowData(obj)$display.name)
     colData(obj.ret)[,column] <- colnames(obj.ret)
     return(obj.ret)
