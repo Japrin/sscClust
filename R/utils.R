@@ -904,9 +904,11 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
              xdata.rmBE <- as.matrix(xdata) - betaV[,idx.batch,drop=F] %*% t(design[,idx.batch,drop=F])
             .Grp.mean.df <- .getMean(xdata.rmBE,str.note="rmBE")
             all.table <- merge(all.table,.Grp.mean.df)
+			all.table$meanExp <- all.table[[sprintf("mean.%s.rmBE",group.label)]]
         }else{
             .Grp.mean.df <- .getMean(xdata)
             all.table <- merge(all.table,.Grp.mean.df)
+			all.table$meanExp <- all.table[[sprintf("mean.%s",group.label)]]
         }
     }
 

@@ -570,6 +570,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' cluster_label_prop cluster_louvain cluster_optimal cluster_spinglass cluster_walktrap
 #' cluster_edge_betweenness
 #' @importFrom plyr llply
+#' @importFrom leiden leiden
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
@@ -579,7 +580,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
 #' @param method.vgene character; variable gene identification method used. (default: "HVG.sd")
 #' @param SNN.k integer; number of shared NN. (default: 10)
 #' @param SNN.method character; cluster method applied on SNN， one of "greedy", "eigen", "infomap",
-#' "prop", "louvain", "optimal", "spinglass", "walktrap", "betweenness". (default: "eigen")
+#' "prop", "louvain", "optimal", "spinglass", "walktrap", "betweenness", "leiden". (default: "eigen")
 #' @param SC3.biology logical, SC3 parameter, whether calcualte biology. (default: T)
 #' @param SC3.markerplot.width integer, SC3 parameter, with of the marker plot (default: 15)
 #' @param dpclust.rho numberic; cuttoff of rho, if it is NULL, infer frome the data (default: NULL)
@@ -646,7 +647,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
   if(method=="adpclust"){
     clust.res <- ADPclust::adpclust(dat.transformed,nclust = k.batch)
     k <- "auto"
-    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
+    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%02d",clust.res$clusters)
     if(!is.null(out.prefix)){
       dir.create(dirname(out.prefix),showWarnings = F,recursive = T)
       pdf(sprintf("%s.adpclust.diagnostic.pdf",out.prefix),width=11,height = 5)
@@ -677,7 +678,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
                                               delta = dpclust.delta,plot=F)
     }
     k <- "auto"
-    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$clusters)
+    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%02d",clust.res$clusters)
     res.list[[as.character(k)]] <- clust.res
     if(!is.null(out.prefix)){
       pdf(sprintf("%s.decision.pdf",out.prefix),width = 5,height = 5)
@@ -722,11 +723,14 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
       clust.res <- igraph::cluster_walktrap(snn.gr)
     }else if(SNN.method=="betweenness"){
       clust.res <- igraph::cluster_edge_betweenness(snn.gr)
-    }
+    }else if(SNN.method=="leiden"){
+      clust.res <- leiden::leiden(igraph::as_adjacency_matrix(snn.gr),...)
+	  clust.res <- list(membership=clust.res)
+	}
     metadata(obj)$ssc$clust.res[["snn.gr"]] <- snn.gr
     loginfo(sprintf("cluster using method %s finished\n",SNN.method))
     k <- "auto"
-    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$membership)
+	colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%02d",clust.res$membership)
     res.list[[as.character(k)]] <- clust.res
   }else if(method=="SC3"){
     ##vgene <- metadata(obj)$ssc[["variable.gene"]][[method.vgene]]
@@ -751,7 +755,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     cluster.label <- dynamicTreeCut::cutreeDynamic(obj.hclust,distM=as.matrix(obj.distM),
                                                    method = "hybrid", ...)
     clust.res <- list("hclust"=obj.hclust,"dist"=obj.distM,"cluster"=cluster.label)
-    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%d",clust.res$cluster)
+    colData(obj)[,sprintf("%s.%s.k%s",method.reduction,method,k)] <- sprintf("C%02d",clust.res$cluster)
     res.list[[as.character(k)]] <- clust.res
   }else{
     ### for other methods need k, llply on k.batch
