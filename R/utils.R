@@ -789,6 +789,7 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 #' @param group character; group of interest, if NULL the last group will be used (default: NULL)
 #' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
 #' @param do.voom logical; perform voom transfromation (default: FALSE)
+#' @param rn.seed integer; random number seed (default: 9999)
 #' @details diffeerentially expressed genes dectection using limma
 #' @return a matrix with dimention as input ( samples in rows and variables in columns)
 #' @importFrom limma lmFit eBayes topTable
@@ -796,7 +797,7 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 #' @export
 run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsample=NULL,
                              T.fdr=0.05,T.logFC=1,verbose=F,n.cores=NULL,group=NULL,
-                             gid.mapping=NULL, do.voom=F)
+                             gid.mapping=NULL, do.voom=F,rn.seed=9999)
 {
 	suppressPackageStartupMessages(require("limma"))
 	suppressPackageStartupMessages(require("dplyr"))
@@ -808,6 +809,7 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     }
     names(xlabel) <- colnames(xdata)
     if(!is.null(ncell.downsample)){
+        set.seed(rn.seed)
         grp.list <- unique(xlabel)
         f.cell <- unlist(lapply(grp.list,function(x){
                              x <- names(xlabel[xlabel==x])

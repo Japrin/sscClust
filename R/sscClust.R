@@ -1654,6 +1654,10 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     requireNamespace("plyr")
     requireNamespace("dplyr")
 
+    if(!is.null(ncell.downsample)){
+        obj <- ssc.downsample(obj, ncell.downsample=ncell.downsample, group.var=group.var,rn.seed=9999)
+    }
+    
     clust <- colData(obj)[,group.var]
     if(is.null(group.list)){ group.list <- unique(clust) }
     batchV <- NULL
@@ -1681,7 +1685,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
         ##xlabel[xlabel!=x] <- "_control"
         out.limma <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
                                       out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
-                                      ncell.downsample=ncell.downsample,group=x,
+                                      group=x,
                                       T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
                                       gid.mapping=gid.mapping, do.voom=F)
     },.parallel=T)
@@ -1881,4 +1885,26 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     if(!is.null(out.prefix)){ dev.off() }
 }
 
+#' downsample
+#' @param obj object of \code{singleCellExperiment} class
+#' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
+#' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
+#' @param rn.seed integer; random number seed (default: 9999)
+#' @details return a downsampled object of \code{singleCellExperiment} class.
+#' @export
+ssc.downsample <- function(obj, ncell.downsample=NULL, group.var="majorCluster",rn.seed=9999)
+{
+    #### downsample cells
+    set.seed(rn.seed)
+    if(!is.null(ncell.downsample)){
+        clust <- colData(obj)[,group.var]
+        names(clust) <- colnames(obj)
+        grp.list <- unique(clust)
+        f.cell <- unlist(sapply(grp.list,function(x){
+                             x <- names(clust[clust==x])
+                             sample(x,min(length(x),ncell.downsample)) }))
+        obj <- obj[,f.cell]
+    }
+    return(obj)
+}
 
