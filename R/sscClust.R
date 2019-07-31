@@ -1400,47 +1400,59 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 {
   requireNamespace("ggplot2")
   requireNamespace("data.table")
-  gene <- ssc.displayName2id(obj,display.name = gene)
-
-  dat.violin <- assay(obj,assay.name)[gene,,drop=F]
-  if(!is.null(adjB)){
-    dat.violin <- simple.removeBatchEffect(dat.violin,batch=colData(obj)[[adjB]])
-  }
-
-  dat.plot <- as.matrix(t(dat.violin))
-  colnames(dat.plot) <- ssc.id2displayName(obj,colnames(dat.plot))
-  dat.plot.df <- data.table::data.table(sample=rownames(dat.plot),stringsAsFactors = F)
-  dat.plot.df <- cbind(dat.plot.df,as.data.frame(colData(obj)[,group.var,drop=F]))
-  dat.plot.df <- cbind(dat.plot.df,dat.plot)
-  dat.plot.df <- data.table::melt(dat.plot.df,id.vars=c("sample",group.var),
-                                  variable.name="gene",value.name=assay.name)
-  dat.plot.df.grpMean <- dat.plot.df[,lapply(.SD,mean),by=c("gene",group.var),.SDcols=assay.name]
-  colnames(dat.plot.df.grpMean) <- c("gene",group.var,"meanExp")
-  dat.plot.df <- dat.plot.df.grpMean[dat.plot.df,,on=c("gene",group.var)]
-  dat.plot.df[meanExp<clamp[1],meanExp:=clamp[1],]
-  dat.plot.df[meanExp>clamp[2],meanExp:=clamp[2],]
-  head(dat.plot.df)
-  p <- ggplot(dat.plot.df, aes_string(group.var[1], assay.name))
-  if(length(group.var)==1){
-    p <- p +
-      geom_violin(scale = "width",aes(fill=meanExp),color=NA,show.legend = T) +
-      scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),
-                          limits=clamp)
-  }else if(length(group.var)==2)
+  if(!is.null(gene))
   {
-    p <- p +
-        geom_boxplot(aes_string(colour = group.var[2])) +
-        scale_colour_brewer(palette = "Set1")
-        #geom_violin(scale = "width",aes_string(fill="meanExp",linetype=group.var[2],color=group.var[2]),
-        #            show.legend = T) +
-        #scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),limits=clamp)
+	  gene <- ssc.displayName2id(obj,display.name = gene)
+
+	  dat.violin <- assay(obj,assay.name)[gene,,drop=F]
+	  if(!is.null(adjB)){
+		dat.violin <- simple.removeBatchEffect(dat.violin,batch=colData(obj)[[adjB]])
+	  }
+
+	  dat.plot <- as.matrix(t(dat.violin))
+	  colnames(dat.plot) <- ssc.id2displayName(obj,colnames(dat.plot))
+	  dat.plot.df <- data.table::data.table(sample=rownames(dat.plot),stringsAsFactors = F)
+	  dat.plot.df <- cbind(dat.plot.df,as.data.frame(colData(obj)[,group.var,drop=F]))
+	  dat.plot.df <- cbind(dat.plot.df,dat.plot)
+	  dat.plot.df <- data.table::melt(dat.plot.df,id.vars=c("sample",group.var),
+									  variable.name="gene",value.name=assay.name)
+	  dat.plot.df.grpMean <- dat.plot.df[,lapply(.SD,mean),by=c("gene",group.var),.SDcols=assay.name]
+	  colnames(dat.plot.df.grpMean) <- c("gene",group.var,"meanExp")
+	  dat.plot.df <- dat.plot.df.grpMean[dat.plot.df,,on=c("gene",group.var)]
+	  dat.plot.df[meanExp<clamp[1],meanExp:=clamp[1],]
+	  dat.plot.df[meanExp>clamp[2],meanExp:=clamp[2],]
+	  head(dat.plot.df)
+	  p <- ggplot(dat.plot.df, aes_string(group.var[1], assay.name))
+	  if(length(group.var)==1){
+		p <- p +
+		  geom_violin(scale = "width",aes(fill=meanExp),color=NA,show.legend = T) +
+		  scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),
+							  limits=clamp)
+	  }else if(length(group.var)==2)
+	  {
+		p <- p +
+			geom_boxplot(aes_string(colour = group.var[2])) +
+			scale_colour_brewer(palette = "Set1")
+			#geom_violin(scale = "width",aes_string(fill="meanExp",linetype=group.var[2],color=group.var[2]),
+			#            show.legend = T) +
+			#scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),limits=clamp)
+	  }
+	  p <- p +
+		theme_bw(base_size = 12) +
+		facet_grid(gene ~ .,switch = "y",scales = "free_y") +
+		theme(axis.text.x = element_text(angle = 60, hjust = 1),strip.placement = "inside")
+  } else if(!is.null(columns)){
+	  dat.plot.df <- as.data.table(cbind(data.frame(cellID=colnames(obj),stringsAsFactors=F),
+						  as.data.frame(colData(obj)[,c(group.var,columns),drop=F])))
+	  dat.plot.df <- melt(dat.plot.df,id.vars=c("cellID",group.var))
+	  p <- ggplot(dat.plot.df, aes_string(group.var, "value")) +
+			geom_boxplot() +
+			theme_bw(base_size = 12) +
+			facet_grid(variable ~ .,switch = "y",scales = "free_y") +
+			theme(axis.text.x = element_text(angle = 60, hjust = 1),strip.placement = "inside")
   }
-  p <- p +
-    theme_bw(base_size = 12) +
-    facet_grid(gene ~ .,switch = "y",scales = "free_y") +
-    theme(axis.text.x = element_text(angle = 60, hjust = 1),strip.placement = "inside")
   if(!is.null(out.prefix)){
-    cowplot::save_plot(sprintf("%s.violin.gene.pdf",out.prefix),p,
+    cowplot::save_plot(sprintf("%s.violin.%s.pdf",out.prefix,if(!is.null(gene)) "gene" else "columns"),p,
                        ncol = p.ncol,
                        base_aspect_ratio=base_aspect_ratio,...)
   }else{
