@@ -1444,7 +1444,7 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
                        ncol = p.ncol,
                        base_aspect_ratio=base_aspect_ratio,...)
   }else{
-    print(p)
+    return(p)
   }
 }
 
