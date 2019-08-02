@@ -8,6 +8,7 @@
 #' @param gene.de.list list; if not NULL, each element is a data.frame with "geneID" column (default: NULL)
 #' @param avg.by character; calculate the average expression of cells group by the specifid column (default: "majorCluster")
 #' @param n.downsample integer; number of cells in each cluster to downsample to (default: NULL)
+#' @param n.pc integer; number of pc ot use (default: 15)
 #' @param method.avg character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")
 #' @param topGene.lo double; for top gene heatmap.(default: -1.5)
 #' @param topGene.hi double; for top gene heatmap.(default: 1.5)
@@ -23,6 +24,7 @@ integrate.by.avg <- function(sce.list,
                              gene.de.list=NULL,
                              avg.by="majorCluster",
 							 n.downsample=NULL,
+							 n.pc=15,
 							 ###par.clust=list(deepSplit=4, minClusterSize=2,method="dynamicTreeCut"),
 							 par.clust=list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2),
                              topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,
@@ -118,7 +120,7 @@ integrate.by.avg <- function(sce.list,
     rowData(sce.pb)$gene.de.common <- rownames(sce.pb) %in% gene.de.common
 
     sce.pb <- ssc.reduceDim(sce.pb,method="pca",method.vgene="gene.de.common",
-                            pca.npc=15,seed=9997)
+                            pca.npc=n.pc,seed=9997)
 
     #ssc.plot.pca(sce.pb)
     m <- regexec("^(.+?)\\.",colnames(sce.pb),perl=T)
@@ -206,7 +208,7 @@ integrate.by.avg <- function(sce.list,
 							   columns="pca.SNN.kauto",columns.order="pca.SNN.kauto",
 							   gene.desc=as.data.table(g.desc)[!duplicated(geneID),],
 							   pdf.width=20,pdf.height=15,do.scale=F,
-							   z.lo=-15,z.hi=15,z.step=3,
+							   z.lo=topGene.lo,z.hi=topGene.hi,z.step=topGene.step,
 							   do.clustering.row=F,
 							   do.clustering.col=T
 							   )
