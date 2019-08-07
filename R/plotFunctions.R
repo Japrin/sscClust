@@ -45,13 +45,15 @@ auto.point.size <- function(n){
 #' @param size double; points' size. If NULL, infer from number of points (default NULL)
 #' @param width numeric; width of the plot (default: 9)
 #' @param height numeric; height of the plot (default: 8)
+#' @param scales character; passed to facet_wrap (default: "fixed")
+#' @param points.order character; (default: "value")
 #' @details For genes contained in both `Y` and `gene.to.show`, show their expression on the tSNE
 #' map provided as `dat.map`. One point in the map represent a cell; cells with higher expression
 #' also have darker color.
 #' @return a ggplot object
 ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
                          xlim=NULL,ylim=NULL,size=NULL,
-                         width=9,height=8){
+                         width=9,height=8,scales="fixed",points.order="value"){
   #suppressPackageStartupMessages(require("data.table"))
   #requireNamespace("ggplot2",quietly = T)
   #requireNamespace("RColorBrewer",quietly = T)
@@ -69,12 +71,16 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
   dat.plot <- cbind(dat.plot,dat.map,t(as.matrix(Y[gene.to.show,dat.plot$sample,drop=F])))
   colnames(dat.plot) <- c("sample","Dim1","Dim2",names(gene.to.show))
   dat.plot.melt <- data.table::melt(dat.plot,id.vars = c("sample","Dim1","Dim2"))
-  dat.plot.melt <- dat.plot.melt[order(dat.plot.melt$value,decreasing = F),]
+  if(points.order=="value"){
+	  dat.plot.melt <- dat.plot.melt[order(dat.plot.melt$value,decreasing = F),]
+  }else if(points.order=="random"){
+	  dat.plot.melt <- dat.plot.melt[sample(nrow(dat.plot.melt),nrow(dat.plot.melt)),]
+  }
   npts <- nrow(dat.plot.melt)
   p <- ggplot2::ggplot(dat.plot.melt,aes(Dim1,Dim2)) +
-    geom_point(aes(colour=value),size=if(is.null(size)) auto.point.size(npts)*1.1 else size) +
+    geom_point(aes(colour=value),size=if(is.null(size)) auto.point.size(npts)*1.1 else size,alpha=0.5) +
     scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
-    facet_wrap(~variable, ncol = p.ncol) +
+    facet_wrap(~variable, ncol = p.ncol,scales=scales) +
     theme_bw() +
     coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
   if(!is.null(out.prefix)){

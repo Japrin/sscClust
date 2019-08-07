@@ -1247,6 +1247,8 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
 #' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )
 #' @param label double; label size. if NULL, no label showed. (default: NULL )
+#' @param scales character; passed to facet_wrap (default: "fixed")
+#' @param points.order character; (default: "value")
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend coord_cartesian
 #' @importFrom ggrepel geom_text_repel
@@ -1262,7 +1264,7 @@ ssc.run <- function(obj, assay.name="exprs",
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,splitBy=NULL,
                              plotDensity=F, colSet=list(),
                              reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,size=NULL,
-                             brewer.palette="YlOrRd",adjB=NULL,clamp=NULL,label=NULL,
+                             brewer.palette="YlOrRd",adjB=NULL,clamp=NULL,label=NULL,scales="fixed",points.order="value",
                              out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
   #requireNamespace("ggplot2")
@@ -1292,7 +1294,11 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
             dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,cc,drop=F]))
             colnames(dat.plot) <- c("sample","Dim1","Dim2",cc)
           }
-          dat.plot <- dat.plot[order(dat.plot[,cc]),]
+		  if(points.order=="value"){
+			  dat.plot <- dat.plot[order(dat.plot[,cc]),]
+		  }else if(points.order=="random"){
+			  dat.plot <- dat.plot[sample(nrow(dat.plot),nrow(dat.plot)),]
+		  }
           npts <- nrow(dat.plot)
           if(is.numeric(dat.plot[,cc])){
             nvalues <- Inf
@@ -1357,7 +1363,10 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
     }
     p <- ggGeneOnTSNE(dat.onTSNE,
                       dat.map,
-                      gene,out.prefix,p.ncol=p.ncol,xlim=xlim,ylim=ylim,size=size,width=width,height=height)
+                      gene,out.prefix,
+					  p.ncol=p.ncol,xlim=xlim,ylim=ylim,
+					  scales=scales,points.order=points.order,
+					  size=size,width=width,height=height)
     if(is.null(out.prefix)){
       #print(p)
       return(p)
@@ -1421,6 +1430,8 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 	  dat.plot.df <- dat.plot.df.grpMean[dat.plot.df,,on=c("gene",group.var)]
 	  dat.plot.df[meanExp<clamp[1],meanExp:=clamp[1],]
 	  dat.plot.df[meanExp>clamp[2],meanExp:=clamp[2],]
+	  dat.plot.df[ dat.plot.df[[assay.name]] < clamp[1],][[assay.name]] <- clamp[1]
+	  dat.plot.df[ dat.plot.df[[assay.name]] > clamp[2],][[assay.name]] <- clamp[2]
 	  head(dat.plot.df)
 	  p <- ggplot(dat.plot.df, aes_string(group.var[1], assay.name))
 	  if(length(group.var)==1){
