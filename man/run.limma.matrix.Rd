@@ -6,7 +6,8 @@
 \usage{
 run.limma.matrix(xdata, xlabel, batch = NULL, out.prefix = NULL,
   ncell.downsample = NULL, T.fdr = 0.05, T.logFC = 1, verbose = F,
-  n.cores = NULL, group = NULL, gid.mapping = NULL, do.voom = F)
+  n.cores = NULL, group = NULL, gid.mapping = NULL, do.voom = F,
+  rn.seed = 9999)
 }
 \arguments{
 \item{xdata}{data frame or matrix; rows for genes and columns for samples}
@@ -32,6 +33,8 @@ run.limma.matrix(xdata, xlabel, batch = NULL, out.prefix = NULL,
 \item{gid.mapping}{named character; gene id to gene symbol mapping. (default: NULL)}
 
 \item{do.voom}{logical; perform voom transfromation (default: FALSE)}
+
+\item{rn.seed}{integer; random number seed (default: 9999)}
 }
 \value{
 a matrix with dimention as input ( samples in rows and variables in columns)

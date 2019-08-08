@@ -5,7 +5,9 @@
 \title{Plot gene expression on tSNE map}
 \usage{
 ggGeneOnTSNE(Y, dat.map, gene.to.show, out.prefix = NULL, p.ncol = 3,
-  xlim = NULL, ylim = NULL, size = NULL, width = 9, height = 8)
+  xlim = NULL, ylim = NULL, size = NULL, pt.alpha = 0.5,
+  pt.order = "value", clamp = NULL, width = 9, height = 8,
+  scales = "fixed")
 }
 \arguments{
 \item{Y}{matrix or data.frame; Gene expression data, rownames shoud be gene id, colnames
@@ -25,9 +27,17 @@ should be sample id}
 
 \item{size}{double; points' size. If NULL, infer from number of points (default NULL)}
 
+\item{pt.alpha}{numeric; alpha of the points (default: 0.5)}
+
+\item{pt.order}{character; (default: "value")}
+
+\item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )}
+
 \item{width}{numeric; width of the plot (default: 9)}
 
 \item{height}{numeric; height of the plot (default: 8)}
+
+\item{scales}{character; whether use the same scale across genes. one of "fixed" or "free" (default: "fixed")}
 }
 \value{
 a ggplot object

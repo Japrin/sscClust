@@ -28,7 +28,7 @@ ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
 \item{SNN.k}{integer; number of shared NN. (default: 10)}
 
 \item{SNN.method}{character; cluster method applied on SNN， one of "greedy", "eigen", "infomap",
-"prop", "louvain", "optimal", "spinglass", "walktrap", "betweenness". (default: "eigen")}
+"prop", "louvain", "optimal", "spinglass", "walktrap", "betweenness", "leiden". (default: "eigen")}
 
 \item{SC3.biology}{logical, SC3 parameter, whether calcualte biology. (default: T)}
 
