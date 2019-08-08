@@ -32,7 +32,7 @@ auto.point.size <- function(n){
 #'
 #' @importFrom RColorBrewer brewer.pal
 #' @importFrom ggplot2 ggplot ggsave scale_colour_gradientn geom_point facet_wrap theme_bw coord_cartesian
-#' @importFrom data.table melt
+#' @importFrom data.table melt data.table
 #' @importFrom utils head
 #' @param Y matrix or data.frame; Gene expression data, rownames shoud be gene id, colnames
 #' should be sample id
@@ -45,15 +45,17 @@ auto.point.size <- function(n){
 #' @param size double; points' size. If NULL, infer from number of points (default NULL)
 #' @param width numeric; width of the plot (default: 9)
 #' @param height numeric; height of the plot (default: 8)
-#' @param scales character; passed to facet_wrap (default: "fixed")
-#' @param points.order character; (default: "value")
+#' @param pt.alpha numeric; alpha of the points (default: 0.5)
+#' @param pt.order character; (default: "value")
+#' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )
+#' @param scales character; whether use the same scale across genes. one of "fixed" or "free" (default: "fixed")
 #' @details For genes contained in both `Y` and `gene.to.show`, show their expression on the tSNE
 #' map provided as `dat.map`. One point in the map represent a cell; cells with higher expression
 #' also have darker color.
 #' @return a ggplot object
 ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
-                         xlim=NULL,ylim=NULL,size=NULL,
-                         width=9,height=8,scales="fixed",points.order="value"){
+                         xlim=NULL,ylim=NULL,size=NULL,pt.alpha=0.5,pt.order="value",clamp=NULL,
+                         width=9,height=8,scales="fixed"){
   #suppressPackageStartupMessages(require("data.table"))
   #requireNamespace("ggplot2",quietly = T)
   #requireNamespace("RColorBrewer",quietly = T)
@@ -67,24 +69,59 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
   }
   gene.to.show <- gene.to.show[f.g]
 
-  dat.plot <- data.frame(sample=rownames(dat.map),stringsAsFactors = F)
+  dat.plot <- data.table::data.table(sample=rownames(dat.map),stringsAsFactors = F)
   dat.plot <- cbind(dat.plot,dat.map,t(as.matrix(Y[gene.to.show,dat.plot$sample,drop=F])))
   colnames(dat.plot) <- c("sample","Dim1","Dim2",names(gene.to.show))
   dat.plot.melt <- data.table::melt(dat.plot,id.vars = c("sample","Dim1","Dim2"))
-  if(points.order=="value"){
+  if(pt.order=="value"){
 	  dat.plot.melt <- dat.plot.melt[order(dat.plot.melt$value,decreasing = F),]
-  }else if(points.order=="random"){
+  }else if(pt.order=="random"){
 	  dat.plot.melt <- dat.plot.melt[sample(nrow(dat.plot.melt),nrow(dat.plot.melt)),]
   }
-  npts <- nrow(dat.plot.melt)
-  p <- ggplot2::ggplot(dat.plot.melt,aes(Dim1,Dim2)) +
-    geom_point(aes(colour=value),size=if(is.null(size)) auto.point.size(npts)*1.1 else size,alpha=0.5) +
-    scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
-    facet_wrap(~variable, ncol = p.ncol,scales=scales) +
-    theme_bw() +
-    coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+  npts <- nrow(dat.plot)
+  dat.plot.melt[,variable:=factor(variable,levels=names(gene.to.show),ordered=T)]
+  if(scales=="fixed"){
+      if(!is.null(clamp) && clamp=="none"){
+      }else{
+          if(is.null(clamp)){
+              clamp <- quantile(dat.plot.melt$value,c(0.05,0.95))
+          }
+          dat.plot.melt[value < clamp[1],value:=clamp[1]]
+          dat.plot.melt[value > clamp[2],value:=clamp[2]]
+      }
+      p <- ggplot2::ggplot(dat.plot.melt,aes(Dim1,Dim2)) +
+        geom_point(aes(colour=value),
+                   size=if(is.null(size)) auto.point.size(npts)*1.1 else size,
+                   alpha=pt.alpha) +
+        scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
+        facet_wrap(~variable, ncol = p.ncol) +
+        theme_bw() +
+        coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+  }else{
+      multi.p <- lapply(names(gene.to.show),function(x){
+                            .dd <- dat.plot.melt[variable==x,]
+                            if(!is.null(clamp) && clamp=="none"){
+                            }else{
+                                if(is.null(clamp)){
+                                    clamp <- quantile(.dd$value,c(0.05,0.95))
+                                }
+                                .dd[value < clamp[1],value:=clamp[1]]
+                                .dd[value > clamp[2],value:=clamp[2]]
+                            }
+                            ggplot2::ggplot(.dd,aes(Dim1,Dim2))+
+                                geom_point(aes(colour=value),
+                                           size=if(is.null(size)) auto.point.size(npts)*1.1 else size,
+                                           alpha=pt.alpha) +
+                                labs(title=x, x ="", y = "") +
+                                scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
+                                theme_bw() +
+                                theme(plot.title = element_text(hjust = 0.5))+
+                                coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+                         })
+      p <- cowplot::plot_grid(plotlist=multi.p,ncol = p.ncol,align = "hv")
+  }
   if(!is.null(out.prefix)){
-    ggplot2::ggsave(sprintf("%s.geneOntSNE.pdf",out.prefix),width = width,height = height)
+    ggplot2::ggsave(sprintf("%s.geneOntSNE.pdf",out.prefix),plot=p,width = width,height = height)
   }
   return(p)
 }
@@ -320,5 +357,104 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
     return(list("obj.clust"=obj.clust,"branch"=branch.col))
 }
 
+#' plot distribution using cell info table
+#' @param obj object; can be class of Seurat, SingleCellExperiment or data.frame;
+#' @param out.prefix character; output prefix.
+#' @param plot.type character; (default: "barplot")
+#' @param facet.ncol integer; (default: 3)
+#' @param plot.width integer; (default: 10)
+#' @param plot.height integer; (default: 5)
+#' @param test.method character; (default: "fisher.test")
+#' @param cmp.var character; (default: "Species")
+#' @param group.var character; (default: "ClusterID")
+#' @param donor.var character; (default: "donor")
+#' @param verbose logical; (default: FALSE)
+#' @importFrom  ggpubr ggbarplot ggboxplot stat_compare_means
+#' @importFrom ggplot2 facet_wrap coord_cartesian expand_limits geom_text element_text theme ggsave
+#' @importFrom plyr ldply
+#' @details plot distribution
+#' @export
+plot.dist.cellInfoTable <- function(obj,out.prefix,plot.type="barplot",
+                        facet.ncol=3,plot.width=10,plot.height=5,test.method="fisher.test",
+                        cmp.var="Species",group.var="ClusterID",donor.var="donor",verbose=F)
+{
+    require("ggpubr")
+    require("ggplot2")
+    require("plyr")
+    require("ggsignif")
+    if(class(obj)=="Seurat"){
+        dat.tb <- as.data.table(obj[[]])
+    }else if(class(obj)=="SingleCellExperiment"){
+        dat.tb <- as.data.table(colData(obj))
+    }else if(is.data.frame(obj)){
+        dat.tb <- as.data.table(obj)
+    }
+    if(is.null(donor.var)){
+        dat.spe.group.dist <- dat.tb[, .N, by=c(cmp.var,group.var)]
+        colnames(dat.spe.group.dist) <- c("cmp.var","group.var","N")
+        dat.spe.group.dist$donor.var <- "ALL"
+    }else{
+        dat.spe.group.dist <- dat.tb[, .N, by=c(donor.var,cmp.var,group.var)]
+        colnames(dat.spe.group.dist) <- c("donor.var","cmp.var","group.var","N")
+    }
+    #### fill missing value using 0
+    dat.spe.group.dist <- melt(dcast(dat.spe.group.dist,group.var~donor.var+cmp.var,fill=0,value.var="N"),
+                               id.vars="group.var",value.name="N")
+    dat.spe.group.dist[,donor.var:=sapply(strsplit(as.character(variable),"_",perl=T),"[",1) ]
+    dat.spe.group.dist[,cmp.var:=sapply(strsplit(as.character(variable),"_",perl=T),"[",2) ]
+    dat.spe.group.dist[,variable:=NULL]
+    dat.spe.group.dist <- dat.spe.group.dist[,.(group.var=group.var,N=N,NTotal=sum(.SD$N)),
+                                             by=c("donor.var","cmp.var")]
+    dat.spe.group.dist[,freq:=N/NTotal]
+
+    if(plot.type=="boxplot"){
+        p <- ggboxplot(dat.spe.group.dist,x="group.var",y="freq",
+                       color = "cmp.var", palette = "npg",
+                       add = "jitter",outlier.shape=NA) +
+                stat_compare_means(aes_string(group = "cmp.var"), label = "p.signif")
+    }else if(plot.type=="boxplot2"){
+        p <- ggboxplot(dat.spe.group.dist,x="cmp.var",y="freq",
+                       color = "cmp.var", palette = "npg",
+                       add = "jitter",outlier.shape=NA) +
+                facet_wrap(~group.var,ncol=facet.ncol,scales="free_y")+
+                expand_limits(y=0) +
+                stat_compare_means(label = "p.format")
+    }else if(plot.type=="barplot"){
+        dat.plot <- dat.spe.group.dist[,.(N=sum(.SD$N),NTotal=sum(.SD$NTotal),
+                                          freq=mean(.SD$freq)),
+                                        by=c("cmp.var","group.var")]
+        dat.plot[,NOther:=NTotal-N]
+
+        if(test.method=="prop.test"){
+            ann.tb <- dat.plot[,.(p.value=prop.test(.SD$N, .SD$NTotal)$p.value,
+                                  y_pos=max(.SD$freq)),
+                               by="group.var"]
+        }else if(test.method=="fisher.test"){
+            ann.tb <- dat.plot[,.(p.value=fisher.test(.SD[,c("N","NOther"),with=F])$p.value,
+                                  y_pos=max(.SD$freq)),
+                               by="group.var"]
+        }
+        ann.tb[,p.adj:=p.adjust(p.value,"fdr")]
+        ann.tb[,p.signif:="ns"]
+        ann.tb[p.adj<0.05,p.signif:="*"]
+        ann.tb[p.adj<0.01,p.signif:="**"]
+        ann.tb[p.adj<0.001,p.signif:="***"]
+        #ann.tb[,xmin:=as.numeric(factor(group.var))-0.2]
+        #ann.tb[,xmax:=as.numeric(factor(group.var))+0.2]
+
+        p <- ggbarplot(dat.plot,x="group.var",y="freq",fill="cmp.var",color=NA,
+                       palette="npg",position=position_dodge2()) +
+                geom_text(data=ann.tb,aes(x=group.var,y=y_pos,label=p.signif),vjust=-0.5)
+
+    }
+    p <- p + theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+                coord_cartesian(clip="off")+
+    ggsave(sprintf("%s.dist.%s.%s.%s.freq.pdf",out.prefix,plot.type,cmp.var,group.var),
+           width=plot.width,height=plot.height)
+    if(verbose){
+        write.table(dat.spe.group.dist, sprintf("%s.dist.%s.%s.freq.pdf",out.prefix,cmp.var,group.var),
+                    row.names=F,sep="\t",quote=F)
+    }
+}
 
 

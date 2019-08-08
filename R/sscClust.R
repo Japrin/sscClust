@@ -192,6 +192,7 @@ ssc.displayName2id <- function(obj,display.name)
     #ret <- lookup.table[ids]
     ret <- lookup.table[lookup.table %in% display.name]
     ret <- structure(names(ret),names=lookup.table[names(ret)])
+    ret <- ret[display.name]
   }
   return(ret)
 }
@@ -1245,10 +1246,9 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param size double; points' size. If NULL, infer from number of points (default NULL)
 #' @param brewer.palette character; which palette to use. (default: "YlOrRd")
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
-#' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )
+#' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: "none" )
 #' @param label double; label size. if NULL, no label showed. (default: NULL )
-#' @param scales character; passed to facet_wrap (default: "fixed")
-#' @param points.order character; (default: "value")
+#' @param par.geneOnTSNE character; other parameters of geneOnTSNE
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend coord_cartesian
 #' @importFrom ggrepel geom_text_repel
@@ -1264,7 +1264,8 @@ ssc.run <- function(obj, assay.name="exprs",
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,splitBy=NULL,
                              plotDensity=F, colSet=list(),
                              reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,size=NULL,
-                             brewer.palette="YlOrRd",adjB=NULL,clamp=NULL,label=NULL,scales="fixed",points.order="value",
+                             brewer.palette="YlOrRd",adjB=NULL,clamp="none",label=NULL,
+                             par.geneOnTSNE=list(scales="free",pt.order="value",pt.alpha=0.1),
                              out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
   #requireNamespace("ggplot2")
@@ -1357,16 +1358,12 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
     if(!is.null(adjB)){
       dat.onTSNE <- simple.removeBatchEffect(dat.onTSNE,batch=colData(obj)[[adjB]])
     }
-    if(!is.null(clamp)){
-      dat.onTSNE[dat.onTSNE<clamp[1]] <- clamp[1]
-      dat.onTSNE[dat.onTSNE>clamp[2]] <- clamp[2]
-    }
-    p <- ggGeneOnTSNE(dat.onTSNE,
-                      dat.map,
-                      gene,out.prefix,
-					  p.ncol=p.ncol,xlim=xlim,ylim=ylim,
-					  scales=scales,points.order=points.order,
-					  size=size,width=width,height=height)
+    p <- do.call(ggGeneOnTSNE,c(list(Y=dat.onTSNE, dat.map=dat.map, gene.to.show=gene,
+                                     p.ncol=p.ncol,xlim=xlim,ylim=ylim,
+                                     size=size,width=width,height=height,
+                                     clamp=clamp,
+                                     out.prefix=out.prefix),
+                                par.geneOnTSNE))
     if(is.null(out.prefix)){
       #print(p)
       return(p)
@@ -1428,17 +1425,21 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 	  dat.plot.df.grpMean <- dat.plot.df[,lapply(.SD,mean),by=c("gene",group.var),.SDcols=assay.name]
 	  colnames(dat.plot.df.grpMean) <- c("gene",group.var,"meanExp")
 	  dat.plot.df <- dat.plot.df.grpMean[dat.plot.df,,on=c("gene",group.var)]
-	  dat.plot.df[meanExp<clamp[1],meanExp:=clamp[1],]
-	  dat.plot.df[meanExp>clamp[2],meanExp:=clamp[2],]
-	  dat.plot.df[ dat.plot.df[[assay.name]] < clamp[1],][[assay.name]] <- clamp[1]
-	  dat.plot.df[ dat.plot.df[[assay.name]] > clamp[2],][[assay.name]] <- clamp[2]
-	  head(dat.plot.df)
+      dat.plot.df[,gene:=factor(gene,levels=colnames(dat.plot),ordered=T)]
+      
+      if(is.null(clamp)){
+          clamp <- quantile(dat.plot.df[[assay.name]],c(0.05,0.95))
+      }
+      dat.plot.df[meanExp<clamp[1],meanExp:=clamp[1],]
+      dat.plot.df[meanExp>clamp[2],meanExp:=clamp[2],]
+      dat.plot.df[[assay.name]][ dat.plot.df[[assay.name]] < clamp[1] ] <- clamp[1]
+      dat.plot.df[[assay.name]][ dat.plot.df[[assay.name]] > clamp[2] ] <- clamp[2]
+
 	  p <- ggplot(dat.plot.df, aes_string(group.var[1], assay.name))
 	  if(length(group.var)==1){
 		p <- p +
 		  geom_violin(scale = "width",aes(fill=meanExp),color=NA,show.legend = T) +
-		  scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp),
-							  limits=clamp)
+		  scale_fill_gradient2(low = "yellow",mid = "red",high = "black",midpoint = mean(clamp), limits=clamp)
 	  }else if(length(group.var)==2)
 	  {
 		p <- p +
@@ -1684,7 +1685,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     clust <- colData(obj)[,group.var]
     if(is.null(group.list)){ group.list <- unique(clust) }
     batchV <- NULL
-    if(!is.null(batch)){
+    if(!is.null(batch)  && length(unique(colData(obj)[,batch])) > 1 ){
         batchV <- colData(obj)[,batch]
     }
     stat.clust <- table(clust)
