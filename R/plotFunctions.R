@@ -374,7 +374,7 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 #' @importFrom plyr ldply
 #' @details plot distribution
 #' @export
-plot.dist.cellInfoTable <- function(obj,out.prefix,plot.type="barplot",
+plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
                         facet.ncol=3,plot.width=10,plot.height=5,test.method="fisher.test",
                         cmp.var="Species",group.var="ClusterID",donor.var="donor",verbose=F)
 {

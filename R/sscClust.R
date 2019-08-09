@@ -51,6 +51,7 @@ ssc.build <- function(x,display.name=NULL,assay.name="exprs")
   }else if(class(x) %in% c("dgCMatrix","dgTMatrix")){
     obj <- SingleCellExperiment(assays = setNames(list(x),assay.name))
   }
+  metadata(obj)$ssc$colSet <- list()
   if(is.null(rowData(obj)[["display.name"]])){
     if(!is.null(display.name)){
       f.na <- is.na(display.name)
@@ -1283,9 +1284,13 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
       if(is.list(colSet)){
         multi.p <- lapply(columns,function(cc){
           if(is.null(colSet[[cc]])){
-            cc.values <- sort(unique(colData(obj)[,cc]))
-            colSet[[cc]] <- structure(auto.colSet(length(cc.values),name = "Paired"),
-                                      names=cc.values)
+            if(is.null(metadata(obj)$ssc$colSet[[cc]])){
+                cc.values <- sort(unique(colData(obj)[,cc]))
+                colSet[[cc]] <- structure(auto.colSet(length(cc.values),name = "Paired"),
+                                          names=cc.values)
+            }else{
+                colSet[[cc]] <- metadata(obj)$ssc$colSet[[cc]]
+            }
           }
           dat.plot <- data.frame(sample=rownames(dat.map),stringsAsFactors = F)
           if(!is.null(splitBy)){
@@ -1295,9 +1300,9 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
             dat.plot <- as.data.frame(cbind(dat.plot,dat.map,colData(obj)[,cc,drop=F]))
             colnames(dat.plot) <- c("sample","Dim1","Dim2",cc)
           }
-		  if(points.order=="value"){
+		  if(par.geneOnTSNE$pt.order=="value"){
 			  dat.plot <- dat.plot[order(dat.plot[,cc]),]
-		  }else if(points.order=="random"){
+		  }else if(par.geneOnTSNE$pt.order=="random"){
 			  dat.plot <- dat.plot[sample(nrow(dat.plot),nrow(dat.plot)),]
 		  }
           npts <- nrow(dat.plot)
@@ -1457,9 +1462,18 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 	  dat.plot.df <- as.data.table(cbind(data.frame(cellID=colnames(obj),stringsAsFactors=F),
 						  as.data.frame(colData(obj)[,c(group.var,columns),drop=F])))
 	  dat.plot.df <- melt(dat.plot.df,id.vars=c("cellID",group.var))
-	  p <- ggplot(dat.plot.df, aes_string(group.var, "value")) +
-			geom_boxplot() +
-			theme_bw(base_size = 12) +
+	  p <- ggplot(dat.plot.df, aes_string(group.var[1], "value"))
+      if(length(group.var)==1){
+          p <- p + geom_boxplot()
+      }else if(length(group.var)==2){
+          p <- p + geom_boxplot(aes_string(colour=group.var[2]))
+          if(is.null(metadata(obj)$ssc$colSet)){
+              p <- p + scale_colour_brewer(palette = "Set1")
+          }else{
+              p <- p + scale_colour_manual(values = metadata(sce.int)$ssc$colSet[[group.var[2]]])
+          }
+      }
+      p <- p + theme_bw(base_size = 12) +
 			facet_grid(variable ~ .,switch = "y",scales = "free_y") +
 			theme(axis.text.x = element_text(angle = 60, hjust = 1),strip.placement = "inside")
   }
