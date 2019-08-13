@@ -208,12 +208,14 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
         x <- x^100
         x <- x/sum(x)
         m <- length(x)
-        for (i in 1:m){
-            if (x[i]) {
-                score = score + 1.5^(-i) * (x[i])
-                ##score = score + 10^( - (i/m) * 100/x[i])
-            }
-        }
+        score <- sum(1.5^(-seq_len(m)) * x)
+        if(is.na(score)) { score <- 0 }
+        #for (i in 1:m){
+        #    if (x[i]) {
+        #        score = score + 1.5^(-i) * (x[i])
+        #        ##score = score + 10^( - (i/m) * 100/x[i])
+        #    }
+        #}
         return(score)
     }
     dat.ordered <- dat
@@ -398,6 +400,8 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
         colnames(dat.spe.group.dist) <- c("donor.var","cmp.var","group.var","N")
     }
     #### fill missing value using 0
+    dat.spe.group.dist[,donor.var:=gsub("_",".",donor.var)]
+    dat.spe.group.dist[,cmp.var:=gsub("_",".",cmp.var)]
     dat.spe.group.dist <- melt(dcast(dat.spe.group.dist,group.var~donor.var+cmp.var,fill=0,value.var="N"),
                                id.vars="group.var",value.name="N")
     dat.spe.group.dist[,donor.var:=sapply(strsplit(as.character(variable),"_",perl=T),"[",1) ]

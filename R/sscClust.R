@@ -1249,6 +1249,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
 #' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: "none" )
 #' @param label double; label size. if NULL, no label showed. (default: NULL )
+#' @param par.repel list; passed to geom_text_repel
 #' @param par.geneOnTSNE character; other parameters of geneOnTSNE
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend coord_cartesian
@@ -1265,7 +1266,8 @@ ssc.run <- function(obj, assay.name="exprs",
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,splitBy=NULL,
                              plotDensity=F, colSet=list(),
                              reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,size=NULL,
-                             brewer.palette="YlOrRd",adjB=NULL,clamp="none",label=NULL,
+                             brewer.palette="YlOrRd",adjB=NULL,clamp="none",
+                             label=NULL,par.repel=list(force=1),
                              par.geneOnTSNE=list(scales="free",pt.order="value",pt.alpha=0.1),
                              out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
@@ -1316,8 +1318,12 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
                        show.legend=if(!is.numeric(dat.plot[,cc]) && nvalues>40) F else NA,
                        size=if(is.null(size)) auto.point.size(npts)*1.1 else size)
           if(!is.null(label)){
-              dat.plot.label <- as.data.table(dat.plot)[,.(Dim1=mean(.SD$Dim1),Dim2=mean(.SD$Dim2)),by=cc]
-              p <- p + ggrepel::geom_text_repel(aes_string("Dim1", "Dim2", label = cc),size=label,data=dat.plot.label)
+              dat.plot.label <- as.data.table(dat.plot)[,.(Dim1=median(.SD$Dim1),
+                                                           Dim2=median(.SD$Dim2)),
+                                                        by=cc]
+              p <- p + do.call(ggrepel::geom_text_repel,c(list(aes_string("Dim1","Dim2",label = cc),
+                                                               size=label,data=dat.plot.label),
+                                                          par.repel))
           }
           if(!is.null(splitBy)){
             p <- p + ggplot2::facet_wrap(~splitBy)

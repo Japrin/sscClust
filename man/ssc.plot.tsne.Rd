@@ -8,10 +8,10 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
   splitBy = NULL, plotDensity = F, colSet = list(),
   reduced.name = "iCor.tsne", reduced.dim = c(1, 2), xlim = NULL,
   ylim = NULL, size = NULL, brewer.palette = "YlOrRd", adjB = NULL,
-  clamp = "none", label = NULL, par.geneOnTSNE = list(scales =
-  "free", pt.order = "value", pt.alpha = 0.1), out.prefix = NULL,
-  p.ncol = 3, width = NA, height = NA, base_aspect_ratio = 1.1,
-  peaks = NULL)
+  clamp = "none", label = NULL, par.repel = list(force = 1),
+  par.geneOnTSNE = list(scales = "free", pt.order = "value", pt.alpha =
+  0.1), out.prefix = NULL, p.ncol = 3, width = NA, height = NA,
+  base_aspect_ratio = 1.1, peaks = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -45,6 +45,8 @@ ssc.plot.tsne(obj, assay.name = "exprs", gene = NULL, columns = NULL,
 \item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: "none" )}
 
 \item{label}{double; label size. if NULL, no label showed. (default: NULL )}
+
+\item{par.repel}{list; passed to geom_text_repel}
 
 \item{par.geneOnTSNE}{character; other parameters of geneOnTSNE}
 
