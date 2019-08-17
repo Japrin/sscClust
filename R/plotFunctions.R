@@ -410,6 +410,8 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
     dat.spe.group.dist <- dat.spe.group.dist[,.(group.var=group.var,N=N,NTotal=sum(.SD$N)),
                                              by=c("donor.var","cmp.var")]
     dat.spe.group.dist[,freq:=N/NTotal]
+    dat.spe.group.dist[["cmp.var"]] <- factor(dat.spe.group.dist[["cmp.var"]],
+                                              levels=levels(dat.tb[[cmp.var]]))
 
     if(plot.type=="boxplot"){
         p <- ggboxplot(dat.spe.group.dist,x="group.var",y="freq",
@@ -452,12 +454,16 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
 
     }
     p <- p + theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
-                coord_cartesian(clip="off")+
-    ggsave(sprintf("%s.dist.%s.%s.%s.freq.pdf",out.prefix,plot.type,cmp.var,group.var),
-           width=plot.width,height=plot.height)
+                coord_cartesian(clip="off")
     if(verbose){
         write.table(dat.spe.group.dist, sprintf("%s.dist.%s.%s.freq.pdf",out.prefix,cmp.var,group.var),
                     row.names=F,sep="\t",quote=F)
+    }
+    if(!is.null(out.prefix)){
+        ggsave(sprintf("%s.dist.%s.%s.%s.freq.pdf",out.prefix,plot.type,cmp.var,group.var),
+               width=plot.width,height=plot.height)
+    }else{
+        return(p)
     }
 }
 
