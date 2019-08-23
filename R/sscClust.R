@@ -1735,8 +1735,8 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     },.parallel=T)
     names(out) <- group.list
 
-    all.table <- data.table(ldply(group.list,function(x){ out[[x]]$all }))
-    sig.table <- data.table(ldply(group.list,function(x){ out[[x]]$sig }))
+    all.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$all }))
+    sig.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$sig }))
 
     return(list(all=all.table,sig=sig.table))
 }

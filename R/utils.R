@@ -831,7 +831,7 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 		x.levels <- unique(sort(xlabel))
 	}
     if(!is.null(group)){
-        x.levels <- c(setdiff(x.levels,group),group)
+        x.levels <- c(setdiff(x.levels,group),as.character(group))
     }
 
     if(is.null(batch)){

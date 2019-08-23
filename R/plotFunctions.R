@@ -391,6 +391,9 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
     }else if(is.data.frame(obj)){
         dat.tb <- as.data.table(obj)
     }
+    if(!is.factor(dat.tb[[cmp.var]])){
+        dat.tb[[cmp.var]] <- factor(dat.tb[[cmp.var]])
+    }
     if(is.null(donor.var)){
         dat.spe.group.dist <- dat.tb[, .N, by=c(cmp.var,group.var)]
         colnames(dat.spe.group.dist) <- c("cmp.var","group.var","N")
