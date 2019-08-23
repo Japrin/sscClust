@@ -367,10 +367,13 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 #' @param plot.width integer; (default: 10)
 #' @param plot.height integer; (default: 5)
 #' @param test.method character; (default: "fisher.test")
+#' @param group.filter character; (default: NULL)
+#' @param sort.freq logical; (default: FALSE)
 #' @param cmp.var character; (default: "Species")
 #' @param group.var character; (default: "ClusterID")
 #' @param donor.var character; (default: "donor")
 #' @param verbose logical; (default: FALSE)
+#' @param ... parameter passed to ggpubr
 #' @importFrom  ggpubr ggbarplot ggboxplot stat_compare_means
 #' @importFrom ggplot2 facet_wrap coord_cartesian expand_limits geom_text element_text theme ggsave
 #' @importFrom plyr ldply
@@ -378,7 +381,8 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 #' @export
 plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
                         facet.ncol=3,plot.width=10,plot.height=5,test.method="fisher.test",
-                        cmp.var="Species",group.var="ClusterID",donor.var="donor",verbose=F)
+						group.filter=NULL,sort.freq=F,
+                        cmp.var="Species",group.var="ClusterID",donor.var="donor",verbose=F,...)
 {
     require("ggpubr")
     require("ggplot2")
@@ -410,16 +414,26 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
     dat.spe.group.dist <- dat.spe.group.dist[,.(group.var=group.var,N=N,NTotal=sum(.SD$N)),
                                              by=c("donor.var","cmp.var")]
     dat.spe.group.dist[,freq:=N/NTotal]
+	dat.freq.med <- dat.spe.group.dist[,.(freq.med=median(freq)),by=c("group.var","cmp.var")][order(freq.med),]
+	if(!is.null(group.filter)){
+		dat.spe.group.dist <- dat.spe.group.dist[group.var==group.filter,]
+		dat.freq.med <- dat.freq.med[group.var==group.filter]
+	}
+	###dat.spe.group.dist.test <<- dat.spe.group.dist
+	if(sort.freq){
+		dat.spe.group.dist <- dat.spe.group.dist[order(freq,cmp.var),]
+		dat.spe.group.dist[,cmp.var:=factor(cmp.var,levels=unique(dat.freq.med$cmp.var))]
+	}
 
     if(plot.type=="boxplot"){
         p <- ggboxplot(dat.spe.group.dist,x="group.var",y="freq",
-                       color = "cmp.var", palette = "npg",
-                       add = "jitter",outlier.shape=NA) +
+                       color = "cmp.var", 
+                       add = "jitter",outlier.shape=NA,...) +
                 stat_compare_means(aes_string(group = "cmp.var"), label = "p.signif")
     }else if(plot.type=="boxplot2"){
         p <- ggboxplot(dat.spe.group.dist,x="cmp.var",y="freq",
-                       color = "cmp.var", palette = "npg",
-                       add = "jitter",outlier.shape=NA) +
+                       color = "cmp.var", 
+                       add = "jitter",outlier.shape=NA,...) +
                 facet_wrap(~group.var,ncol=facet.ncol,scales="free_y")+
                 expand_limits(y=0) +
                 stat_compare_means(label = "p.format")
@@ -447,7 +461,7 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
         #ann.tb[,xmax:=as.numeric(factor(group.var))+0.2]
 
         p <- ggbarplot(dat.plot,x="group.var",y="freq",fill="cmp.var",color=NA,
-                       palette="npg",position=position_dodge2()) +
+                       position=position_dodge2(),...) +
                 geom_text(data=ann.tb,aes(x=group.var,y=y_pos,label=p.signif),vjust=-0.5)
 
     }
@@ -456,7 +470,7 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
     ggsave(sprintf("%s.dist.%s.%s.%s.freq.pdf",out.prefix,plot.type,cmp.var,group.var),
            width=plot.width,height=plot.height)
     if(verbose){
-        write.table(dat.spe.group.dist, sprintf("%s.dist.%s.%s.freq.pdf",out.prefix,cmp.var,group.var),
+        write.table(dat.spe.group.dist, sprintf("%s.dist.%s.%s.freq.txt",out.prefix,cmp.var,group.var),
                     row.names=F,sep="\t",quote=F)
     }
 }

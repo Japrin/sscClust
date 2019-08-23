@@ -6,8 +6,9 @@
 \usage{
 plotDistFromCellInfoTable(obj, out.prefix, plot.type = "barplot",
   facet.ncol = 3, plot.width = 10, plot.height = 5,
-  test.method = "fisher.test", cmp.var = "Species",
-  group.var = "ClusterID", donor.var = "donor", verbose = F)
+  test.method = "fisher.test", group.filter = NULL, sort.freq = F,
+  cmp.var = "Species", group.var = "ClusterID", donor.var = "donor",
+  verbose = F, ...)
 }
 \arguments{
 \item{obj}{object; can be class of Seurat, SingleCellExperiment or data.frame;}
@@ -24,6 +25,10 @@ plotDistFromCellInfoTable(obj, out.prefix, plot.type = "barplot",
 
 \item{test.method}{character; (default: "fisher.test")}
 
+\item{group.filter}{character; (default: NULL)}
+
+\item{sort.freq}{logical; (default: FALSE)}
+
 \item{cmp.var}{character; (default: "Species")}
 
 \item{group.var}{character; (default: "ClusterID")}
@@ -31,6 +36,8 @@ plotDistFromCellInfoTable(obj, out.prefix, plot.type = "barplot",
 \item{donor.var}{character; (default: "donor")}
 
 \item{verbose}{logical; (default: FALSE)}
+
+\item{...}{parameter passed to ggpubr}
 }
 \description{
 plot distribution using cell info table
