@@ -414,18 +414,18 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
     dat.spe.group.dist <- dat.spe.group.dist[,.(group.var=group.var,N=N,NTotal=sum(.SD$N)),
                                              by=c("donor.var","cmp.var")]
     dat.spe.group.dist[,freq:=N/NTotal]
+	###dat.spe.group.dist.test <<- dat.spe.group.dist
 	dat.freq.med <- dat.spe.group.dist[,.(freq.med=median(freq)),by=c("group.var","cmp.var")][order(freq.med),]
 	if(!is.null(group.filter)){
 		dat.spe.group.dist <- dat.spe.group.dist[group.var==group.filter,]
 		dat.freq.med <- dat.freq.med[group.var==group.filter]
 	}
-	###dat.spe.group.dist.test <<- dat.spe.group.dist
 	if(sort.freq){
 		dat.spe.group.dist <- dat.spe.group.dist[order(freq,cmp.var),]
 		dat.spe.group.dist[,cmp.var:=factor(cmp.var,levels=unique(dat.freq.med$cmp.var))]
+	}else if(is.factor(dat.spe.group.dist[["cmp.var"]])){
+		dat.spe.group.dist[,cmp.var:=factor(cmp.var,levels=levels(dat.tb[[cmp.var]]))]
 	}
-    dat.spe.group.dist[["cmp.var"]] <- factor(dat.spe.group.dist[["cmp.var"]],
-                                              levels=levels(dat.tb[[cmp.var]]))
 
     if(plot.type=="boxplot"){
         p <- ggboxplot(dat.spe.group.dist,x="group.var",y="freq",
