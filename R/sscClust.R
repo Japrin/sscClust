@@ -1289,7 +1289,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
             if(is.null(metadata(obj)$ssc$colSet[[cc]])){
                 cc.values <- sort(unique(colData(obj)[,cc]))
                 colSet[[cc]] <- structure(auto.colSet(length(cc.values),name = "Paired"),
-                                          names=cc.values)
+                                          names=as.character(cc.values))
             }else{
                 colSet[[cc]] <- metadata(obj)$ssc$colSet[[cc]]
             }
