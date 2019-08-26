@@ -182,6 +182,7 @@ integrate.by.avg <- function(sce.list,
 		gene.desc.top$meta.cluster <- sce.pb$pca.SNN.kauto[match(gene.desc.top$Group,colnames(sce.pb))]
 		gene.desc.top <- gene.desc.top[order(meta.cluster,-t,Group),]
 		saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
+		##gene.desc.top <- readRDS(sprintf("%s.gene.desc.top.rds",out.prefix))
 
 		RhpcBLASctl::omp_set_num_threads(1)
 		doParallel::registerDoParallel(cores = ncores)
@@ -197,7 +198,7 @@ integrate.by.avg <- function(sce.list,
 							   columns="pca.SNN.kauto",columns.order="pca.SNN.kauto",
 							   gene.desc=g.desc,
 							   pdf.width=20,pdf.height=10,do.scale=F,
-							   z.lo=-15,z.hi=15,z.step=3,
+							   z.lo=topGene.lo,z.hi=topGene.hi,z.step=topGene.step,
 							   do.clustering.row=F,
 							   do.clustering.col=T
 							   )
@@ -217,9 +218,50 @@ integrate.by.avg <- function(sce.list,
 	#### heatmap show average expression of specified genes
     ###return(list("sce.pb"=sce.pb,"branch.out"=branch.out))
     metadata(sce.pb)$ssc$gene.de.list <- gene.de.list
+    metadata(sce.pb)$ssc$gene.desc.top <- gene.desc.top
 	loginfo(sprintf("integrate.by.avg run successfully"))
     return(sce.pb)
 }
+
+#' plot genes expression in pairs of clusters to examine the correlation
+#' @param obj object; object of \code{singleCellExperiment} class
+#' @param gene.desc.top data.frame; signature genes 
+#' @param assay.name character; which assay (default: "exprs")
+#' @param out.prefix character; output prefix (default: NULL).
+#' @param adjB character; batch column of the colData(obj). (default: NULL)
+#' @param sig.prevelance double; (default: 0.5)
+#' @import data.table
+#' @import ggplot2
+#' @importFrom  ggpubr ggscatter
+#' @details classify cells using the signature genes
+#' @export
+classifyCell.by.sigGene <- function(obj,gene.desc.top,assay.name="exprs",out.prefix=NULL,
+                                    adjB=NULL,
+                                    sig.prevelance=0.5){
+    mcls <- unique(gene.desc.top$meta.cluster)
+    for(i in seq_along(mcls)){
+        gene.desc.top.i <- gene.desc.top[meta.cluster==mcls[i],]
+		ncluster <- length(unique(sort(gene.desc.top.i$Group)))
+		gene.core.tb <- gene.desc.top.i[,.(N=.N),by=c("meta.cluster","geneID")][N>sig.prevelance*ncluster,]
+		gene.core.tb$meta.cluster.size <- ncluster
+		gene.core.tb$Group <- gene.core.tb$meta.cluster
+        gene.used <- intersect(gene.core.tb$geneID,rownames(obj))
+	    dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+	    if(!is.null(adjB)){
+		    dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+	    }
+        sig.score <- colMeans(dat.block)
+
+        if(!is.null(out.prefix)){
+            p <- ggplot(data.table(cellID=colnames(obj),sig.score=sig.score), aes(x=sig.score)) +
+                geom_histogram(aes(y=..density..), colour="black", fill="white")+
+                geom_density()
+            ggsave(file=sprintf("%s.sigScore.density.pdf",out.prefix),width=8,height=6)
+        }
+
+    }
+}
+
 
 #' plot genes expression in pairs of clusters to examine the correlation
 #' @param sce.pb object; object of \code{singleCellExperiment} class

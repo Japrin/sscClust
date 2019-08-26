@@ -2,6 +2,7 @@
 
 S3method(plot,matrix.simple)
 S3method(plot,pairs.cor)
+export(classifyCell.by.sigGene)
 export(fftRtsne)
 export(integrate.by.avg)
 export(loginfo)

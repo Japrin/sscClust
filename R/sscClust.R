@@ -1476,7 +1476,7 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
           if(is.null(metadata(obj)$ssc$colSet)){
               p <- p + scale_colour_brewer(palette = "Set1")
           }else{
-              p <- p + scale_colour_manual(values = metadata(sce.int)$ssc$colSet[[group.var[2]]])
+              p <- p + scale_colour_manual(values = metadata(obj)$ssc$colSet[[group.var[2]]])
           }
       }
       p <- p + theme_bw(base_size = 12) +

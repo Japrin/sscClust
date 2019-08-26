@@ -447,7 +447,7 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
                                           freq=mean(.SD$freq)),
                                         by=c("cmp.var","group.var")]
         dat.plot[,NOther:=NTotal-N]
-
+        #dat.plot.test <<- dat.plot
         if(test.method=="prop.test"){
             ann.tb <- dat.plot[,.(p.value=prop.test(.SD$N, .SD$NTotal)$p.value,
                                   y_pos=max(.SD$freq)),
