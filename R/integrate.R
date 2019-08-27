@@ -224,44 +224,213 @@ integrate.by.avg <- function(sce.list,
 }
 
 #' plot genes expression in pairs of clusters to examine the correlation
-#' @param obj object; object of \code{singleCellExperiment} class
+#' @param obj.list object; named list of object of \code{singleCellExperiment} class
 #' @param gene.desc.top data.frame; signature genes 
 #' @param assay.name character; which assay (default: "exprs")
 #' @param out.prefix character; output prefix (default: NULL).
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
 #' @param sig.prevelance double; (default: 0.5)
 #' @import data.table
-#' @import ggplot2
+#' @import ggplot2 
+#' @import ggridges
 #' @importFrom  ggpubr ggscatter
 #' @details classify cells using the signature genes
 #' @export
-classifyCell.by.sigGene <- function(obj,gene.desc.top,assay.name="exprs",out.prefix=NULL,
+classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",out.prefix=NULL,
                                     adjB=NULL,
                                     sig.prevelance=0.5){
     mcls <- unique(gene.desc.top$meta.cluster)
-    for(i in seq_along(mcls)){
-        gene.desc.top.i <- gene.desc.top[meta.cluster==mcls[i],]
-		ncluster <- length(unique(sort(gene.desc.top.i$Group)))
-		gene.core.tb <- gene.desc.top.i[,.(N=.N),by=c("meta.cluster","geneID")][N>sig.prevelance*ncluster,]
+
+    dat.list <- (llply(seq_along(mcls),function(j){
+        gene.desc.top.j <- gene.desc.top[meta.cluster==mcls[j],]
+		ncluster <- length(unique(sort(gene.desc.top.j$Group)))
+		gene.core.tb <- gene.desc.top.j[,.(N=.N),by=c("meta.cluster","geneID")][N>sig.prevelance*ncluster,]
 		gene.core.tb$meta.cluster.size <- ncluster
 		gene.core.tb$Group <- gene.core.tb$meta.cluster
-        gene.used <- intersect(gene.core.tb$geneID,rownames(obj))
-	    dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
-	    if(!is.null(adjB)){
-		    dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
-	    }
-        sig.score <- colMeans(dat.block)
+		dat.plot.j <- ldply(seq_along(obj.list),function(i){
+							  obj <- obj.list[[i]]
+							  gene.used <- rownames(obj)[match(gene.core.tb$geneID,rowData(obj)$display.name)]
+							  gene.used <- gene.used[!is.na(gene.used)]
+							  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+							  if(!is.null(adjB)){
+								dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+							  }
+							  sig.score <- colMeans(dat.block)
+							  data.table(cellID=colnames(obj),
+										 dataset.id=names(obj.list)[i],
+										 meta.cluster=mcls[j],
+										 sig.score=sig.score)
+									})
+		return(list(dat.plot=dat.plot.j,gene.core.tb=gene.core.tb))
+	}))
+	dat.plot <- as.data.table(ldply(dat.list,function(x){ x$dat.plot }))
+	gene.core.tb <- as.data.table(ldply(dat.list,function(x){ x$gene.core.tb }))
 
-        if(!is.null(out.prefix)){
-            p <- ggplot(data.table(cellID=colnames(obj),sig.score=sig.score), aes(x=sig.score)) +
-                geom_histogram(aes(y=..density..), colour="black", fill="white")+
-                geom_density()
-            ggsave(file=sprintf("%s.sigScore.density.pdf",out.prefix),width=8,height=6)
-        }
-
+    if(!is.null(out.prefix)){
+		p <- ggplot(dat.plot, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
+			##geom_histogram(aes(y=..density..), colour="black", fill="white")+
+			#geom_density() +
+			geom_density_ridges() +
+			facet_wrap(~meta.cluster,ncol=4)
+		ggsave(file=sprintf("%s.sigScore.density.pdf",out.prefix),width=15,height=12)
     }
+
+    
 }
 
+####
+#####' outlier detection using extremevalues
+#####' @param x object; vector
+#####' @import data.table
+#####' @import ggplot2 
+#####' @import ggridges
+#####' @import extremevalues
+#####' @importFrom  ggpubr ggscatter
+#####' @details outlier detection using extremevalues
+#####' @export
+####classify.outlier <- function(x){
+####	##### outlier detection (use method I at last)
+####	K <- getOutliers(x,method="I",distribution="normal")
+####	L <- getOutliers(x,method="II",distribution="normal")
+####	pdf(sprintf("%s.outlier.pdf",out.prefix),width = 10,height = 6)
+####	opar <- par(mfrow=c(1,2))
+####	outlierPlot(myDesign$prol.score,K,mode="qq")
+####	outlierPlot(myDesign$prol.score,L,mode="residual")
+####	dev.off()
+####	par(opar)
+####	print("K$mu,K$sigma,K$limit")
+####	print(c(K$mu,K$sigma,K$limit))
+####	myDesign$prol.cls <- "lo"
+####	myDesign$prol.cls[K$iRight] <- "hi"
+####	######
+####
+####	##### plot #####
+####	#prol.score.x <- seq(-2,6,0.001)
+####	##prol.score.x <- seq(K$yMin,K$yMax,0.001)
+####	prol.score.pretty <- pretty(myDesign$prol.score)
+####	prol.score.x <- seq(prol.score.pretty[1], prol.score.pretty[length(prol.score.pretty)],0.001)
+####	prol.score.forPlot <- data.frame(x=prol.score.x,y=dnorm(prol.score.x,mean = K$mu,sd = K$sigma))
+####	p <- ggplot(myDesign, aes(prol.score)) + geom_density(colour="black") + theme_bw() +
+####		geom_line(data=prol.score.forPlot,aes(x=x,y=y),colour="red") +
+####		geom_vline(xintercept = K$limit,linetype=2)
+####	ggsave(filename = sprintf("%s.density.pdf",out.prefix),width = 4,height = 3)
+####
+####
+####}
+####
+####### zero.as.low: if True, zero counts as low expression (0); else as "-1"
+####binarizedExp <- function(x,ofile=NULL,G=NULL,e.TH=NULL,e.name="Exp",verbose=F, draw.CI=T, zero.as.low=T,...)
+####{
+####  require(mclust)
+####  ### bin.Exp == -1: drop out
+####  o.df <- data.frame(sample=names(x),bin.Exp=-1,stringsAsFactors = F)
+####  rownames(o.df) <- o.df$sample
+####  #f<-is.finite(x) & x>0
+####  f<-is.finite(x)
+####  if(sum(f)<3){
+####      colnames(o.df) <- c("sample",e.name)
+####      if(verbose){
+####        return(list(x_mix=NULL,o.df=o.df))
+####      }else{
+####        return(structure(o.df[,e.name],names=rownames(o.df)))
+####      }
+####  }
+####
+####  x<-x[f]
+####  x_mix<-densityMclust(x,G=G,modelNames=c("E","V"))
+####  x_mix_summary<-summary(x_mix)
+####  
+####  if(verbose && !is.null(ofile)){
+####	  print(x_mix_summary)
+####      if(grepl(".png$",ofile,perl = T)){
+####          png(ofile,width=800,height=600)
+####	      old_par<-par(no.readonly=T)
+####	      layout(matrix(c(1,1,1,1,1,1,2,3,4), 3, 3, byrow = TRUE))
+####	      a_par<-par(cex.axis=2,cex.lab=2,cex.main=1.8,mar=c(5,6,4,2)+0.1)
+####      }else{
+####          pdf(ofile,width=8,height=6)
+####      }
+####	  plot(x_mix,what="density",data=x,breaks=50,col="darkgreen",lwd=2,main="",...)
+####	  abline(v=x_mix_summary$mean,lty=2)
+####	  if(!is.null(e.TH)){
+####		abline(v=e.TH,lty=2,col="red")
+####	  }
+####	  
+####	  for(i in 1:x_mix_summary$G)
+####	  {
+####		i_mean<-x_mix_summary$mean[i]
+####		i_sd<-sqrt(x_mix_summary$variance[i])
+####		i_pro<-x_mix_summary$pro[i]
+####		#i_sd<-RC_mix_summary$variance[i]
+####		d<-qnorm(c(0.0013,0.9987),i_mean,i_sd)
+####		e<-i_pro*dnorm(i_mean,i_mean,i_sd)
+####		lines(seq(d[1],d[2],by=0.01),i_pro*dnorm(seq(d[1],d[2],by=0.01),i_mean,i_sd),col="orange",lwd=2)
+####        if(draw.CI){ rect(d[1],0,d[2],e+0.02,col=NA,border="blue") }
+####		#rect(d[1],0,d[2],e+0.02,col=rgb(0,0,0.8,0.2),border=NA)
+####	  }
+####	  plot(x_mix,data=x,breaks=20,col="darkgreen",lwd=2,what="BIC")
+####	  densityMclust.diagnostic(x_mix,type = "cdf",cex.lab=1.5)
+####	  densityMclust.diagnostic(x_mix,type = "qq")
+####	  dev.off()
+####  }
+####  
+####  o.df[names(x_mix$classification),"bin.Exp"] <- x_mix$classification 
+####  colnames(o.df) <- c("sample",e.name)
+####  if(!is.null(G) && x_mix_summary$G==3){
+####	  ### determin which classes 'not-expressed' and which classes 'expressed'	
+####	  i_mean<-x_mix_summary$mean
+####	  i_sd<-sqrt(x_mix_summary$variance)
+####	  ci95.1 <- qnorm(c(0.0013,0.9987),i_mean[1],i_sd[1])
+####	  ci95.1.overlap <- pnorm(ci95.1[2],i_mean[2],i_sd[2])
+####	  if(ci95.1.overlap>0.3333){
+####		  C.min <-  2
+####	  }else{
+####		  C.min <- 1
+####	  }
+####	  ci95.2 <- qnorm(c(0.0013,0.9987),i_mean[2],i_sd[2])
+####	  ci95.3 <- qnorm(c(0.0013,0.9987),i_mean[3],i_sd[3])
+####	  ci95.3.overlap <- pnorm(ci95.3[1],i_mean[2],i_sd[2],lower.tail = F)
+####	  if(ci95.3.overlap>0.3333){
+####		  C.max <- 2
+####	  }else{
+####		  C.max <- 3
+####	  }
+#####	  ci95.2.overlap <- pnorm(ci95.2[2],i_mean[3],i_sd[3])
+#####	  if(ci95.2.overlap>0.3333){
+#####	  	  C.max <- 2
+#####	  }else{
+#####	  	  C.max <- 3
+#####	  }
+####      if(zero.as.low){
+####	    f.low <- o.df[,e.name] <= C.min
+####      }else{
+####	    f.low <- o.df[,e.name] <= C.min & o.df[,e.name] != -1
+####      }
+####	  f.hi <-  o.df[,e.name] >= C.max
+####	  f.mid <- (o.df[,e.name] > C.min) & (o.df[,e.name] < C.max)
+####	  o.df[f.low,e.name] <- 0
+####	  o.df[f.mid,e.name] <- 0.5
+####	  o.df[f.hi,e.name] <- 1
+####	  #f.G <- o.df[,e.name] < C.max
+####	  #o.df[f.G,e.name] <- 0
+####	  #o.df[!f.G,e.name] <- 1
+####  }else if(x_mix_summary$G==2){
+####      if(zero.as.low){
+####	    f.low <- o.df[,e.name] <= 1
+####      }else{
+####	    f.low <- o.df[,e.name] <= 1 & o.df[,e.name] != -1
+####      }
+####	  f.hi <-  o.df[,e.name] == 2
+####	  o.df[f.low,e.name] <- 0
+####	  o.df[f.hi,e.name] <- 1
+####  }
+####  if(verbose){
+####	return(list(x_mix=x_mix,o.df=o.df))
+####  }else{
+####	return(structure(o.df[,e.name],names=rownames(o.df)))
+####  }
+####}
+####
 
 #' plot genes expression in pairs of clusters to examine the correlation
 #' @param sce.pb object; object of \code{singleCellExperiment} class
