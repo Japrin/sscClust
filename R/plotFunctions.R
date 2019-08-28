@@ -426,8 +426,9 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
 	if(sort.freq){
 		dat.spe.group.dist <- dat.spe.group.dist[order(freq,cmp.var),]
 		dat.spe.group.dist[,cmp.var:=factor(cmp.var,levels=unique(dat.freq.med$cmp.var))]
-	}else if(is.factor(dat.spe.group.dist[["cmp.var"]])){
-		dat.spe.group.dist[,cmp.var:=factor(cmp.var,levels=levels(dat.tb[[cmp.var]]))]
+	}else if(is.factor(dat.tb[[cmp.var]])){
+        clevels <- levels(dat.tb[[cmp.var]])
+        dat.spe.group.dist[,cmp.var:=factor(cmp.var,levels=clevels)]
 	}
 
     if(plot.type=="boxplot"){

@@ -238,7 +238,8 @@ integrate.by.avg <- function(sce.list,
 #' @export
 classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",out.prefix=NULL,
                                     adjB=NULL,
-                                    sig.prevelance=0.5){
+                                    sig.prevelance=0.5)
+{
     mcls <- unique(gene.desc.top$meta.cluster)
 
     dat.list <- (llply(seq_along(mcls),function(j){
@@ -278,159 +279,186 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
     
 }
 
-####
-#####' outlier detection using extremevalues
-#####' @param x object; vector
-#####' @import data.table
-#####' @import ggplot2 
-#####' @import ggridges
-#####' @import extremevalues
-#####' @importFrom  ggpubr ggscatter
-#####' @details outlier detection using extremevalues
-#####' @export
-####classify.outlier <- function(x){
-####	##### outlier detection (use method I at last)
-####	K <- getOutliers(x,method="I",distribution="normal")
-####	L <- getOutliers(x,method="II",distribution="normal")
-####	pdf(sprintf("%s.outlier.pdf",out.prefix),width = 10,height = 6)
-####	opar <- par(mfrow=c(1,2))
-####	outlierPlot(myDesign$prol.score,K,mode="qq")
-####	outlierPlot(myDesign$prol.score,L,mode="residual")
-####	dev.off()
-####	par(opar)
-####	print("K$mu,K$sigma,K$limit")
-####	print(c(K$mu,K$sigma,K$limit))
-####	myDesign$prol.cls <- "lo"
-####	myDesign$prol.cls[K$iRight] <- "hi"
-####	######
-####
-####	##### plot #####
-####	#prol.score.x <- seq(-2,6,0.001)
-####	##prol.score.x <- seq(K$yMin,K$yMax,0.001)
-####	prol.score.pretty <- pretty(myDesign$prol.score)
-####	prol.score.x <- seq(prol.score.pretty[1], prol.score.pretty[length(prol.score.pretty)],0.001)
-####	prol.score.forPlot <- data.frame(x=prol.score.x,y=dnorm(prol.score.x,mean = K$mu,sd = K$sigma))
-####	p <- ggplot(myDesign, aes(prol.score)) + geom_density(colour="black") + theme_bw() +
-####		geom_line(data=prol.score.forPlot,aes(x=x,y=y),colour="red") +
-####		geom_vline(xintercept = K$limit,linetype=2)
-####	ggsave(filename = sprintf("%s.density.pdf",out.prefix),width = 4,height = 3)
-####
-####
-####}
-####
-####### zero.as.low: if True, zero counts as low expression (0); else as "-1"
-####binarizedExp <- function(x,ofile=NULL,G=NULL,e.TH=NULL,e.name="Exp",verbose=F, draw.CI=T, zero.as.low=T,...)
-####{
-####  require(mclust)
-####  ### bin.Exp == -1: drop out
-####  o.df <- data.frame(sample=names(x),bin.Exp=-1,stringsAsFactors = F)
-####  rownames(o.df) <- o.df$sample
-####  #f<-is.finite(x) & x>0
-####  f<-is.finite(x)
-####  if(sum(f)<3){
-####      colnames(o.df) <- c("sample",e.name)
-####      if(verbose){
-####        return(list(x_mix=NULL,o.df=o.df))
-####      }else{
-####        return(structure(o.df[,e.name],names=rownames(o.df)))
-####      }
-####  }
-####
-####  x<-x[f]
-####  x_mix<-densityMclust(x,G=G,modelNames=c("E","V"))
-####  x_mix_summary<-summary(x_mix)
-####  
-####  if(verbose && !is.null(ofile)){
-####	  print(x_mix_summary)
-####      if(grepl(".png$",ofile,perl = T)){
-####          png(ofile,width=800,height=600)
-####	      old_par<-par(no.readonly=T)
-####	      layout(matrix(c(1,1,1,1,1,1,2,3,4), 3, 3, byrow = TRUE))
-####	      a_par<-par(cex.axis=2,cex.lab=2,cex.main=1.8,mar=c(5,6,4,2)+0.1)
-####      }else{
-####          pdf(ofile,width=8,height=6)
-####      }
-####	  plot(x_mix,what="density",data=x,breaks=50,col="darkgreen",lwd=2,main="",...)
-####	  abline(v=x_mix_summary$mean,lty=2)
-####	  if(!is.null(e.TH)){
-####		abline(v=e.TH,lty=2,col="red")
-####	  }
-####	  
-####	  for(i in 1:x_mix_summary$G)
-####	  {
-####		i_mean<-x_mix_summary$mean[i]
-####		i_sd<-sqrt(x_mix_summary$variance[i])
-####		i_pro<-x_mix_summary$pro[i]
-####		#i_sd<-RC_mix_summary$variance[i]
-####		d<-qnorm(c(0.0013,0.9987),i_mean,i_sd)
-####		e<-i_pro*dnorm(i_mean,i_mean,i_sd)
-####		lines(seq(d[1],d[2],by=0.01),i_pro*dnorm(seq(d[1],d[2],by=0.01),i_mean,i_sd),col="orange",lwd=2)
-####        if(draw.CI){ rect(d[1],0,d[2],e+0.02,col=NA,border="blue") }
-####		#rect(d[1],0,d[2],e+0.02,col=rgb(0,0,0.8,0.2),border=NA)
-####	  }
-####	  plot(x_mix,data=x,breaks=20,col="darkgreen",lwd=2,what="BIC")
-####	  densityMclust.diagnostic(x_mix,type = "cdf",cex.lab=1.5)
-####	  densityMclust.diagnostic(x_mix,type = "qq")
-####	  dev.off()
-####  }
-####  
-####  o.df[names(x_mix$classification),"bin.Exp"] <- x_mix$classification 
-####  colnames(o.df) <- c("sample",e.name)
-####  if(!is.null(G) && x_mix_summary$G==3){
-####	  ### determin which classes 'not-expressed' and which classes 'expressed'	
-####	  i_mean<-x_mix_summary$mean
-####	  i_sd<-sqrt(x_mix_summary$variance)
-####	  ci95.1 <- qnorm(c(0.0013,0.9987),i_mean[1],i_sd[1])
-####	  ci95.1.overlap <- pnorm(ci95.1[2],i_mean[2],i_sd[2])
-####	  if(ci95.1.overlap>0.3333){
-####		  C.min <-  2
-####	  }else{
-####		  C.min <- 1
-####	  }
-####	  ci95.2 <- qnorm(c(0.0013,0.9987),i_mean[2],i_sd[2])
-####	  ci95.3 <- qnorm(c(0.0013,0.9987),i_mean[3],i_sd[3])
-####	  ci95.3.overlap <- pnorm(ci95.3[1],i_mean[2],i_sd[2],lower.tail = F)
-####	  if(ci95.3.overlap>0.3333){
-####		  C.max <- 2
-####	  }else{
-####		  C.max <- 3
-####	  }
-#####	  ci95.2.overlap <- pnorm(ci95.2[2],i_mean[3],i_sd[3])
-#####	  if(ci95.2.overlap>0.3333){
-#####	  	  C.max <- 2
-#####	  }else{
-#####	  	  C.max <- 3
-#####	  }
-####      if(zero.as.low){
-####	    f.low <- o.df[,e.name] <= C.min
-####      }else{
-####	    f.low <- o.df[,e.name] <= C.min & o.df[,e.name] != -1
-####      }
-####	  f.hi <-  o.df[,e.name] >= C.max
-####	  f.mid <- (o.df[,e.name] > C.min) & (o.df[,e.name] < C.max)
-####	  o.df[f.low,e.name] <- 0
-####	  o.df[f.mid,e.name] <- 0.5
-####	  o.df[f.hi,e.name] <- 1
-####	  #f.G <- o.df[,e.name] < C.max
-####	  #o.df[f.G,e.name] <- 0
-####	  #o.df[!f.G,e.name] <- 1
-####  }else if(x_mix_summary$G==2){
-####      if(zero.as.low){
-####	    f.low <- o.df[,e.name] <= 1
-####      }else{
-####	    f.low <- o.df[,e.name] <= 1 & o.df[,e.name] != -1
-####      }
-####	  f.hi <-  o.df[,e.name] == 2
-####	  o.df[f.low,e.name] <- 0
-####	  o.df[f.hi,e.name] <- 1
-####  }
-####  if(verbose){
-####	return(list(x_mix=x_mix,o.df=o.df))
-####  }else{
-####	return(structure(o.df[,e.name],names=rownames(o.df)))
-####  }
-####}
-####
+
+#' binarize the expression value using the distribution
+#' @param x object; vector
+#' @param out.prefix character; output prefix [default: NULL]
+#' @param G integer; number of components [default: NULL]
+#' @param e.TH double; for plot purpose: comparing the components with the user defined threhold [default: NULL]
+#' @param e.name character; name of the expression metric [default: "Exp"]
+#' @param verbose logical; [default: F]
+#' @param draw.CI logical; [default: T]
+#' @param zero.as.low logical; [default: T]
+#' @param ... parameters passed to plot.densityMclust
+#' @import data.table
+#' @import ggplot2 
+#' @import mclust
+#' @details use mixture model to classify each data point. If G is null, the largest component is corresponding to binarized expression 1, and other components are corresponding to binarized expressed 0.
+#' @export
+binarizeExp <- function(x,out.prefix=NULL,G=NULL,e.TH=NULL,e.name="Exp",verbose=F,
+                         draw.CI=T, zero.as.low=T,...)
+{
+  ###require(mclust)
+  if(!is.null(names(x))){
+    o.df <- data.frame(sample=names(x),bin.Exp=-1,o.Exp=x,stringsAsFactors = F)
+  }else{
+    names(x) <- sprintf("S%04d",seq_along(x))
+    o.df <- data.frame(sample=sprintf("S%04d",seq_along(x)),bin.Exp=-1,o.Exp=x,stringsAsFactors = F)
+  }
+  rownames(o.df) <- o.df$sample
+  #f<-is.finite(x) & x>0
+  f<-is.finite(x)
+  if(sum(f)<3){
+      colnames(o.df) <- c("sample",e.name)
+      if(verbose){
+        return(list(x_mix=NULL,o.df=o.df))
+      }else{
+        return(structure(o.df[,e.name],names=rownames(o.df)))
+      }
+  }
+
+  x <- x[f]
+  x_mix <- densityMclust(x,G=G,modelNames=c("E","V"))
+  x_mix_summary <- summary(x_mix)
+  
+  if(verbose && !is.null(ofile)){
+	  print(x_mix_summary)
+      if(grepl(".png$",ofile,perl = T)){
+          png(ofile,width=800,height=600)
+	      old_par<-par(no.readonly=T)
+	      layout(matrix(c(1,1,1,1,1,1,2,3,4), 3, 3, byrow = TRUE))
+	      a_par<-par(cex.axis=2,cex.lab=2,cex.main=1.8,mar=c(5,6,4,2)+0.1)
+      }else{
+          pdf(ofile,width=8,height=6)
+      }
+	  plot(x_mix,what="density",data=x,breaks=50,col="darkgreen",lwd=2,main="",...)
+	  abline(v=x_mix_summary$mean,lty=2)
+	  if(!is.null(e.TH)){
+		abline(v=e.TH,lty=2,col="red")
+	  }
+	  
+	  for(i in 1:x_mix_summary$G)
+	  {
+		i_mean<-x_mix_summary$mean[i]
+		i_sd<-sqrt(x_mix_summary$variance[i])
+		i_pro<-x_mix_summary$pro[i]
+		#i_sd<-RC_mix_summary$variance[i]
+		d<-qnorm(c(0.0013,0.9987),i_mean,i_sd)
+		e<-i_pro*dnorm(i_mean,i_mean,i_sd)
+		lines(seq(d[1],d[2],by=0.01),i_pro*dnorm(seq(d[1],d[2],by=0.01),i_mean,i_sd),col="orange",lwd=2)
+        if(draw.CI){ rect(d[1],0,d[2],e+0.02,col=NA,border="blue") }
+		#rect(d[1],0,d[2],e+0.02,col=rgb(0,0,0.8,0.2),border=NA)
+	  }
+	  plot(x_mix,data=x,breaks=20,col="darkgreen",lwd=2,what="BIC")
+	  densityMclust.diagnostic(x_mix,type = "cdf",cex.lab=1.5)
+	  densityMclust.diagnostic(x_mix,type = "qq")
+	  dev.off()
+  }
+  
+  o.df[names(x_mix$classification),"classification"] <- x_mix$classification 
+  o.df[names(x_mix$classification),"bin.Exp"] <- x_mix$classification 
+  colnames(o.df)[2] <- e.name
+  if(is.null(G)){
+      iG.2nd <- x_mix$G-1
+      iG.1st <- x_mix$G
+      f.low <- o.df[[e.name]] <= iG.2nd 
+      o.df[[e.name]][f.low] <- 0
+      o.df[[e.name]][!f.low] <- 1
+  }else if(!is.null(G) && x_mix_summary$G==3){
+	  ### determin which classes 'not-expressed' and which classes 'expressed'	
+	  i_mean<-x_mix_summary$mean
+	  i_sd<-sqrt(x_mix_summary$variance)
+	  ci95.1 <- qnorm(c(0.0013,0.9987),i_mean[1],i_sd[1])
+	  ci95.1.overlap <- pnorm(ci95.1[2],i_mean[2],i_sd[2])
+	  if(ci95.1.overlap>0.3333){
+		  C.min <-  2
+	  }else{
+		  C.min <- 1
+	  }
+	  ci95.2 <- qnorm(c(0.0013,0.9987),i_mean[2],i_sd[2])
+	  ci95.3 <- qnorm(c(0.0013,0.9987),i_mean[3],i_sd[3])
+	  ci95.3.overlap <- pnorm(ci95.3[1],i_mean[2],i_sd[2],lower.tail = F)
+	  if(ci95.3.overlap>0.3333){
+		  C.max <- 2
+	  }else{
+		  C.max <- 3
+	  }
+#	  ci95.2.overlap <- pnorm(ci95.2[2],i_mean[3],i_sd[3])
+#	  if(ci95.2.overlap>0.3333){
+#	  	  C.max <- 2
+#	  }else{
+#	  	  C.max <- 3
+#	  }
+      if(zero.as.low){
+	    f.low <- o.df[,e.name] <= C.min
+      }else{
+	    f.low <- o.df[,e.name] <= C.min & o.df[,e.name] != -1
+      }
+	  f.hi <-  o.df[,e.name] >= C.max
+	  f.mid <- (o.df[,e.name] > C.min) & (o.df[,e.name] < C.max)
+	  o.df[f.low,e.name] <- 0
+	  o.df[f.mid,e.name] <- 0.5
+	  o.df[f.hi,e.name] <- 1
+	  #f.G <- o.df[,e.name] < C.max
+	  #o.df[f.G,e.name] <- 0
+	  #o.df[!f.G,e.name] <- 1
+  }else if(x_mix_summary$G==2){
+      if(zero.as.low){
+	    f.low <- o.df[,e.name] <= 1
+      }else{
+	    f.low <- o.df[,e.name] <= 1 & o.df[,e.name] != -1
+      }
+	  f.hi <-  o.df[,e.name] == 2
+	  o.df[f.low,e.name] <- 0
+	  o.df[f.hi,e.name] <- 1
+  }
+  if(verbose){
+	return(list(x_mix=x_mix,o.df=o.df))
+  }else{
+	return(structure(o.df[,e.name],names=rownames(o.df)))
+  }
+}
+
+
+#' outlier detection using extremevalues
+#' @param x object; vector
+#' @param out.prefix character; output prefix [default: NULL]
+#' @import data.table
+#' @import ggplot2 
+#' @import extremevalues
+#' @details outlier detection using extremevalues
+#' @export
+classify.outlier <- function(x,out.prefix=NULL)
+{
+	##### outlier detection (use method I at last)
+	K <- getOutliers(x,method="I",distribution="normal")
+	L <- getOutliers(x,method="II",distribution="normal")
+
+	ii <- seq(K$limit[1], K$limit[2],0.01)
+    x.fit <- dnorm(ii,mean = K$mu,sd = K$sigma)
+    ret.1 <- data.table(score=x)
+    ret.1[,score.cls:=0]
+    ret.1[K$iRight,score.cls:=1]
+
+    ret.2 <- data.table(score=ii,density=x.fit)
+
+	##### plot #####
+    if(!is.null(out.prefix)){
+        pdf(sprintf("%s.outlier.pdf",out.prefix),width = 10,height = 6)
+        opar <- par(mfrow=c(1,2))
+        outlierPlot(x,K,mode="qq")
+        outlierPlot(x,L,mode="residual")
+        dev.off()
+        par(opar)
+    
+	    p <- ggplot(ret.1, aes(score)) + geom_density(colour="black") + theme_bw() +
+		        geom_line(data=ret.2,aes(x=score,y=density),colour="red") +
+		        geom_vline(xintercept = K$limit,linetype=2)
+	    ggsave(filename = sprintf("%s.density.pdf",out.prefix),width = 4,height = 3)
+    }
+    return(list("score.cls.tb"=ret.1,"fit.value.tb"=ret.2,"K"=K,"R2"=K$R2))
+}
+
 
 #' plot genes expression in pairs of clusters to examine the correlation
 #' @param sce.pb object; object of \code{singleCellExperiment} class
