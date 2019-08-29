@@ -284,19 +284,21 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 #' @param x object; vector
 #' @param out.prefix character; output prefix [default: NULL]
 #' @param G integer; number of components [default: NULL]
+#' @param topNAsHi integer; treat this number of top components as high [default: 1]
 #' @param e.TH double; for plot purpose: comparing the components with the user defined threhold [default: NULL]
 #' @param e.name character; name of the expression metric [default: "Exp"]
 #' @param verbose logical; [default: F]
 #' @param draw.CI logical; [default: T]
 #' @param zero.as.low logical; [default: T]
+#' @param my.seed integer; [default: 9997]
 #' @param ... parameters passed to plot.densityMclust
 #' @import data.table
 #' @import ggplot2 
 #' @import mclust
 #' @details use mixture model to classify each data point. If G is null, the largest component is corresponding to binarized expression 1, and other components are corresponding to binarized expressed 0.
 #' @export
-binarizeExp <- function(x,out.prefix=NULL,G=NULL,e.TH=NULL,e.name="Exp",verbose=F,
-                         draw.CI=T, zero.as.low=T,...)
+binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Exp",verbose=F,
+                         draw.CI=T, zero.as.low=T,my.seed=9997,...)
 {
   ###require(mclust)
   if(!is.null(names(x))){
@@ -318,18 +320,19 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,e.TH=NULL,e.name="Exp",verbose=
   }
 
   x <- x[f]
+  set.seed(my.seed)
   x_mix <- densityMclust(x,G=G,modelNames=c("E","V"))
   x_mix_summary <- summary(x_mix)
   
-  if(verbose && !is.null(ofile)){
+  if(verbose && !is.null(out.prefix)){
 	  print(x_mix_summary)
-      if(grepl(".png$",ofile,perl = T)){
-          png(ofile,width=800,height=600)
+      if(grepl(".png$",out.prefix,perl = T)){
+          png(out.prefix,width=800,height=600)
 	      old_par<-par(no.readonly=T)
 	      layout(matrix(c(1,1,1,1,1,1,2,3,4), 3, 3, byrow = TRUE))
 	      a_par<-par(cex.axis=2,cex.lab=2,cex.main=1.8,mar=c(5,6,4,2)+0.1)
       }else{
-          pdf(ofile,width=8,height=6)
+          pdf(out.prefix,width=8,height=6)
       }
 	  plot(x_mix,what="density",data=x,breaks=50,col="darkgreen",lwd=2,main="",...)
 	  abline(v=x_mix_summary$mean,lty=2)
@@ -359,8 +362,7 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,e.TH=NULL,e.name="Exp",verbose=
   o.df[names(x_mix$classification),"bin.Exp"] <- x_mix$classification 
   colnames(o.df)[2] <- e.name
   if(is.null(G)){
-      iG.2nd <- x_mix$G-1
-      iG.1st <- x_mix$G
+      iG.2nd <- x_mix$G-topNAsHi
       f.low <- o.df[[e.name]] <= iG.2nd 
       o.df[[e.name]][f.low] <- 0
       o.df[[e.name]][!f.low] <- 1
