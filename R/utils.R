@@ -762,6 +762,9 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 {
     if (is.null(batch) && is.null(covariates))
         return(as.matrix(x))
+	if(!is.null(batch) && length(unique(batch))==1){
+		return(t(scale(t(as.matrix(x)),scale=F)))
+	}
     if (!is.null(batch)) {
         batch <- as.factor(batch)
         batch <- model.matrix(~batch)

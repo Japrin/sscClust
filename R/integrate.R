@@ -267,6 +267,18 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 	dat.plot <- as.data.table(ldply(dat.list,function(x){ x$dat.plot }))
 	gene.core.tb <- as.data.table(ldply(dat.list,function(x){ x$gene.core.tb }))
 
+	ocluster <- unique(dat.plot[,c("dataset.id","meta.cluster")])
+	binExp.list <- llply(seq_len(nrow(ocluster)),function(i){
+							 dat.block <- dat.plot[dataset.id==ocluster$dataset.id[i] &
+												   meta.cluster==ocluster$meta.cluster[i],]
+						     gscore <- dat.block$sig.score
+							 names(gscore) <- dat.block$cellID
+						     dat.binExp <- binarizeExp(gscore,out.prefix=sprintf("%s.sigGene.value.dist.%s.%s.png",
+															  out.prefix,ocluster$dataset.id[i],ocluster$meta.cluster[i]),
+													   G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,
+													   draw.CI=T, zero.as.low=T,my.seed=9997)
+									})
+
     if(!is.null(out.prefix)){
 		p <- ggplot(dat.plot, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
 			##geom_histogram(aes(y=..density..), colour="black", fill="white")+
@@ -284,12 +296,13 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 #' @param x object; vector
 #' @param out.prefix character; output prefix [default: NULL]
 #' @param G integer; number of components [default: NULL]
-#' @param topNAsHi integer; treat this number of top components as high [default: 1]
+#' @param topNAsHi integer; treat this number of top components as high;if it's zero, components with mean larger than 0 are high [default: 1]
 #' @param e.TH double; for plot purpose: comparing the components with the user defined threhold [default: NULL]
 #' @param e.name character; name of the expression metric [default: "Exp"]
 #' @param verbose logical; [default: F]
 #' @param draw.CI logical; [default: T]
 #' @param zero.as.low logical; [default: T]
+#' @param zero.notUsed logical; [default: F]
 #' @param my.seed integer; [default: 9997]
 #' @param ... parameters passed to plot.densityMclust
 #' @import data.table
@@ -298,7 +311,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 #' @details use mixture model to classify each data point. If G is null, the largest component is corresponding to binarized expression 1, and other components are corresponding to binarized expressed 0.
 #' @export
 binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Exp",verbose=F,
-                         draw.CI=T, zero.as.low=T,my.seed=9997,...)
+                         draw.CI=T, zero.as.low=T,zero.notUsed=F,my.seed=9997,...)
 {
   ###require(mclust)
   if(!is.null(names(x))){
@@ -308,8 +321,11 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
     o.df <- data.frame(sample=sprintf("S%04d",seq_along(x)),bin.Exp=-1,o.Exp=x,stringsAsFactors = F)
   }
   rownames(o.df) <- o.df$sample
-  #f<-is.finite(x) & x>0
-  f<-is.finite(x)
+  if(zero.notUsed){
+    f<-is.finite(x) & x>0
+  }else{
+	f<-is.finite(x)
+  }
   if(sum(f)<3){
       colnames(o.df) <- c("sample",e.name)
       if(verbose){
@@ -321,7 +337,7 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 
   x <- x[f]
   set.seed(my.seed)
-  x_mix <- densityMclust(x,G=G,modelNames=c("E","V"))
+  x_mix <- mclust::densityMclust(x,G=G,modelNames=c("E","V"))
   x_mix_summary <- summary(x_mix)
   
   if(verbose && !is.null(out.prefix)){
@@ -352,9 +368,12 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
         if(draw.CI){ rect(d[1],0,d[2],e+0.02,col=NA,border="blue") }
 		#rect(d[1],0,d[2],e+0.02,col=rgb(0,0,0.8,0.2),border=NA)
 	  }
+
 	  plot(x_mix,data=x,breaks=20,col="darkgreen",lwd=2,what="BIC")
-	  densityMclust.diagnostic(x_mix,type = "cdf",cex.lab=1.5)
-	  densityMclust.diagnostic(x_mix,type = "qq")
+	  mclust::densityMclust.diagnostic(x_mix,type = "cdf",cex.lab=1.5)
+	  tryCatch({
+		mclust::densityMclust.diagnostic(x_mix,type = "qq")
+	  },error=function(e){ cat(sprintf("Error in  densityMclust.diagnostic(x_mix,type = \"qq\")\n")); print(e); e })
 	  dev.off()
   }
   
@@ -362,7 +381,11 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
   o.df[names(x_mix$classification),"bin.Exp"] <- x_mix$classification 
   colnames(o.df)[2] <- e.name
   if(is.null(G)){
-      iG.2nd <- x_mix$G-topNAsHi
+	  if(topNAsHi==0){
+		iG.2nd <- x_mix$G - sum(x_mix_summary$mean > 0)
+	  }else{
+		iG.2nd <- x_mix$G-topNAsHi
+	  }
       f.low <- o.df[[e.name]] <= iG.2nd 
       o.df[[e.name]][f.low] <- 0
       o.df[[e.name]][!f.low] <- 1
