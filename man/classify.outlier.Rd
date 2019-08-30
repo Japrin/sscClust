@@ -4,12 +4,14 @@
 \alias{classify.outlier}
 \title{outlier detection using extremevalues}
 \usage{
-classify.outlier(x, out.prefix = NULL)
+classify.outlier(x, out.prefix = NULL, e.name = "Exp")
 }
 \arguments{
 \item{x}{object; vector}
 
 \item{out.prefix}{character; output prefix [default: NULL]}
+
+\item{e.name}{character; name of the expression metric [default: "Exp"]}
 }
 \description{
 outlier detection using extremevalues

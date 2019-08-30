@@ -174,9 +174,11 @@ plot.density2D <- function(x,peaks=NULL)
 #' @param row.split vector; used for row; (default: NULL)
 #' @param returnHT logical; whether return HT; (default: FALSE)
 #' @param par.legend list; lengend parameters, used to overwrite the default setting; (default: list())
+#' @param score.alpha double; for row/column score; (default: 1.5)
 #' @param pdf.width double; width of the output plot (default: 22)
 #' @param pdf.height double; height of the output plot (default: 22)
 #' @param exp.name character; showd in the legend (default: "Count")
+#' @param ... parameters passed to ComplexHeatmap::draw
 #' @import data.table
 #' @import ggplot2
 #' @importFrom ggpubr ggscatter
@@ -189,8 +191,8 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
                                waterfall.row=FALSE,waterfall.column=FALSE,
                                row.ann.dat=NULL,row.split=NULL,returnHT=FALSE,
-                               par.legend=list(),
-                               pdf.width=8,pdf.height=8,exp.name="Count")
+                               par.legend=list(),score.alpha=1.5,
+                               pdf.width=8,pdf.height=8,exp.name="Count",...)
 {
     require("gplots")
     require("ComplexHeatmap")
@@ -205,18 +207,15 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
     }
     scoreVec = function(x) {
         score = 0
-        x <- x^100
+        if(all(x<1)){ x <- x^100 }
         x <- x/sum(x)
         m <- length(x)
-        score <- sum(1.5^(-seq_len(m)) * x)
+        score <- sum(score.alpha^(-seq_len(m)) * x)
         if(is.na(score)) { score <- 0 }
-        #for (i in 1:m){
-        #    if (x[i]) {
-        #        score = score + 1.5^(-i) * (x[i])
-        #        ##score = score + 10^( - (i/m) * 100/x[i])
-        #    }
-        #}
         return(score)
+    }
+    if(!is.null(row.split) && is.null(names(row.split))){
+        names(row.split) <- rownames(dat)
     }
     dat.ordered <- dat
     if(clust.row=="cutreeDynamic"){
@@ -275,6 +274,10 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
             par.legend.used[[ipar]] <- par.legend[[ipar]]
         }
     }
+    if(!is.null(row.split)){
+        row.split <- row.split[rownames(dat)]
+    }
+
     ht <- ComplexHeatmap::Heatmap(dat, name = exp.name,
                   col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
                   cluster_columns=clust.column,cluster_rows=clust.row,
@@ -286,7 +289,7 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
                   show_row_dend = show.dendrogram,
                   show_column_dend = show.dendrogram,
                   heatmap_legend_param = par.legend.used,
-                  cell_fun = my.cell_fun)
+                  cell_fun = my.cell_fun,...)
     if(!is.null(row.ann.dat)){
         for(idx in colnames(row.ann.dat)){
             idx.col <- NULL

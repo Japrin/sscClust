@@ -302,6 +302,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 #' @param verbose logical; [default: F]
 #' @param draw.CI logical; [default: T]
 #' @param zero.as.low logical; [default: T]
+#' @param run.extremevalue logical; [default: F]
 #' @param zero.notUsed logical; [default: F]
 #' @param my.seed integer; [default: 9997]
 #' @param ... parameters passed to plot.densityMclust
@@ -311,7 +312,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 #' @details use mixture model to classify each data point. If G is null, the largest component is corresponding to binarized expression 1, and other components are corresponding to binarized expressed 0.
 #' @export
 binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Exp",verbose=F,
-                         draw.CI=T, zero.as.low=T,zero.notUsed=F,my.seed=9997,...)
+                         draw.CI=T, zero.as.low=T,run.extremevalue=F,zero.notUsed=F,my.seed=9997,...)
 {
   ###require(mclust)
   if(!is.null(names(x))){
@@ -340,6 +341,18 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
   x_mix <- mclust::densityMclust(x,G=G,modelNames=c("E","V"))
   x_mix_summary <- summary(x_mix)
   
+  quantEstDist <- mclust::quantileMclust(x_mix, p = ppoints(length(x)))
+  quantSample <- sort(x_mix$data)
+  res.lm <- lm(y~x,data=data.frame(x=quantEstDist,y=quantSample))
+  res.lm.summ <- summary(res.lm)
+  ret.gof <- list(R2=res.lm.summ$r.squared)
+
+  dat.extra <- NULL
+  if(run.extremevalue){
+    ###dat.extra <- classify.outlier(x,out.prefix=sprintf("%s.extremevalue",out.prefix))
+    dat.extra <- classify.outlier(x,out.prefix=NULL)
+  }
+
   if(verbose && !is.null(out.prefix)){
 	  print(x_mix_summary)
       if(grepl(".png$",out.prefix,perl = T)){
@@ -438,7 +451,7 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 	  o.df[f.hi,e.name] <- 1
   }
   if(verbose){
-	return(list(x_mix=x_mix,o.df=o.df))
+	return(list(x_mix=x_mix,o.df=o.df,gof=ret.gof,dat.extra=dat.extra))
   }else{
 	return(structure(o.df[,e.name],names=rownames(o.df)))
   }
@@ -448,12 +461,13 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 #' outlier detection using extremevalues
 #' @param x object; vector
 #' @param out.prefix character; output prefix [default: NULL]
+#' @param e.name character; name of the expression metric [default: "Exp"]
 #' @import data.table
 #' @import ggplot2 
 #' @import extremevalues
 #' @details outlier detection using extremevalues
 #' @export
-classify.outlier <- function(x,out.prefix=NULL)
+classify.outlier <- function(x,out.prefix=NULL,e.name="Exp")
 {
 	##### outlier detection (use method I at last)
 	K <- getOutliers(x,method="I",distribution="normal")
@@ -461,15 +475,21 @@ classify.outlier <- function(x,out.prefix=NULL)
 
 	ii <- seq(K$limit[1], K$limit[2],0.01)
     x.fit <- dnorm(ii,mean = K$mu,sd = K$sigma)
-    ret.1 <- data.table(score=x)
-    ret.1[,score.cls:=0]
-    ret.1[K$iRight,score.cls:=1]
+
+    if(is.null(names(x))){ names(x) <- sprintf("S%04d",seq_along(x)) }
+    ret.1 <- data.frame(sample=names(x),bin.Exp=-1,o.Exp=x,stringsAsFactors=F)
+    ret.1[,classification:=bin.Exp]
+    colnames(ret.1)[2] <- e.name
+
+    ##ret.1 <- data.table(score=x)
+    ##ret.1[,score.cls:=0]
+    ret.1[K$iRight,bin.Exp:=1]
 
     ret.2 <- data.table(score=ii,density=x.fit)
 
 	##### plot #####
     if(!is.null(out.prefix)){
-        pdf(sprintf("%s.outlier.pdf",out.prefix),width = 10,height = 6)
+        pdf(sprintf("%s.extremevalues.outlier.pdf",out.prefix),width = 10,height = 6)
         opar <- par(mfrow=c(1,2))
         outlierPlot(x,K,mode="qq")
         outlierPlot(x,L,mode="residual")
@@ -479,7 +499,7 @@ classify.outlier <- function(x,out.prefix=NULL)
 	    p <- ggplot(ret.1, aes(score)) + geom_density(colour="black") + theme_bw() +
 		        geom_line(data=ret.2,aes(x=score,y=density),colour="red") +
 		        geom_vline(xintercept = K$limit,linetype=2)
-	    ggsave(filename = sprintf("%s.density.pdf",out.prefix),width = 4,height = 3)
+	    ggsave(filename = sprintf("%s.extremevalues.density.pdf",out.prefix),width = 4,height = 3)
     }
     return(list("score.cls.tb"=ret.1,"fit.value.tb"=ret.2,"K"=K,"R2"=K$R2))
 }

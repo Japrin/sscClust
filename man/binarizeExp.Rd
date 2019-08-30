@@ -4,8 +4,10 @@
 \alias{binarizeExp}
 \title{binarize the expression value using the distribution}
 \usage{
-binarizeExp(x, out.prefix = NULL, G = NULL, e.TH = NULL,
-  e.name = "Exp", verbose = F, draw.CI = T, zero.as.low = T, ...)
+binarizeExp(x, out.prefix = NULL, G = NULL, topNAsHi = 1,
+  e.TH = NULL, e.name = "Exp", verbose = F, draw.CI = T,
+  zero.as.low = T, run.extremevalue = F, zero.notUsed = F,
+  my.seed = 9997, ...)
 }
 \arguments{
 \item{x}{object; vector}
@@ -13,6 +15,8 @@ binarizeExp(x, out.prefix = NULL, G = NULL, e.TH = NULL,
 \item{out.prefix}{character; output prefix [default: NULL]}
 
 \item{G}{integer; number of components [default: NULL]}
+
+\item{topNAsHi}{integer; treat this number of top components as high;if it's zero, components with mean larger than 0 are high [default: 1]}
 
 \item{e.TH}{double; for plot purpose: comparing the components with the user defined threhold [default: NULL]}
 
@@ -23,6 +27,12 @@ binarizeExp(x, out.prefix = NULL, G = NULL, e.TH = NULL,
 \item{draw.CI}{logical; [default: T]}
 
 \item{zero.as.low}{logical; [default: T]}
+
+\item{run.extremevalue}{logical; [default: F]}
+
+\item{zero.notUsed}{logical; [default: F]}
+
+\item{my.seed}{integer; [default: 9997]}
 
 \item{...}{parameters passed to plot.densityMclust}
 }
