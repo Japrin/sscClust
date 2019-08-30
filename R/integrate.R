@@ -237,10 +237,14 @@ integrate.by.avg <- function(sce.list,
 #' @details classify cells using the signature genes
 #' @export
 classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",out.prefix=NULL,
-                                    adjB=NULL,
+                                    adjB=NULL,meta.cluster=NULL,
                                     sig.prevelance=0.5)
 {
-    mcls <- unique(gene.desc.top$meta.cluster)
+	if(is.null(meta.cluster)){
+		mcls <- unique(gene.desc.top$meta.cluster)
+	}else{
+		mcls <- meta.cluster
+	}
 
     dat.list <- (llply(seq_along(mcls),function(j){
         gene.desc.top.j <- gene.desc.top[meta.cluster==mcls[j],]
@@ -248,10 +252,12 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 		gene.core.tb <- gene.desc.top.j[,.(N=.N),by=c("meta.cluster","geneID")][N>sig.prevelance*ncluster,]
 		gene.core.tb$meta.cluster.size <- ncluster
 		gene.core.tb$Group <- gene.core.tb$meta.cluster
+		gene.core.tb <- head(gene.core.tb,n=10)
 		dat.plot.j <- ldply(seq_along(obj.list),function(i){
 							  obj <- obj.list[[i]]
 							  gene.used <- rownames(obj)[match(gene.core.tb$geneID,rowData(obj)$display.name)]
 							  gene.used <- gene.used[!is.na(gene.used)]
+							  ##gene.used <- head(gene.used,n=5)
 							  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
 							  if(!is.null(adjB)){
 								dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
@@ -268,6 +274,10 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 	gene.core.tb <- as.data.table(ldply(dat.list,function(x){ x$gene.core.tb }))
 
 	ocluster <- unique(dat.plot[,c("dataset.id","meta.cluster")])
+
+    RhpcBLASctl::omp_set_num_threads(1)
+    registerDoParallel(cores = 24)
+
 	binExp.list <- llply(seq_len(nrow(ocluster)),function(i){
 							 dat.block <- dat.plot[dataset.id==ocluster$dataset.id[i] &
 												   meta.cluster==ocluster$meta.cluster[i],]
@@ -275,9 +285,15 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 							 names(gscore) <- dat.block$cellID
 						     dat.binExp <- binarizeExp(gscore,out.prefix=sprintf("%s.sigGene.value.dist.%s.%s.png",
 															  out.prefix,ocluster$dataset.id[i],ocluster$meta.cluster[i]),
-													   G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,
+													   G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,run.extremevalue=T,
 													   draw.CI=T, zero.as.low=T,my.seed=9997)
-									})
+							 dat.binExp$o.df$dataset.id <- ocluster$dataset.id[i]
+							 dat.binExp$o.df$meta.cluster <- ocluster$meta.cluster[i]
+							 return(dat.binExp)
+									},.parallel=T)
+	binExp.merge <- as.data.table(ldply(binExp.list,function(x){ x$o.df }))
+	binExp.merge <- dcast(binExp.merge,sample+dataset.id~meta.cluster,value.var="Exp")
+	
 
     if(!is.null(out.prefix)){
 		p <- ggplot(dat.plot, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
@@ -343,9 +359,17 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
   
   quantEstDist <- mclust::quantileMclust(x_mix, p = ppoints(length(x)))
   quantSample <- sort(x_mix$data)
-  res.lm <- lm(y~x,data=data.frame(x=quantEstDist,y=quantSample))
-  res.lm.summ <- summary(res.lm)
-  ret.gof <- list(R2=res.lm.summ$r.squared)
+  quantEstDist.debug <<- quantEstDist
+  x.debug <<- x
+  x_mix.debug <<- x_mix
+  ret.gof <- list(R2=NA)
+  tryCatch({
+	  res.lm <- lm(y~x,data=data.frame(x=quantEstDist,y=quantSample))
+	  res.lm.summ <- summary(res.lm)
+	  ret.gof <- list(R2=res.lm.summ$r.squared)
+  },error=function(e){
+	  print(e)
+  })
 
   dat.extra <- NULL
   if(run.extremevalue){
@@ -477,13 +501,12 @@ classify.outlier <- function(x,out.prefix=NULL,e.name="Exp")
     x.fit <- dnorm(ii,mean = K$mu,sd = K$sigma)
 
     if(is.null(names(x))){ names(x) <- sprintf("S%04d",seq_along(x)) }
-    ret.1 <- data.frame(sample=names(x),bin.Exp=-1,o.Exp=x,stringsAsFactors=F)
-    ret.1[,classification:=bin.Exp]
-    colnames(ret.1)[2] <- e.name
-
+    ret.1 <- data.frame(sample=names(x),bin.Exp=0,o.Exp=x,stringsAsFactors=F)
     ##ret.1 <- data.table(score=x)
     ##ret.1[,score.cls:=0]
-    ret.1[K$iRight,bin.Exp:=1]
+    ret.1$bin.Exp[K$iRight] <- 1
+    ret.1$classification <- ret.1$bin.Exp
+    colnames(ret.1)[2] <- e.name
 
     ret.2 <- data.table(score=ii,density=x.fit)
 
