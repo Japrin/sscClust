@@ -5,7 +5,8 @@
 \title{plot genes expression in pairs of clusters to examine the correlation}
 \usage{
 classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
-  out.prefix = NULL, adjB = NULL, sig.prevelance = 0.5)
+  out.prefix = NULL, adjB = NULL, meta.cluster = NULL,
+  sig.prevelance = 0.5)
 }
 \arguments{
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}

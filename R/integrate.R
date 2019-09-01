@@ -9,6 +9,8 @@
 #' @param avg.by character; calculate the average expression of cells group by the specifid column (default: "majorCluster")
 #' @param n.downsample integer; number of cells in each cluster to downsample to (default: NULL)
 #' @param n.pc integer; number of pc ot use (default: 15)
+#' @param de.stat character; column in gene.de.file (default: "t")
+#' @param de.thres double; DE genes present not less than this number in datasets will be used (default: 1)
 #' @param method.avg character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")
 #' @param topGene.lo double; for top gene heatmap.(default: -1.5)
 #' @param topGene.hi double; for top gene heatmap.(default: 1.5)
@@ -25,6 +27,7 @@ integrate.by.avg <- function(sce.list,
                              avg.by="majorCluster",
 							 n.downsample=NULL,
 							 n.pc=15,
+							 de.stat="t",de.thres=1,
 							 ###par.clust=list(deepSplit=4, minClusterSize=2,method="dynamicTreeCut"),
 							 par.clust=list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2),
                              topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,
@@ -66,11 +69,17 @@ integrate.by.avg <- function(sce.list,
         }
         for(i in seq_along(gene.de.list)){
             if(length(gene.de.common)==0)
-                gene.de.common <- gene.de.list[[i]]$geneID
+                gene.de.common <- unique(gene.de.list[[i]]$geneID)
             else
-                gene.de.common <- c(gene.de.common,gene.de.list[[i]]$geneID)
+                gene.de.common <- c(gene.de.common,unique(gene.de.list[[i]]$geneID))
         }
-        gene.de.common <- unique(gene.de.common)
+        #gene.de.common <- unique(gene.de.common)
+		de.gene.ntimes <- table(gene.de.common)
+		if(de.thres>=1){
+			gene.de.common <- names(de.gene.ntimes[de.gene.ntimes >= de.thres])
+		}else{
+			gene.de.common <- names(de.gene.ntimes[de.gene.ntimes >= de.thres*length(gene.de.list)])
+		}
 		loginfo(sprintf("total number %d deg in the union set ",length(gene.de.common)))
         #gene.common <- intersect(gene.common,gene.de.common)
     }
@@ -177,10 +186,11 @@ integrate.by.avg <- function(sce.list,
 		##### top de genes
 		gene.desc.top <- as.data.table(ldply(names(gene.de.list),function(aid){
 								   gene.de.list[[aid]]$Group <- sprintf("%s.%s",aid,gene.de.list[[aid]][["cluster"]])
-								   return(gene.de.list[[aid]][,c("geneID","geneSymbol","t","cluster","Group"),with=F])
+								   return(gene.de.list[[aid]][,c("geneID","geneSymbol",de.stat,"cluster","Group"),with=F])
 								   }))
 		gene.desc.top$meta.cluster <- sce.pb$pca.SNN.kauto[match(gene.desc.top$Group,colnames(sce.pb))]
-		gene.desc.top <- gene.desc.top[order(meta.cluster,-t,Group),]
+		###gene.desc.top <- gene.desc.top[order(meta.cluster,-t,Group),]
+		gene.desc.top[ order(gene.desc.top$meta.cluster,-gene.desc.top[[de.stat]],gene.desc.top$Group),]
 		saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
 		##gene.desc.top <- readRDS(sprintf("%s.gene.desc.top.rds",out.prefix))
 

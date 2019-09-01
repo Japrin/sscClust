@@ -5,7 +5,7 @@
 \title{run limma, given an expression matrix}
 \usage{
 run.limma.matrix(xdata, xlabel, batch = NULL, out.prefix = NULL,
-  ncell.downsample = NULL, T.fdr = 0.05, T.logFC = 1, verbose = F,
+  ncell.downsample = NULL, T.fdr = 0.05, T.logFC = 1, verbose = 0,
   n.cores = NULL, group = NULL, gid.mapping = NULL, do.voom = F,
   rn.seed = 9999)
 }
@@ -24,7 +24,7 @@ run.limma.matrix(xdata, xlabel, batch = NULL, out.prefix = NULL,
 
 \item{T.logFC}{numeric; threshold of the absoute diff (default: 1)}
 
-\item{verbose}{logical; verbose (default: F)}
+\item{verbose}{integer; verbose (default: 0)}
 
 \item{n.cores}{integer; number of cores used, if NULL it will be determined automatically (default: NULL)}
 

@@ -787,7 +787,7 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 #' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param T.fdr numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)
 #' @param T.logFC numeric; threshold of the absoute diff (default: 1)
-#' @param verbose logical; verbose (default: F)
+#' @param verbose integer; verbose (default: 0)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 #' @param group character; group of interest, if NULL the last group will be used (default: NULL)
 #' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
@@ -799,7 +799,7 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @export
 run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsample=NULL,
-                             T.fdr=0.05,T.logFC=1,verbose=F,n.cores=NULL,group=NULL,
+                             T.fdr=0.05,T.logFC=1,verbose=0,n.cores=NULL,group=NULL,
                              gid.mapping=NULL, do.voom=F,rn.seed=9999)
 {
 	suppressPackageStartupMessages(require("limma"))
@@ -833,7 +833,13 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 	}else{
 		x.levels <- unique(sort(xlabel))
 	}
+	group.dis <- NULL
     if(!is.null(group)){
+		tmp.group <- unlist(strsplit(group,":"))
+		group <- tmp.group[1]
+		if(length(tmp.group)>1){
+			group.dis <- tmp.group[2]
+		}
         x.levels <- c(setdiff(x.levels,group),as.character(group))
     }
 
@@ -887,37 +893,51 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     }
 	all.table <- cbind(data.table(geneID=rownames(all.table),
                                   geneSymbol=if(is.null(gid.mapping)) rownames(all.table) else gid.mapping[rownames(all.table)],
-                                  cluster=group.label,
+                                  cluster=if(is.null(group.dis)) group.label else group.dis,
                                   stringsAsFactors = F),
                        all.table)
 
-    .getMean <- function(inDat,str.note=NULL){
-        .Grp.mean <- t(apply(inDat,1,function(x){
-                                 .mexp <- aggregate(x ~ design.df$xlabel, FUN = mean)
-                                 structure(.mexp[,2],names=sprintf("mean.%s",.mexp[,1])) }))
+    .getStatistics <- function(inDat,str.note=NULL,stat="mean"){
+        .Grp.stat <- t(apply(inDat,1,function(x){
+                                 .mexp <- aggregate(x ~ design.df$xlabel, FUN = if(stat=="mean") mean else if(stat=="sd") sd)
+                                 structure(.mexp[,2],names=sprintf("%s.%s",stat,.mexp[,1]))
+								  }))
         if(!is.null(str.note)){
-            colnames(.Grp.mean) <- sprintf("%s.%s",colnames(.Grp.mean),str.note)
+            colnames(.Grp.stat) <- sprintf("%s.%s",colnames(.Grp.stat),str.note)
         }
-        .Grp.mean.df <- data.table(geneID=rownames(.Grp.mean),stringsAsFactors = F)
-        .Grp.mean.df <- cbind(.Grp.mean.df,.Grp.mean)
+        .Grp.stat.df <- data.table(geneID=rownames(.Grp.stat),stringsAsFactors = F)
+        .Grp.stat.df <- cbind(.Grp.stat.df,.Grp.stat)
     }
-    if(verbose){
+    if(verbose>0){
         if(!is.null(batch)){
              betaV <- fit.00$coefficients
              betaV[is.na(betaV)] <- 0
              idx.batch <- grep("^batch",colnames(design),value = T)
              xdata.rmBE <- as.matrix(xdata) - betaV[,idx.batch,drop=F] %*% t(design[,idx.batch,drop=F])
-            .Grp.mean.df <- .getMean(xdata.rmBE,str.note="rmBE")
+            .Grp.mean.df <- .getStatistics(xdata.rmBE,str.note="rmBE")
             all.table <- merge(all.table,.Grp.mean.df)
 			all.table$meanExp <- all.table[[sprintf("mean.%s.rmBE",group.label)]]
+			if(verbose>1){
+				.Grp.sd.df <- .getStatistics(xdata.rmBE,str.note="rmBE",stat="sd")
+				all.table <- merge(all.table,.Grp.sd.df)
+				colName.sd <- grep("^sd.",colnames(all.table),value=T)
+				all.table$SNR <- all.table$logFC/rowSums(all.table[,colName.sd,with=F])
+			}
         }else{
-            .Grp.mean.df <- .getMean(xdata)
+            .Grp.mean.df <- .getStatistics(xdata)
             all.table <- merge(all.table,.Grp.mean.df)
 			all.table$meanExp <- all.table[[sprintf("mean.%s",group.label)]]
+			if(verbose>1){
+				.Grp.sd.df <- .getStatistics(xdata,stat="sd")
+				all.table <- merge(all.table,.Grp.sd.df)
+				colName.sd <- grep("^sd.",colnames(all.table),value=T)
+				all.table$SNR <- all.table$logFC/rowSums(all.table[,colName.sd,with=F])
+			}
         }
     }
 
     all.table <- all.table[order(adj.P.Val,-t,-logFC),]
+
     #print(head(all.table))
     sig.table <- all.table[adj.P.Val<T.fdr & abs(logFC)>T.logFC,]
     if(!is.null(out.prefix))
