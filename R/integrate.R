@@ -11,6 +11,7 @@
 #' @param n.pc integer; number of pc ot use (default: 15)
 #' @param de.stat character; column in gene.de.file (default: "t")
 #' @param de.thres double; DE genes present not less than this number in datasets will be used (default: 1)
+#' @param do.scale logical; scale the summarized vectors (default: false)
 #' @param method.avg character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")
 #' @param topGene.lo double; for top gene heatmap.(default: -1.5)
 #' @param topGene.hi double; for top gene heatmap.(default: 1.5)
@@ -27,7 +28,7 @@ integrate.by.avg <- function(sce.list,
                              avg.by="majorCluster",
 							 n.downsample=NULL,
 							 n.pc=15,
-							 de.stat="t",de.thres=1,
+							 de.stat="t",de.thres=1,do.scale=F,
 							 ###par.clust=list(deepSplit=4, minClusterSize=2,method="dynamicTreeCut"),
 							 par.clust=list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2),
                              topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,
@@ -112,24 +113,36 @@ integrate.by.avg <- function(sce.list,
     names(sce.avg.list) <- names(sce.list)
 
 	loginfo(sprintf("get the average expression data across datasets "))
-    dat.avg.mtx <- NULL
-    for(aid in names(sce.avg.list)){
-        if(is.null(dat.avg.mtx)){
-            dat.avg.mtx <- assay(sce.avg.list[[aid]],assay.name)
-        }else{
-            dat.avg.mtx <- cbind(dat.avg.mtx,assay(sce.avg.list[[aid]],assay.name))
-        }
-    }
-
+	sce.pb <- NULL
+	for(xx in assayNames(sce.avg.list[[1]])){
+		dat.avg.mtx <- NULL
+		for(aid in names(sce.avg.list)){
+			if(is.null(dat.avg.mtx)){
+				dat.avg.mtx <- assay(sce.avg.list[[aid]],xx)
+			}else{
+				dat.avg.mtx <- cbind(dat.avg.mtx,assay(sce.avg.list[[aid]],xx))
+			}
+		}
+		if(is.null(sce.pb)){
+			sce.pb <- ssc.build(dat.avg.mtx,assay.name=xx)
+		}else{
+			assay(sce.pb,xx) <- dat.avg.mtx
+		}
+	}
+	assay(sce.pb,"exprs") <- assay(sce.pb,assay.name)
+	rowData(sce.pb)$gene.de.common <- rownames(sce.pb) %in% gene.de.common
     ###  clustering the pseudo bulk data
     #all(rownames(dat.avg.mtx)==rownames(sce.avg.list[[1]]))
 	loginfo(sprintf("cluster the pseudo-bulk samples..."))
-    sce.pb <- ssc.build(dat.avg.mtx)
 
-    rowData(sce.pb)$gene.de.common <- rownames(sce.pb) %in% gene.de.common
-
-    sce.pb <- ssc.reduceDim(sce.pb,method="pca",method.vgene="gene.de.common",
-                            pca.npc=n.pc,seed=9997)
+	if(do.scale){
+		assay(sce.pb,"exprs.scale") <- t(scale(t(assay(sce.pb,"exprs"))))
+		sce.pb <- ssc.reduceDim(sce.pb,assay.name="exprs.scale",
+								method="pca",method.vgene="gene.de.common", pca.npc=n.pc,seed=9997)
+	}else{
+		sce.pb <- ssc.reduceDim(sce.pb,assay.name="exprs",
+								method="pca",method.vgene="gene.de.common", pca.npc=n.pc,seed=9997)
+	}
 
     #ssc.plot.pca(sce.pb)
     m <- regexec("^(.+?)\\.",colnames(sce.pb),perl=T)
@@ -184,13 +197,17 @@ integrate.by.avg <- function(sce.list,
 
 	if(!is.null(gene.de.list) && "pca.SNN.kauto" %in% colnames(colData(sce.pb))){
 		##### top de genes
-		gene.desc.top <- as.data.table(ldply(names(gene.de.list),function(aid){
-								   gene.de.list[[aid]]$Group <- sprintf("%s.%s",aid,gene.de.list[[aid]][["cluster"]])
-								   return(gene.de.list[[aid]][,c("geneID","geneSymbol",de.stat,"cluster","Group"),with=F])
-								   }))
-		gene.desc.top$meta.cluster <- sce.pb$pca.SNN.kauto[match(gene.desc.top$Group,colnames(sce.pb))]
-		###gene.desc.top <- gene.desc.top[order(meta.cluster,-t,Group),]
-		gene.desc.top[ order(gene.desc.top$meta.cluster,-gene.desc.top[[de.stat]],gene.desc.top$Group),]
+#		gene.desc.top <- as.data.table(ldply(names(gene.de.list),function(aid){
+#								   gene.de.list[[aid]]$Group <- sprintf("%s.%s",aid,gene.de.list[[aid]][["cluster"]])
+#								   return(gene.de.list[[aid]][,c("geneID","geneSymbol",de.stat,"cluster","Group"),with=F])
+#								   }))
+#		gene.desc.top$meta.cluster <- sce.pb$pca.SNN.kauto[match(gene.desc.top$Group,colnames(sce.pb))]
+#		###gene.desc.top <- gene.desc.top[order(meta.cluster,-t,Group),]
+#		gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,-gene.desc.top[[de.stat]],gene.desc.top$Group),]
+#		saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
+#		##gene.desc.top <- readRDS(sprintf("%s.gene.desc.top.rds",out.prefix))
+
+		gene.desc.top <- rank.de.gene(sce.pb)
 		saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
 		##gene.desc.top <- readRDS(sprintf("%s.gene.desc.top.rds",out.prefix))
 
@@ -199,10 +216,11 @@ integrate.by.avg <- function(sce.list,
 
 		g.desc <- ldply(sort(unique(gene.desc.top$meta.cluster)),function(mcls){
 					dat.plot <- gene.desc.top[meta.cluster==mcls,]
-					ncluster <- length(unique(sort(dat.plot$Group)))
-					gene.core.tb <- dat.plot[,.(N=.N),by=c("meta.cluster","geneID")][N>0.3*ncluster,]
-					gene.core.tb$meta.cluster.size <- ncluster
-					gene.core.tb$Group <- gene.core.tb$meta.cluster
+					gene.core.tb <- dat.plot[freq.sig>0.3 & median.rank < 0.1,]
+#					ncluster <- length(unique(sort(dat.plot$Group)))
+#					gene.core.tb <- dat.plot[,.(N=.N),by=c("meta.cluster","geneID")][N>0.3*ncluster,]
+#					gene.core.tb$meta.cluster.size <- ncluster
+#					gene.core.tb$Group <- gene.core.tb$meta.cluster
 					g.desc <- head(gene.core.tb[geneID %in% rownames(sce.pb),],n=30)
 					ssc.plot.heatmap(sce.pb,out.prefix=sprintf("%s.gene.top.meta.cluster.%s",out.prefix,mcls),
 							   columns="pca.SNN.kauto",columns.order="pca.SNN.kauto",
@@ -231,6 +249,35 @@ integrate.by.avg <- function(sce.list,
     metadata(sce.pb)$ssc$gene.desc.top <- gene.desc.top
 	loginfo(sprintf("integrate.by.avg run successfully"))
     return(sce.pb)
+}
+
+#' get gene ranking table from obj
+#' @param obj object; object of \code{singleCellExperiment} class
+#' @import data.table
+#' @importFrom plyr ldply
+#' @details rank genes
+rank.de.gene <- function(obj)
+{
+	gene.desc.top <- as.data.table(ldply(unique(sort(obj$pca.SNN.kauto)),function(x){
+											 obj.x <- obj[,obj$pca.SNN.kauto==x]
+											 ret.tb <- data.table(geneID=rownames(obj.x),
+														geneSymbol=rowData(obj.x)$display.name,
+														meta.cluster=x,
+														Group=x,
+														N.sig=rowSums(assay(obj.x,"sig")),
+														meta.cluster.size=ncol(obj.x))
+											 ret.tb[,freq.sig:=N.sig/meta.cluster.size]
+											 anames <- intersect(assayNames(obj.x),c("logFC","t","SNR","meanExp"))
+											 for(aa in anames){
+												 ret.tb[[sprintf("median.%s",aa)]] <- rowMedians(assay(obj.x,aa))
+											 }
+											 ret.tb[["median.rank"]] <- rowMedians(apply(assay(obj.x,"t"),2,
+																					 function(x){ rank(-x)/length(x)}))
+											 return(ret.tb)
+							   }))
+	###gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,-gene.desc.top[[sprintf("mean.%s",de.stat)]]), ]
+	gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,median.rank), ]
+	return(gene.desc.top)
 }
 
 #' plot genes expression in pairs of clusters to examine the correlation
