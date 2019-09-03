@@ -1738,11 +1738,27 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                                       group=xgroup,
                                       T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
                                       gid.mapping=gid.mapping, do.voom=F)
+		
     },.parallel=T)
     names(out) <- group.list
 
     all.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$all }))
     sig.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$sig }))
+
+	if(verbose>2){
+		res.aov <- findDEGenesByAOV(assay(obj,assay.name),clust,batch=batchV, out.prefix=NULL,
+									n.cores=n.cores, gid.mapping=gid.mapping)
+		res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
+		all.table <- merge(all.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
+		sig.table <- merge(sig.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
+		all.table <- all.table[order(cluster,adj.P.Val,-t,-logFC),]
+		sig.table <- sig.table[order(cluster,adj.P.Val,-t,-logFC),]
+	    if(!is.null(out.prefix))
+		{
+			write.table(all.table,sprintf("%s.limma.all.txt",out.prefix),row.names = F,quote = F,sep = "\t")
+			write.table(sig.table,sprintf("%s.limma.sig.txt",out.prefix),row.names = F,quote = F,sep = "\t")
+		}
+	}
 
     return(list(all=all.table,sig=sig.table))
 }

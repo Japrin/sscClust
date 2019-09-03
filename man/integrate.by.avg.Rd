@@ -35,7 +35,7 @@ integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
 
 \item{de.stat}{character; column in gene.de.file (default: "t")}
 
-\item{de.thres}{double; DE genes present not less than this number in datasets will be used (default: 1)}
+\item{de.thres}{double; used for selecting genes. can be larger than 1(top number of genes) or less than 1 (F.rank threshold) (default: 2000)}
 
 \item{do.scale}{logical; scale the summarized vectors (default: false)}
 

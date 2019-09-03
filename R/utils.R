@@ -923,23 +923,6 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 				colName.sd <- grep("^sd.",colnames(all.table),value=T)
 				all.table$SNR <- all.table$logFC/rowSums(all.table[,colName.sd,with=F])
 			}
-			if(verbose>2){
-				res.aov <- ldply(rownames(xdata),function(v){
-					aov.out <- aov(y ~ g+b,data=data.frame(y=xdata[v,],g=xlabel,b=batch))
-					aov.out.s <- summary(aov.out)
-					t.res.f <- data.frame(F=aov.out.s[[1]]["g",c("F value")],
-										  F.pvalue=aov.out.s[[1]]["g",c("Pr(>F)")])
-				},.parallel=T)
-				res.aov$geneID <- rownames(xdata)
-				#res.aov$F.adjp <- p.adjust(res.aov$F.pvalue,method = "BH")
-				res.aov$F.adjp <- 1
-				res.aov.1 <- subset(res.aov,!is.na(F.pvalue))
-				res.aov$F.adjp <- p.adjust(res.aov.1$F.pvalue,method = "BH")
-				res.aov.2 <- subset(res.aov,is.na(F.pvalue))
-				res.aov <- rbind(res.aov.1,res.aov.2)
-			    res.aov <- res.aov[rownames(xdata)]
-				all.table <- merge(all.table,res.aov)
-			}
         }else{
             .Grp.mean.df <- .getStatistics(xdata)
             all.table <- merge(all.table,.Grp.mean.df)
@@ -949,23 +932,6 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 				all.table <- merge(all.table,.Grp.sd.df)
 				colName.sd <- grep("^sd.",colnames(all.table),value=T)
 				all.table$SNR <- all.table$logFC/rowSums(all.table[,colName.sd,with=F])
-			}
-			if(verbose>2){
-				res.aov <- ldply(rownames(xdata),function(v){
-					aov.out <- aov(y ~ g,data=data.frame(y=xdata[v,],g=xlabel))
-					aov.out.s <- summary(aov.out)
-					t.res.f <- data.frame(F=aov.out.s[[1]]["g",c("F value")],
-										  F.pvalue=aov.out.s[[1]]["g",c("Pr(>F)")])
-				},.parallel=T)
-				res.aov$geneID <- rownames(xdata)
-				#res.aov$F.adjp <- p.adjust(res.aov$F.pvalue,method = "BH")
-				res.aov$F.adjp <- 1
-				res.aov.1 <- subset(res.aov,!is.na(F.pvalue))
-				res.aov$F.adjp <- p.adjust(res.aov.1$F.pvalue,method = "BH")
-				res.aov.2 <- subset(res.aov,is.na(F.pvalue))
-				res.aov <- rbind(res.aov.1,res.aov.2)
-			    res.aov <- res.aov[rownames(xdata)]
-				all.table <- merge(all.table,res.aov)
 			}
         }
     }
