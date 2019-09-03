@@ -1675,13 +1675,14 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
 #' @param group.list character; DEG of groups to calculate. If NULL, all groups. (default: "NULL")
+#' @param group.mode character; One of "multi", "multiAsTwo" (default: "multi")
 #' @param batch character; covariate. (default: NULL)
 #' @param out.prefix character; output prefix. (default: NULL)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 #' @param do.plot logical; whether plot. (default: TRUE)
 #' @param T.fdr numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)
 #' @param T.logFC numeric; threshold of the absoute diff (default: 1)
-#' @param verbose logical; whether output all genes' result. (default: FALSE)
+#' @param verbose integer; verbose level. (default: 0)
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom limma lmFit eBayes topTable
 #' @importFrom doParallel registerDoParallel
@@ -1689,10 +1690,10 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @details identify differential genes using limma
 #' @export
 ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
-                                  group.var="majorCluster",group.list=NULL,batch=NULL,
+                                  group.var="majorCluster",group.list=NULL,group.mode="multi",batch=NULL,
                                   out.prefix=NULL,n.cores=NULL, do.plot=T,
                                   T.fdr=0.01,T.logFC=1,
-                                  verbose=F)
+                                  verbose=0)
 {
 #    requireNamespace("doParallel")
     requireNamespace("plyr")
@@ -1726,17 +1727,38 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     doParallel::registerDoParallel(cores = n.cores)
     out <- llply(group.list,function(x){
         xlabel <- clust
-        ##xlabel[xlabel!=x] <- "_control"
+		xgroup <- x
+		if(group.mode=="multiAsTwo"){
+			xlabel[xlabel!=x] <- "_control"
+			xlabel[xlabel==x] <- "_case"
+			xgroup <- sprintf("_case:%s",x)
+		}
         out.limma <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
                                       out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
-                                      group=x,
+                                      group=xgroup,
                                       T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
                                       gid.mapping=gid.mapping, do.voom=F)
+		
     },.parallel=T)
     names(out) <- group.list
 
     all.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$all }))
     sig.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$sig }))
+
+	if(verbose>2){
+		res.aov <- findDEGenesByAOV(assay(obj,assay.name),clust,batch=batchV, out.prefix=NULL,
+									n.cores=n.cores, gid.mapping=gid.mapping)
+		res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
+		all.table <- merge(all.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
+		sig.table <- merge(sig.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
+		all.table <- all.table[order(cluster,adj.P.Val,-t,-logFC),]
+		sig.table <- sig.table[order(cluster,adj.P.Val,-t,-logFC),]
+	    if(!is.null(out.prefix))
+		{
+			write.table(all.table,sprintf("%s.limma.all.txt",out.prefix),row.names = F,quote = F,sep = "\t")
+			write.table(sig.table,sprintf("%s.limma.sig.txt",out.prefix),row.names = F,quote = F,sep = "\t")
+		}
+	}
 
     return(list(all=all.table,sig=sig.table))
 }

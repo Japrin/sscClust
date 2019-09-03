@@ -9,6 +9,9 @@
 #' @param avg.by character; calculate the average expression of cells group by the specifid column (default: "majorCluster")
 #' @param n.downsample integer; number of cells in each cluster to downsample to (default: NULL)
 #' @param n.pc integer; number of pc ot use (default: 15)
+#' @param de.stat character; column in gene.de.file (default: "t")
+#' @param de.thres double; used for selecting genes. can be larger than 1(top number of genes) or less than 1 (F.rank threshold) (default: 2000)
+#' @param do.scale logical; scale the summarized vectors (default: false)
 #' @param method.avg character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")
 #' @param topGene.lo double; for top gene heatmap.(default: -1.5)
 #' @param topGene.hi double; for top gene heatmap.(default: 1.5)
@@ -25,6 +28,7 @@ integrate.by.avg <- function(sce.list,
                              avg.by="majorCluster",
 							 n.downsample=NULL,
 							 n.pc=15,
+							 de.stat="t",de.thres=1,do.scale=F,
 							 ###par.clust=list(deepSplit=4, minClusterSize=2,method="dynamicTreeCut"),
 							 par.clust=list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2),
                              topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,
@@ -49,38 +53,6 @@ integrate.by.avg <- function(sce.list,
     }
     loginfo(sprintf("total %d common genes obtain ",length(gene.common)))
 
-    ##Differential expressed genes
-    gene.de.common <- c()
-    if(use.deg){
-		loginfo(sprintf("use deg "))
-        if(is.null(gene.de.list)){
-            gene.de.list <- list()
-            for(i in seq_along(sce.list)){
-				loginfo(sprintf(">>> cal deg for %s ",names(sce.list)[i]))
-                de.out <- ssc.clusterMarkerGene(sce.list[[i]],assay.name=assay.name,
-												ncell.downsample=n.downsample,
-												n.cores=ncores,group.var=avg.by,...)
-                gene.de.list[[i]] <- de.out$gene.table
-            }
-            names(gene.de.list) <- names(sce.list)
-        }
-        for(i in seq_along(gene.de.list)){
-            if(length(gene.de.common)==0)
-                gene.de.common <- gene.de.list[[i]]$geneID
-            else
-                gene.de.common <- c(gene.de.common,gene.de.list[[i]]$geneID)
-        }
-        gene.de.common <- unique(gene.de.common)
-		loginfo(sprintf("total number %d deg in the union set ",length(gene.de.common)))
-        #gene.common <- intersect(gene.common,gene.de.common)
-    }
-	if(length(gene.de.common)>0){
-		gene.de.common <- intersect(gene.common,gene.de.common)
-	}else{
-		gene.de.common <- gene.common
-	}
-	loginfo(sprintf("total number %d genes will be used ",length(gene.de.common)))
-
     ### cal the average
     RhpcBLASctl::omp_set_num_threads(1)
     doParallel::registerDoParallel(cores = ncores)
@@ -103,24 +75,94 @@ integrate.by.avg <- function(sce.list,
     names(sce.avg.list) <- names(sce.list)
 
 	loginfo(sprintf("get the average expression data across datasets "))
-    dat.avg.mtx <- NULL
-    for(aid in names(sce.avg.list)){
-        if(is.null(dat.avg.mtx)){
-            dat.avg.mtx <- assay(sce.avg.list[[aid]],assay.name)
-        }else{
-            dat.avg.mtx <- cbind(dat.avg.mtx,assay(sce.avg.list[[aid]],assay.name))
-        }
-    }
+	sce.pb <- NULL
+	for(xx in assayNames(sce.avg.list[[1]])){
+		dat.avg.mtx <- NULL
+		for(aid in names(sce.avg.list)){
+			if(is.null(dat.avg.mtx)){
+				dat.avg.mtx <- assay(sce.avg.list[[aid]],xx)
+			}else{
+				dat.avg.mtx <- cbind(dat.avg.mtx,assay(sce.avg.list[[aid]],xx))
+			}
+		}
+		if(is.null(sce.pb)){
+			sce.pb <- ssc.build(dat.avg.mtx,assay.name=xx)
+		}else{
+			assay(sce.pb,xx) <- dat.avg.mtx
+		}
+	}
+	assay(sce.pb,"exprs") <- assay(sce.pb,assay.name)
 
+    ##Differential expressed genes
+    gene.de.common <- c()
+	use.F.avg.rank <- TRUE
+    if(use.deg && !is.null(gene.de.list)){
+		if(use.F.avg.rank){
+			gene.rank.tb <- as.data.table(ldply(names(gene.de.list),function(x){
+													ret.tb <- unique(gene.de.list[[x]][,c("geneID","F.rank")])
+													ret.tb$dataset.id <- x
+													return(ret.tb)
+															 }))
+			gene.rank.tb <- dcast(gene.rank.tb,geneID~dataset.id,value.var="F.rank",fill=1)
+			gene.rank.tb$median.F.rank <- rowMedians(as.matrix(gene.rank.tb[,-c("geneID"),with=F]))
+			gene.rank.tb <- gene.rank.tb[order(median.F.rank),]
+			rowData(sce.pb)$median.F.rank <- gene.rank.tb[["median.F.rank"]][match(rownames(sce.pb),gene.rank.tb$geneID)]
+			gene.rank.tb.debug <<- gene.rank.tb
+			sce.pb.debug <<- sce.pb
+			if(de.thres>=1){
+				gene.de.common <- head(gene.rank.tb$geneID,n=de.thres)
+			}else{
+				gene.de.common <- gene.rank.tb[median.F.rank < de.thres,][["geneID"]]
+			}
+		}else{
+			loginfo(sprintf("use deg "))
+			if(is.null(gene.de.list)){
+				gene.de.list <- list()
+				for(i in seq_along(sce.list)){
+					loginfo(sprintf(">>> cal deg for %s ",names(sce.list)[i]))
+					de.out <- ssc.clusterMarkerGene(sce.list[[i]],assay.name=assay.name,
+													ncell.downsample=n.downsample,
+													n.cores=ncores,group.var=avg.by,...)
+					gene.de.list[[i]] <- de.out$gene.table
+				}
+				names(gene.de.list) <- names(sce.list)
+			}
+			for(i in seq_along(gene.de.list)){
+				if(length(gene.de.common)==0)
+					gene.de.common <- unique(gene.de.list[[i]]$geneID)
+				else
+					gene.de.common <- c(gene.de.common,unique(gene.de.list[[i]]$geneID))
+			}
+			#gene.de.common <- unique(gene.de.common)
+			de.gene.ntimes <- table(gene.de.common)
+			if(de.thres>=1){
+				gene.de.common <- names(de.gene.ntimes[de.gene.ntimes >= de.thres])
+			}else{
+				gene.de.common <- names(de.gene.ntimes[de.gene.ntimes >= de.thres*length(gene.de.list)])
+			}
+			loginfo(sprintf("total number %d deg in the union set ",length(gene.de.common)))
+		}
+    }
+	if(length(gene.de.common)>0){
+		gene.de.common <- intersect(gene.common,gene.de.common)
+	}else{
+		gene.de.common <- gene.common
+	}
+	loginfo(sprintf("total number %d genes will be used ",length(gene.de.common)))
+
+	rowData(sce.pb)$gene.de.common <- rownames(sce.pb) %in% gene.de.common
     ###  clustering the pseudo bulk data
     #all(rownames(dat.avg.mtx)==rownames(sce.avg.list[[1]]))
 	loginfo(sprintf("cluster the pseudo-bulk samples..."))
-    sce.pb <- ssc.build(dat.avg.mtx)
 
-    rowData(sce.pb)$gene.de.common <- rownames(sce.pb) %in% gene.de.common
-
-    sce.pb <- ssc.reduceDim(sce.pb,method="pca",method.vgene="gene.de.common",
-                            pca.npc=n.pc,seed=9997)
+	if(do.scale){
+		assay(sce.pb,"exprs.scale") <- t(scale(t(assay(sce.pb,"exprs"))))
+		sce.pb <- ssc.reduceDim(sce.pb,assay.name="exprs.scale",
+								method="pca",method.vgene="gene.de.common", pca.npc=n.pc,seed=9997)
+	}else{
+		sce.pb <- ssc.reduceDim(sce.pb,assay.name="exprs",
+								method="pca",method.vgene="gene.de.common", pca.npc=n.pc,seed=9997)
+	}
 
     #ssc.plot.pca(sce.pb)
     m <- regexec("^(.+?)\\.",colnames(sce.pb),perl=T)
@@ -175,12 +217,7 @@ integrate.by.avg <- function(sce.list,
 
 	if(!is.null(gene.de.list) && "pca.SNN.kauto" %in% colnames(colData(sce.pb))){
 		##### top de genes
-		gene.desc.top <- as.data.table(ldply(names(gene.de.list),function(aid){
-								   gene.de.list[[aid]]$Group <- sprintf("%s.%s",aid,gene.de.list[[aid]][["cluster"]])
-								   return(gene.de.list[[aid]][,c("geneID","geneSymbol","t","cluster","Group"),with=F])
-								   }))
-		gene.desc.top$meta.cluster <- sce.pb$pca.SNN.kauto[match(gene.desc.top$Group,colnames(sce.pb))]
-		gene.desc.top <- gene.desc.top[order(meta.cluster,-t,Group),]
+		gene.desc.top <- sscClust:::rank.de.gene(sce.pb)
 		saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
 		##gene.desc.top <- readRDS(sprintf("%s.gene.desc.top.rds",out.prefix))
 
@@ -189,10 +226,11 @@ integrate.by.avg <- function(sce.list,
 
 		g.desc <- ldply(sort(unique(gene.desc.top$meta.cluster)),function(mcls){
 					dat.plot <- gene.desc.top[meta.cluster==mcls,]
-					ncluster <- length(unique(sort(dat.plot$Group)))
-					gene.core.tb <- dat.plot[,.(N=.N),by=c("meta.cluster","geneID")][N>0.3*ncluster,]
-					gene.core.tb$meta.cluster.size <- ncluster
-					gene.core.tb$Group <- gene.core.tb$meta.cluster
+					gene.core.tb <- dat.plot[freq.sig>0.3 & median.rank < 0.1,]
+#					ncluster <- length(unique(sort(dat.plot$Group)))
+#					gene.core.tb <- dat.plot[,.(N=.N),by=c("meta.cluster","geneID")][N>0.3*ncluster,]
+#					gene.core.tb$meta.cluster.size <- ncluster
+#					gene.core.tb$Group <- gene.core.tb$meta.cluster
 					g.desc <- head(gene.core.tb[geneID %in% rownames(sce.pb),],n=30)
 					ssc.plot.heatmap(sce.pb,out.prefix=sprintf("%s.gene.top.meta.cluster.%s",out.prefix,mcls),
 							   columns="pca.SNN.kauto",columns.order="pca.SNN.kauto",
@@ -223,6 +261,36 @@ integrate.by.avg <- function(sce.list,
     return(sce.pb)
 }
 
+#' get gene ranking table from obj
+#' @param obj object; object of \code{singleCellExperiment} class
+#' @import data.table
+#' @importFrom plyr ldply
+#' @details rank genes
+#' @return a gene table
+rank.de.gene <- function(obj)
+{
+	gene.desc.top <- as.data.table(ldply(unique(sort(obj$pca.SNN.kauto)),function(x){
+											 obj.x <- obj[,obj$pca.SNN.kauto==x]
+											 ret.tb <- data.table(geneID=rownames(obj.x),
+														geneSymbol=rowData(obj.x)$display.name,
+														meta.cluster=x,
+														Group=x,
+														N.sig=rowSums(assay(obj.x,"sig")),
+														meta.cluster.size=ncol(obj.x))
+											 ret.tb[,freq.sig:=N.sig/meta.cluster.size]
+											 anames <- intersect(assayNames(obj.x),c("logFC","t","SNR","meanExp"))
+											 for(aa in anames){
+												 ret.tb[[sprintf("median.%s",aa)]] <- rowMedians(assay(obj.x,aa))
+											 }
+											 ret.tb[["median.rank"]] <- rowMedians(apply(assay(obj.x,"t"),2,
+																					 function(x){ rank(-x)/length(x)}))
+											 return(ret.tb)
+							   }))
+	###gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,-gene.desc.top[[sprintf("mean.%s",de.stat)]]), ]
+	gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,median.rank), ]
+	return(gene.desc.top)
+}
+
 #' plot genes expression in pairs of clusters to examine the correlation
 #' @param obj.list object; named list of object of \code{singleCellExperiment} class
 #' @param gene.desc.top data.frame; signature genes 
@@ -230,6 +298,7 @@ integrate.by.avg <- function(sce.list,
 #' @param out.prefix character; output prefix (default: NULL).
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
 #' @param sig.prevelance double; (default: 0.5)
+#' @param ntop integer; only use the ntop top genes (default: 10)
 #' @import data.table
 #' @import ggplot2 
 #' @import ggridges
@@ -238,48 +307,49 @@ integrate.by.avg <- function(sce.list,
 #' @export
 classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",out.prefix=NULL,
                                     adjB=NULL,meta.cluster=NULL,
-                                    sig.prevelance=0.5)
+                                    sig.prevelance=0.5,ntop=10)
 {
+
+	gene.core.tb <- gene.desc.top[median.rank<0.01 & freq.sig >sig.prevelance,]
+	if(!is.null(ntop)){
+		gene.core.tb <- gene.core.tb[,head(.SD,n=ntop),by=c("meta.cluster")]
+	}
+
 	if(is.null(meta.cluster)){
-		mcls <- unique(gene.desc.top$meta.cluster)
+		mcls <- unique(gene.core.tb$meta.cluster)
 	}else{
 		mcls <- meta.cluster
 	}
 
-    dat.list <- (llply(seq_along(mcls),function(j){
-        gene.desc.top.j <- gene.desc.top[meta.cluster==mcls[j],]
-		ncluster <- length(unique(sort(gene.desc.top.j$Group)))
-		gene.core.tb <- gene.desc.top.j[,.(N=.N),by=c("meta.cluster","geneID")][N>sig.prevelance*ncluster,]
-		gene.core.tb$meta.cluster.size <- ncluster
-		gene.core.tb$Group <- gene.core.tb$meta.cluster
-		gene.core.tb <- head(gene.core.tb,n=10)
+    dat.plot.tb <- as.data.table(ldply(seq_along(mcls),function(j){
+		gene.core.tb.j <- gene.core.tb[meta.cluster==mcls[j],]
 		dat.plot.j <- ldply(seq_along(obj.list),function(i){
 							  obj <- obj.list[[i]]
-							  gene.used <- rownames(obj)[match(gene.core.tb$geneID,rowData(obj)$display.name)]
+							  gene.used <- rownames(obj)[match(gene.core.tb.j$geneID,rowData(obj)$display.name)]
 							  gene.used <- gene.used[!is.na(gene.used)]
 							  ##gene.used <- head(gene.used,n=5)
 							  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+							  ####rownames(dat.block) <- rowData(obj)[gene.used,"display.name"]
 							  if(!is.null(adjB)){
 								dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
 							  }
+							  ###dat.block <- t(scale(t(dat.block)))
 							  sig.score <- colMeans(dat.block)
 							  data.table(cellID=colnames(obj),
 										 dataset.id=names(obj.list)[i],
 										 meta.cluster=mcls[j],
 										 sig.score=sig.score)
 									})
-		return(list(dat.plot=dat.plot.j,gene.core.tb=gene.core.tb))
+		return(dat.plot.j)
 	}))
-	dat.plot <- as.data.table(ldply(dat.list,function(x){ x$dat.plot }))
-	gene.core.tb <- as.data.table(ldply(dat.list,function(x){ x$gene.core.tb }))
 
-	ocluster <- unique(dat.plot[,c("dataset.id","meta.cluster")])
+	ocluster <- unique(dat.plot.tb[,c("dataset.id","meta.cluster")])
 
     RhpcBLASctl::omp_set_num_threads(1)
     registerDoParallel(cores = 24)
 
 	binExp.list <- llply(seq_len(nrow(ocluster)),function(i){
-							 dat.block <- dat.plot[dataset.id==ocluster$dataset.id[i] &
+							 dat.block <- dat.plot.tb[dataset.id==ocluster$dataset.id[i] &
 												   meta.cluster==ocluster$meta.cluster[i],]
 						     gscore <- dat.block$sig.score
 							 names(gscore) <- dat.block$cellID
@@ -296,10 +366,10 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 	
 
     if(!is.null(out.prefix)){
-		p <- ggplot(dat.plot, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
+		p <- ggplot(dat.plot.tb, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
 			##geom_histogram(aes(y=..density..), colour="black", fill="white")+
 			#geom_density() +
-			geom_density_ridges() +
+			ggridges::geom_density_ridges() +
 			facet_wrap(~meta.cluster,ncol=4)
 		ggsave(file=sprintf("%s.sigScore.density.pdf",out.prefix),width=15,height=12)
     }

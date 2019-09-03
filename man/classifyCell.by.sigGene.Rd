@@ -6,7 +6,7 @@
 \usage{
 classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
   out.prefix = NULL, adjB = NULL, meta.cluster = NULL,
-  sig.prevelance = 0.5)
+  sig.prevelance = 0.5, ntop = 10)
 }
 \arguments{
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}
@@ -20,6 +20,8 @@ classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
 \item{adjB}{character; batch column of the colData(obj). (default: NULL)}
 
 \item{sig.prevelance}{double; (default: 0.5)}
+
+\item{ntop}{integer; only use the ntop top genes (default: 10)}
 }
 \description{
 plot genes expression in pairs of clusters to examine the correlation

@@ -7,6 +7,7 @@
 integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
   is.avg = FALSE, ncores = 6, use.deg = TRUE, gene.de.list = NULL,
   avg.by = "majorCluster", n.downsample = NULL, n.pc = 15,
+  de.stat = "t", de.thres = 1, do.scale = F,
   par.clust = list(method = "SNN", SNN.k = 3, SNN.method = "leiden",
   resolution_parameter = 2.2), topGene.lo = -1.5, topGene.hi = 1.5,
   topGene.step = 1, method.avg = "zscore", ...)
@@ -31,6 +32,12 @@ integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
 \item{n.downsample}{integer; number of cells in each cluster to downsample to (default: NULL)}
 
 \item{n.pc}{integer; number of pc ot use (default: 15)}
+
+\item{de.stat}{character; column in gene.de.file (default: "t")}
+
+\item{de.thres}{double; used for selecting genes. can be larger than 1(top number of genes) or less than 1 (F.rank threshold) (default: 2000)}
+
+\item{do.scale}{logical; scale the summarized vectors (default: false)}
 
 \item{topGene.lo}{double; for top gene heatmap.(default: -1.5)}
 

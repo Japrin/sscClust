@@ -5,9 +5,10 @@
 \title{identify differential genes of each cluster (comparing the cluster with all others), using limma}
 \usage{
 ssc.DEGene.limma(obj, assay.name = "exprs", ncell.downsample = NULL,
-  group.var = "majorCluster", group.list = NULL, batch = NULL,
-  out.prefix = NULL, n.cores = NULL, do.plot = T, T.fdr = 0.01,
-  T.logFC = 1, verbose = F)
+  group.var = "majorCluster", group.list = NULL,
+  group.mode = "multi", batch = NULL, out.prefix = NULL,
+  n.cores = NULL, do.plot = T, T.fdr = 0.01, T.logFC = 1,
+  verbose = 0)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -19,6 +20,8 @@ ssc.DEGene.limma(obj, assay.name = "exprs", ncell.downsample = NULL,
 \item{group.var}{character; column in the colData(obj) used for grouping. (default: "majorCluster")}
 
 \item{group.list}{character; DEG of groups to calculate. If NULL, all groups. (default: "NULL")}
+
+\item{group.mode}{character; One of "multi", "multiAsTwo" (default: "multi")}
 
 \item{batch}{character; covariate. (default: NULL)}
 
@@ -32,7 +35,7 @@ ssc.DEGene.limma(obj, assay.name = "exprs", ncell.downsample = NULL,
 
 \item{T.logFC}{numeric; threshold of the absoute diff (default: 1)}
 
-\item{verbose}{logical; whether output all genes' result. (default: FALSE)}
+\item{verbose}{integer; verbose level. (default: 0)}
 }
 \description{
 identify differential genes of each cluster (comparing the cluster with all others), using limma
