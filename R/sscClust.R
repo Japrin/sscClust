@@ -1462,8 +1462,10 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 	  }
 	  p <- p +
 		theme_bw(base_size = 12) +
-		facet_grid(gene ~ .,switch = "y",scales = "free_y") +
-		theme(axis.text.x = element_text(angle = 60, hjust = 1),strip.placement = "inside")
+#		facet_grid(gene ~ .,switch = "y",scales = "free_y") +
+        facet_wrap(gene~.,strip.position = "left",scales="free_y",dir="v",ncol=p.ncol) +
+		theme(axis.text.x = element_text(angle = 60, hjust = 1),
+              strip.placement = "inside")
   } else if(!is.null(columns)){
 	  dat.plot.df <- as.data.table(cbind(data.frame(cellID=colnames(obj),stringsAsFactors=F),
 						  as.data.frame(colData(obj)[,c(group.var,columns),drop=F])))
