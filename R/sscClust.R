@@ -1974,3 +1974,71 @@ ssc.downsample <- function(obj, ncell.downsample=NULL, group.var="majorCluster",
     return(obj)
 }
 
+
+#' Add module scores for gene expression programs in single cells. Mofidy from Seurat::AddModuleScore
+#'
+#' Calculate the average expression levels of each program (cluster) on single cell level,
+#' subtracted by the aggregated expression of control feature sets.
+#' All analyzed features are binned based on averaged expression, and the control features are
+#' randomly selected from each bin.
+#'
+#' @param obj object of SingleCellExperiment
+#' @param features Feature expression programs in named list
+#' @param pool List of features to check expression levels agains, defaults to \code{rownames(x = object)}
+#' @param nbin Number of bins of aggregate expression levels for all analyzed features
+#' @param ctrl Number of control features selected from the same bin per analyzed feature
+#' @param assay.name Name of assay to use
+#' @param seed Set a random seed
+#' @return Returns a SingleCellExperiment object with module scores added to object meta data
+#' @importFrom ggplot2 cut_number
+#' @importFrom Matrix rowMeans colMeans
+#' @references Tirosh et al, Science (2016); Seurat's source code
+#' @export
+ssc.moduleScore <- function(obj, features, pool = NULL,
+							nbin = 24, ctrl = 100, assay.name = "exprs",seed = 1)
+{
+	set.seed(seed = seed)
+	if(is.null(names(features))){
+		names(features) <- sprintf("M%02d",seq_along(features))
+	}
+	features <- llply(features,function(x){ intersect(x,rowData(obj)$display.name) })
+	if(any(sapply(features,length)<1)){
+		warning(sprintf("no expression data of the provided genes!\n"))
+		return(obj)
+	}
+	features <- llply(features,function(x){ rownames(obj)[match(x,rowData(obj)$display.name)] })
+	if(is.null(pool)){
+		pool <- rownames(obj)
+	}else{
+		pool <- rownames(obj)[match(pool,rowData(obj)$display.name)]
+	}
+	assay.data <- assay(obj,assay.name)
+	data.avg <- Matrix::rowMeans(x = assay.data[pool, ])
+	data.avg <- data.avg[order(data.avg)]
+	data.cut <- cut_number(x = data.avg + rnorm(n = length(data.avg))/1e30,
+						   n = nbin, labels = FALSE, right = FALSE)
+	###data.cut <- as.numeric(x = Hmisc::cut2(x = data.avg, m = round(x = length(x = data.avg) / (nbin + 1))))
+	names(x = data.cut) <- names(x = data.avg)
+
+	ctrl.use <- llply(features,function(x){
+							  feat.rnd <- c()
+							  for(i in seq_along(x)){
+									feat.rnd <- c(feat.rnd,
+												  names(sample(data.cut[which(data.cut==data.cut[x[i]])],size=ctrl,replace=F))
+												  )
+							  }
+							  return(feat.rnd)
+						   })
+	ctrl.scores <- laply(ctrl.use,function(x){
+							 Matrix::colMeans(assay.data[x,])
+						   },.drop=F)
+	features.scores <- laply(features,function(x){
+							 Matrix::colMeans(assay.data[x,])
+						   },.drop=F)
+	features.scores.use <- features.scores - ctrl.scores
+	rownames(features.scores.use) <- names(features)
+	features.scores.use <- as.data.frame(x = t(x = features.scores.use))
+	obj[[colnames(x = features.scores.use)]] <- features.scores.use
+	return(obj)
+}
+

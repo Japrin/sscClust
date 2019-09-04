@@ -325,16 +325,21 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 		gene.core.tb.j <- gene.core.tb[meta.cluster==mcls[j],]
 		dat.plot.j <- ldply(seq_along(obj.list),function(i){
 							  obj <- obj.list[[i]]
-							  gene.used <- rownames(obj)[match(gene.core.tb.j$geneID,rowData(obj)$display.name)]
-							  gene.used <- gene.used[!is.na(gene.used)]
-							  ##gene.used <- head(gene.used,n=5)
-							  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
-							  ####rownames(dat.block) <- rowData(obj)[gene.used,"display.name"]
-							  if(!is.null(adjB)){
-								dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
-							  }
-							  ###dat.block <- t(scale(t(dat.block)))
-							  sig.score <- colMeans(dat.block)
+							  features <- list(gene.core.tb.j$geneID)
+							  names(features) <- sprintf("sigScore.%s",mcls[j])
+							  obj <- ssc.moduleScore(obj,features,assay.name="norm_exprs")
+							  sig.score <- obj[[sprintf("sigScore.%s",mcls[j])]]
+
+#							  gene.used <- rownames(obj)[match(gene.core.tb.j$geneID,rowData(obj)$display.name)]
+#							  gene.used <- gene.used[!is.na(gene.used)]
+#							  ##gene.used <- head(gene.used,n=5)
+#							  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+#							  ####rownames(dat.block) <- rowData(obj)[gene.used,"display.name"]
+#							  if(!is.null(adjB)){
+#								dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+#							  }
+#							  ###dat.block <- t(scale(t(dat.block)))
+#							  sig.score <- colMeans(dat.block)
 							  data.table(cellID=colnames(obj),
 										 dataset.id=names(obj.list)[i],
 										 meta.cluster=mcls[j],
