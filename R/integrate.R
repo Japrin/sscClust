@@ -297,6 +297,8 @@ rank.de.gene <- function(obj)
 #' @param assay.name character; which assay (default: "exprs")
 #' @param out.prefix character; output prefix (default: NULL).
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
+#' @param meta.cluster character; (default: NULL)
+#' @param method character; (default: "posFreq")
 #' @param sig.prevelance double; (default: 0.5)
 #' @param ntop integer; only use the ntop top genes (default: 10)
 #' @import data.table
@@ -306,7 +308,7 @@ rank.de.gene <- function(obj)
 #' @details classify cells using the signature genes
 #' @export
 classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",out.prefix=NULL,
-                                    adjB=NULL,meta.cluster=NULL,
+                                    adjB=NULL,meta.cluster=NULL,method="posFreq",
                                     sig.prevelance=0.5,ntop=10)
 {
 
@@ -321,59 +323,74 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 		mcls <- meta.cluster
 	}
 
-    dat.plot.tb <- as.data.table(ldply(seq_along(mcls),function(j){
-		gene.core.tb.j <- gene.core.tb[meta.cluster==mcls[j],]
-		dat.plot.j <- ldply(seq_along(obj.list),function(i){
-							  obj <- obj.list[[i]]
-							  gene.used <- rownames(obj)[match(gene.core.tb.j$geneID,rowData(obj)$display.name)]
-							  gene.used <- gene.used[!is.na(gene.used)]
-							  ##gene.used <- head(gene.used,n=5)
-							  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
-							  ####rownames(dat.block) <- rowData(obj)[gene.used,"display.name"]
-							  if(!is.null(adjB)){
-								dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
-							  }
-							  ###dat.block <- t(scale(t(dat.block)))
-							  sig.score <- colMeans(dat.block)
-							  data.table(cellID=colnames(obj),
-										 dataset.id=names(obj.list)[i],
-										 meta.cluster=mcls[j],
-										 sig.score=sig.score)
-									})
-		return(dat.plot.j)
-	}))
+	if(method=="posFreq") {
+		#### adjB and scale
 
-	ocluster <- unique(dat.plot.tb[,c("dataset.id","meta.cluster")])
+		#### binarize all sig genes
 
-    RhpcBLASctl::omp_set_num_threads(1)
-    registerDoParallel(cores = 24)
+		### classification criteria
 
-	binExp.list <- llply(seq_len(nrow(ocluster)),function(i){
-							 dat.block <- dat.plot.tb[dataset.id==ocluster$dataset.id[i] &
-												   meta.cluster==ocluster$meta.cluster[i],]
-						     gscore <- dat.block$sig.score
-							 names(gscore) <- dat.block$cellID
-						     dat.binExp <- binarizeExp(gscore,out.prefix=sprintf("%s.sigGene.value.dist.%s.%s.png",
-															  out.prefix,ocluster$dataset.id[i],ocluster$meta.cluster[i]),
-													   G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,run.extremevalue=T,
-													   draw.CI=T, zero.as.low=T,my.seed=9997)
-							 dat.binExp$o.df$dataset.id <- ocluster$dataset.id[i]
-							 dat.binExp$o.df$meta.cluster <- ocluster$meta.cluster[i]
-							 return(dat.binExp)
-									},.parallel=T)
-	binExp.merge <- as.data.table(ldply(binExp.list,function(x){ x$o.df }))
-	binExp.merge <- dcast(binExp.merge,sample+dataset.id~meta.cluster,value.var="Exp")
-	
-
-    if(!is.null(out.prefix)){
-		p <- ggplot(dat.plot.tb, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
-			##geom_histogram(aes(y=..density..), colour="black", fill="white")+
-			#geom_density() +
-			ggridges::geom_density_ridges() +
-			facet_wrap(~meta.cluster,ncol=4)
-		ggsave(file=sprintf("%s.sigScore.density.pdf",out.prefix),width=15,height=12)
-    }
-
+###		dat.plot.tb <- as.data.table(ldply(seq_along(mcls),function(j){
+###							  gene.core.tb.j <- gene.core.tb[meta.cluster==mcls[j],]
+###							  dat.plot.j <- ldply(seq_along(obj.list),function(i){
+###								  gene.used <- rownames(obj)[match(gene.core.tb.j$geneID,rowData(obj)$display.name)]
+###								  gene.used <- gene.used[!is.na(gene.used)]
+###								  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+###								  ####rownames(dat.block) <- rowData(obj)[gene.used,"display.name"]
+###								  if(!is.null(adjB)){
+###									dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+###								  }
+###								})
+###							   }))
+###		ocluster <- unique(dat.plot.tb[,c("dataset.id","meta.cluster")])
+###
+###		RhpcBLASctl::omp_set_num_threads(1)
+###		registerDoParallel(cores = 24)
+###
+###		binExp.list <- llply(seq_len(nrow(ocluster)),function(i){
+###								 dat.block <- dat.plot.tb[dataset.id==ocluster$dataset.id[i] &
+###													   meta.cluster==ocluster$meta.cluster[i],]
+###								 gscore <- dat.block$sig.score
+###								 names(gscore) <- dat.block$cellID
+###								 dat.binExp <- binarizeExp(gscore,out.prefix=sprintf("%s.sigGene.value.dist.%s.%s.png",
+###																  out.prefix,ocluster$dataset.id[i],ocluster$meta.cluster[i]),
+###														   G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,run.extremevalue=T,
+###														   draw.CI=T, zero.as.low=T,my.seed=9997)
+###								 dat.binExp$o.df$dataset.id <- ocluster$dataset.id[i]
+###								 dat.binExp$o.df$meta.cluster <- ocluster$meta.cluster[i]
+###								 return(dat.binExp)
+###										},.parallel=T)
+###		binExp.merge <- as.data.table(ldply(binExp.list,function(x){ x$o.df }))
+###		binExp.merge <- dcast(binExp.merge,sample+dataset.id~meta.cluster,value.var="Exp")
+###		if(!is.null(out.prefix)){
+###			p <- ggplot(dat.plot.tb, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
+###				ggridges::geom_density_ridges() +
+###				facet_wrap(~meta.cluster,ncol=4)
+###			ggsave(file=sprintf("%s.sigScore.density.pdf",out.prefix),width=15,height=12)
+###		}
+	}else if(method=="corrCtrl") {
+		dat.plot.tb <- as.data.table(ldply(seq_along(mcls),function(j){
+			gene.core.tb.j <- gene.core.tb[meta.cluster==mcls[j],]
+			dat.plot.j <- ldply(seq_along(obj.list),function(i){
+								  obj <- obj.list[[i]]
+								  features <- list(gene.core.tb.j$geneID)
+								  names(features) <- sprintf("sigScore.%s",mcls[j])
+								  #### adjB and  scale
+								  ###
+								  obj <- ssc.moduleScore(obj,features,assay.name="norm_exprs")
+								  sig.score <- obj[[sprintf("sigScore.%s",mcls[j])]][[1]]
+								  data.table(cellID=colnames(obj),
+											 dataset.id=names(obj.list)[i],
+											 meta.cluster=mcls[j],
+											 sig.score=sig.score)
+										})
+			return(dat.plot.j)
+		}))
+		
+		binExp.tb <- dcast(dat.plot.tb,cellID+dataset.id~meta.cluster,value.var="sig.score")
+		idxCol.sigScore <- colnames(binExp.tb)[-c(1,2)]
+		binExp.tb$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb[,idxCol.sigScore,with=F],1,which.max)]
+	}
     
 }
 
