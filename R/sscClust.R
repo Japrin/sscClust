@@ -2030,10 +2030,10 @@ ssc.moduleScore <- function(obj, features, pool = NULL,
 							  return(feat.rnd)
 						   })
 	ctrl.scores <- laply(ctrl.use,function(x){
-							 Matrix::colMeans(assay.data[x,])
+							 Matrix::colMeans(assay.data[x,,drop=F])
 						   },.drop=F)
 	features.scores <- laply(features,function(x){
-							 Matrix::colMeans(assay.data[x,])
+							 Matrix::colMeans(assay.data[x,,drop=F])
 						   },.drop=F)
 	features.scores.use <- features.scores - ctrl.scores
 	rownames(features.scores.use) <- names(features)
