@@ -301,6 +301,7 @@ rank.de.gene <- function(obj)
 #' @param method character; (default: "posFreq")
 #' @param sig.prevelance double; (default: 0.5)
 #' @param ntop integer; only use the ntop top genes (default: 10)
+#' @param ncores integer; number of CPU to used (default: 16)
 #' @import data.table
 #' @import ggplot2 
 #' @import ggridges
@@ -309,7 +310,7 @@ rank.de.gene <- function(obj)
 #' @export
 classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",out.prefix=NULL,
                                     adjB=NULL,meta.cluster=NULL,method="posFreq",
-                                    sig.prevelance=0.5,ntop=10)
+                                    sig.prevelance=0.5,ntop=10,ncores=16)
 {
 
 	gene.core.tb <- gene.desc.top[median.rank<0.01 & freq.sig >sig.prevelance,]
@@ -322,6 +323,9 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 	}else{
 		mcls <- meta.cluster
 	}
+
+	RhpcBLASctl::omp_set_num_threads(1)
+	registerDoParallel(cores = ncores)
 
 	if(method=="posFreq") {
 		#### adjB and scale
@@ -344,8 +348,6 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 ###							   }))
 ###		ocluster <- unique(dat.plot.tb[,c("dataset.id","meta.cluster")])
 ###
-###		RhpcBLASctl::omp_set_num_threads(1)
-###		registerDoParallel(cores = 24)
 ###
 ###		binExp.list <- llply(seq_len(nrow(ocluster)),function(i){
 ###								 dat.block <- dat.plot.tb[dataset.id==ocluster$dataset.id[i] &
@@ -369,21 +371,20 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 ###			ggsave(file=sprintf("%s.sigScore.density.pdf",out.prefix),width=15,height=12)
 ###		}
 	}else if(method=="corrCtrl") {
+
 		dat.plot.tb <- as.data.table(ldply(seq_along(mcls),function(j){
 			gene.core.tb.j <- gene.core.tb[meta.cluster==mcls[j],]
 			dat.plot.j <- ldply(seq_along(obj.list),function(i){
 								  obj <- obj.list[[i]]
 								  features <- list(gene.core.tb.j$geneID)
 								  names(features) <- sprintf("sigScore.%s",mcls[j])
-								  #### adjB and  scale
-								  ###
-								  obj <- ssc.moduleScore(obj,features,assay.name="norm_exprs")
-								  sig.score <- obj[[sprintf("sigScore.%s",mcls[j])]][[1]]
+								  obj <- ssc.moduleScore(obj,features,assay.name="norm_exprs",adjB="batchV")
+								  sig.score <- obj[[sprintf("sigScore.%s",mcls[j])]]
 								  data.table(cellID=colnames(obj),
 											 dataset.id=names(obj.list)[i],
 											 meta.cluster=mcls[j],
 											 sig.score=sig.score)
-										})
+										},.parallel=T)
 			return(dat.plot.j)
 		}))
 		
@@ -392,7 +393,8 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 		binExp.tb$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb[,idxCol.sigScore,with=F],1,
                                                             which.max)]
 	}
-    
+
+	return(binExp.tb)
 }
 
 
