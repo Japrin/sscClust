@@ -1988,6 +1988,8 @@ ssc.downsample <- function(obj, ncell.downsample=NULL, group.var="majorCluster",
 #' @param nbin Number of bins of aggregate expression levels for all analyzed features
 #' @param ctrl Number of control features selected from the same bin per analyzed feature
 #' @param assay.name Name of assay to use
+#' @param adjB character; batch column of the colData(obj). (default: NULL)
+#' @param do.scale logical; scale the data (default: TRUE)
 #' @param seed Set a random seed
 #' @return Returns a SingleCellExperiment object with module scores added to object meta data
 #' @importFrom ggplot2 cut_number
@@ -1995,7 +1997,8 @@ ssc.downsample <- function(obj, ncell.downsample=NULL, group.var="majorCluster",
 #' @references Tirosh et al, Science (2016); Seurat's source code
 #' @export
 ssc.moduleScore <- function(obj, features, pool = NULL,
-							nbin = 24, ctrl = 100, assay.name = "exprs",seed = 1)
+							nbin = 24, ctrl = 100, assay.name = "exprs",
+							adjB=NULL,do.scale=T,seed = 1)
 {
 	set.seed(seed = seed)
 	if(is.null(names(features))){
@@ -2029,16 +2032,25 @@ ssc.moduleScore <- function(obj, features, pool = NULL,
 							  }
 							  return(feat.rnd)
 						   })
-	ctrl.scores <- laply(ctrl.use,function(x){
-							 Matrix::colMeans(assay.data[x,,drop=F])
-						   },.drop=F)
-	features.scores <- laply(features,function(x){
-							 Matrix::colMeans(assay.data[x,,drop=F])
-						   },.drop=F)
+    .calScore <- function(x){
+		 #### adjB and  scale
+		 if(!is.null(adjB)){
+			 dat.use <- simple.removeBatchEffect(assay.data[x,,drop=F],batch = obj[[adjB]])
+		 }else{
+			 dat.use <- t(scale(t(assay.data[x,,drop=F]),scale=F))
+		 }
+		 if(do.scale){
+			 dat.use <- t(scale(t(dat.use)))
+		 }
+		 ###
+		 Matrix::colMeans(dat.use)
+	}
+	ctrl.scores <- laply(ctrl.use,.calScore,.drop=F)
+	features.scores <- laply(features,.calScore,.drop=F)
 	features.scores.use <- features.scores - ctrl.scores
 	rownames(features.scores.use) <- names(features)
 	features.scores.use <- as.data.frame(x = t(x = features.scores.use))
-	obj[[colnames(x = features.scores.use)]] <- features.scores.use
+	obj[[colnames(x = features.scores.use)]] <- features.scores.use[[1]]
 	return(obj)
 }
 
