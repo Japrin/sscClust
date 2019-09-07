@@ -5,7 +5,7 @@
 \title{Add module scores for gene expression programs in single cells. Mofidy from Seurat::AddModuleScore}
 \usage{
 ssc.moduleScore(obj, features, pool = NULL, nbin = 24, ctrl = 100,
-  assay.name = "exprs", seed = 1)
+  assay.name = "exprs", adjB = NULL, do.scale = T, seed = 1)
 }
 \arguments{
 \item{obj}{object of SingleCellExperiment}
@@ -19,6 +19,10 @@ ssc.moduleScore(obj, features, pool = NULL, nbin = 24, ctrl = 100,
 \item{ctrl}{Number of control features selected from the same bin per analyzed feature}
 
 \item{assay.name}{Name of assay to use}
+
+\item{adjB}{character; batch column of the colData(obj). (default: NULL)}
+
+\item{do.scale}{logical; scale the data (default: TRUE)}
 
 \item{seed}{Set a random seed}
 }
