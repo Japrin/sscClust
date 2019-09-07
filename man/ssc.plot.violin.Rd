@@ -6,7 +6,7 @@
 \usage{
 ssc.plot.violin(obj, assay.name = "exprs", gene = NULL,
   columns = NULL, group.var = "majorCluster", clamp = c(0, 12),
-  adjB = NULL, out.prefix = NULL, p.ncol = 1,
+  adjB = NULL, do.scale = F, out.prefix = NULL, p.ncol = 1,
   base_aspect_ratio = 1.1, ...)
 }
 \arguments{
@@ -23,6 +23,8 @@ ssc.plot.violin(obj, assay.name = "exprs", gene = NULL,
 \item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter. (default: c(0,12))}
 
 \item{adjB}{character; batch column of the colData(obj). (default: NULL)}
+
+\item{do.scale}{logical; whether scale the expression value. (default: FALSE)}
 
 \item{out.prefix}{character; output prefix. (default: NULL)}
 
