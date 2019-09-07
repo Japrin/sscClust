@@ -390,7 +390,8 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 		
 		binExp.tb <- dcast(dat.plot.tb,cellID+dataset.id~meta.cluster,value.var="sig.score")
 		idxCol.sigScore <- colnames(binExp.tb)[-c(1,2)]
-		binExp.tb$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb[,idxCol.sigScore,with=F],1,which.max)]
+		binExp.tb$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb[,idxCol.sigScore,with=F],1,
+                                                            which.max)]
 	}
 
 	return(binExp.tb)

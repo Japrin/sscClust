@@ -1248,6 +1248,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param brewer.palette character; which palette to use. (default: "YlOrRd")
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
 #' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: "none" )
+#' @param do.scale logical; whether scale the expression value. (default: FALSE)
 #' @param label double; label size. if NULL, no label showed. (default: NULL )
 #' @param par.repel list; passed to geom_text_repel
 #' @param par.geneOnTSNE character; other parameters of geneOnTSNE
@@ -1266,7 +1267,7 @@ ssc.run <- function(obj, assay.name="exprs",
 ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,splitBy=NULL,
                              plotDensity=F, colSet=list(),
                              reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,size=NULL,
-                             brewer.palette="YlOrRd",adjB=NULL,clamp="none",
+                             brewer.palette="YlOrRd",adjB=NULL,clamp="none",do.scale=FALSE,
                              label=NULL,par.repel=list(force=1),
                              par.geneOnTSNE=list(scales="free",pt.order="value",pt.alpha=0.1),
                              out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
@@ -1369,6 +1370,9 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
     if(!is.null(adjB)){
       dat.onTSNE <- simple.removeBatchEffect(dat.onTSNE,batch=colData(obj)[[adjB]])
     }
+    if(do.scale){
+      dat.onTSNE <- t(scale(t(dat.onTSNE)))
+    }
     p <- do.call(ggGeneOnTSNE,c(list(Y=dat.onTSNE, dat.map=dat.map, gene.to.show=gene,
                                      p.ncol=p.ncol,xlim=xlim,ylim=ylim,
                                      size=size,width=width,height=height,
@@ -1403,6 +1407,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
 #' @param p.ncol integer; number of columns in the figure layout. (default: 3)
 #' @param base_aspect_ratio numeric; base_aspect_ratio, used for plotting metadata. (default 1.1)
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
+#' @param do.scale logical; whether scale the expression value. (default: FALSE)
 #' @param ... parameter passed to cowplot::save_plot
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_violin scale_fill_gradient2 theme_bw theme aes_string facet_grid element_text
@@ -1412,7 +1417,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
 #' NULL, colData of obj with names in `columns` will be plot in violin.
 #' @export
 ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
-                            group.var="majorCluster",clamp=c(0,12),adjB=NULL,
+                            group.var="majorCluster",clamp=c(0,12),adjB=NULL,do.scale=F,
                             out.prefix=NULL,p.ncol=1,base_aspect_ratio=1.1,...)
 {
   requireNamespace("ggplot2")
@@ -1425,6 +1430,9 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 	  if(!is.null(adjB)){
 		dat.violin <- simple.removeBatchEffect(dat.violin,batch=colData(obj)[[adjB]])
 	  }
+      if(do.scale){
+        dat.violin <- t(scale(t(dat.violin)))
+      }
 
 	  dat.plot <- as.matrix(t(dat.violin))
 	  colnames(dat.plot) <- ssc.id2displayName(obj,colnames(dat.plot))
@@ -1462,8 +1470,10 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 	  }
 	  p <- p +
 		theme_bw(base_size = 12) +
-		facet_grid(gene ~ .,switch = "y",scales = "free_y") +
-		theme(axis.text.x = element_text(angle = 60, hjust = 1),strip.placement = "inside")
+#		facet_grid(gene ~ .,switch = "y",scales = "free_y") +
+        facet_wrap(gene~.,strip.position = "left",scales="free_y",dir="v",ncol=p.ncol) +
+		theme(axis.text.x = element_text(angle = 60, hjust = 1),
+              strip.placement = "inside")
   } else if(!is.null(columns)){
 	  dat.plot.df <- as.data.table(cbind(data.frame(cellID=colnames(obj),stringsAsFactors=F),
 						  as.data.frame(colData(obj)[,c(group.var,columns),drop=F])))
