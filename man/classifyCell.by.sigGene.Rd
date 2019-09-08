@@ -6,7 +6,8 @@
 \usage{
 classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
   out.prefix = NULL, adjB = NULL, meta.cluster = NULL,
-  method = "posFreq", sig.prevelance = 0.5, ntop = 10, ncores = 16)
+  method = "posFreq", sig.prevelance = 0.5, ntop = 10, ncores = 16,
+  TH.gene.exp.freq = 0.5)
 }
 \arguments{
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}
@@ -28,6 +29,8 @@ classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
 \item{ntop}{integer; only use the ntop top genes (default: 10)}
 
 \item{ncores}{integer; number of CPU to used (default: 16)}
+
+\item{TH.gene.exp.freq}{double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)}
 }
 \description{
 plot genes expression in pairs of clusters to examine the correlation

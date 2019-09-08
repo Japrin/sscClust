@@ -302,6 +302,7 @@ rank.de.gene <- function(obj)
 #' @param sig.prevelance double; (default: 0.5)
 #' @param ntop integer; only use the ntop top genes (default: 10)
 #' @param ncores integer; number of CPU to used (default: 16)
+#' @param TH.gene.exp.freq double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)
 #' @import data.table
 #' @import ggplot2 
 #' @import ggridges
@@ -310,7 +311,7 @@ rank.de.gene <- function(obj)
 #' @export
 classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",out.prefix=NULL,
                                     adjB=NULL,meta.cluster=NULL,method="posFreq",
-                                    sig.prevelance=0.5,ntop=10,ncores=16)
+                                    sig.prevelance=0.5,ntop=10,ncores=16,TH.gene.exp.freq=0.5)
 {
 
 	gene.core.tb <- gene.desc.top[median.rank<0.01 & freq.sig >sig.prevelance,]
@@ -328,42 +329,46 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 	registerDoParallel(cores = ncores)
 
 	if(method=="posFreq") {
-		#### adjB and scale
 
-		#### binarize all sig genes
+		binExp.tb <- as.data.table(ldply(seq_along(obj.list),function(i){
+				  obj <- obj.list[[i]]
+				  gene.used <- rownames(obj)[match(gene.core.tb$geneSymbol,rowData(obj)$display.name)]
+				  gene.used <- unique(gene.used[!is.na(gene.used)])
+				  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+				  #### adjB
+				  if(!is.null(adjB)){
+					  dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+				  }
+				  #### binarize all sig genes
+				  dat.block.bin <- laply(seq_len(nrow(dat.block)),function(j){
+					  gene.j <- rownames(dat.block)[j]
+					  dat.binExp <- binarizeExp(dat.block[j,],
+												#out.prefix=sprintf("%s.gene.dist.%s.%s.png",
+												#				   out.prefix,names(obj.list)[i],
+												#				   rowData(obj)[gene.j,"geneSymbol"]),
+												G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,run.extremevalue=F,
+												draw.CI=T, zero.as.low=T,my.seed=9997)
+					  structure(dat.binExp$o.df$Exp,names=rownames(dat.binExp$o.df))
+							   },.parallel=T)
+				  ##rownames(dat.block.bin) <- rownames(dat.block)
+				  rownames(dat.block.bin) <- rowData(obj)[rownames(dat.block),"display.name"]
+				  ### classification criteria
+				  mcls.bin <- sapply(mcls,function(x){
+							gene.sig <- gene.core.tb[meta.cluster==x,][["geneSymbol"]]
+							exp.freq <- colSums(dat.block.bin[gene.sig,,drop=F])/length(gene.sig)
+							ret <- exp.freq
+							#ret <- structure(as.integer(exp.freq >= TH.gene.exp.freq),
+							#				 names=colnames(dat.block.bin))
+							return(ret)
+							   })
+				  binExp.tb.i <- cbind(data.table(sample=rownames(mcls.bin),dataset.id=names(obj.list)[i]),
+										mcls.bin)
+				  idxCol.sigScore <- colnames(binExp.tb.i)[-c(1,2)]
+				  binExp.tb.i$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb.i[,idxCol.sigScore,with=F],1,
+                                                            which.max)]
+				  return(binExp.tb.i)
+									}))
 
-		### classification criteria
-
-###		dat.plot.tb <- as.data.table(ldply(seq_along(mcls),function(j){
-###							  gene.core.tb.j <- gene.core.tb[meta.cluster==mcls[j],]
-###							  dat.plot.j <- ldply(seq_along(obj.list),function(i){
-###								  gene.used <- rownames(obj)[match(gene.core.tb.j$geneID,rowData(obj)$display.name)]
-###								  gene.used <- gene.used[!is.na(gene.used)]
-###								  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
-###								  ####rownames(dat.block) <- rowData(obj)[gene.used,"display.name"]
-###								  if(!is.null(adjB)){
-###									dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
-###								  }
-###								})
-###							   }))
-###		ocluster <- unique(dat.plot.tb[,c("dataset.id","meta.cluster")])
-###
-###
-###		binExp.list <- llply(seq_len(nrow(ocluster)),function(i){
-###								 dat.block <- dat.plot.tb[dataset.id==ocluster$dataset.id[i] &
-###													   meta.cluster==ocluster$meta.cluster[i],]
-###								 gscore <- dat.block$sig.score
-###								 names(gscore) <- dat.block$cellID
-###								 dat.binExp <- binarizeExp(gscore,out.prefix=sprintf("%s.sigGene.value.dist.%s.%s.png",
-###																  out.prefix,ocluster$dataset.id[i],ocluster$meta.cluster[i]),
-###														   G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,run.extremevalue=T,
-###														   draw.CI=T, zero.as.low=T,my.seed=9997)
-###								 dat.binExp$o.df$dataset.id <- ocluster$dataset.id[i]
-###								 dat.binExp$o.df$meta.cluster <- ocluster$meta.cluster[i]
-###								 return(dat.binExp)
-###										},.parallel=T)
-###		binExp.merge <- as.data.table(ldply(binExp.list,function(x){ x$o.df }))
-###		binExp.merge <- dcast(binExp.merge,sample+dataset.id~meta.cluster,value.var="Exp")
 ###		if(!is.null(out.prefix)){
 ###			p <- ggplot(dat.plot.tb, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
 ###				ggridges::geom_density_ridges() +
