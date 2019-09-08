@@ -361,20 +361,19 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 							#				 names=colnames(dat.block.bin))
 							return(ret)
 							   })
-				  binExp.tb.i <- cbind(data.table(sample=rownames(mcls.bin),dataset.id=names(obj.list)[i]),
+				  binExp.tb.i <- cbind(data.table(cellID=rownames(mcls.bin),dataset.id=names(obj.list)[i]),
 										mcls.bin)
 				  idxCol.sigScore <- colnames(binExp.tb.i)[-c(1,2)]
 				  binExp.tb.i$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb.i[,idxCol.sigScore,with=F],1,
                                                             which.max)]
+				  colnames(binExp.tb.i)[seq_along(idxCol.sigScore)+2] <- sprintf("score.%s",idxCol.sigScore)
+				  for(xx in idxCol.sigScore){
+					  binExp.tb.i[[sprintf("bin.%s",xx)]] <- as.integer(binExp.tb.i[[sprintf("score.%s",xx)]] >= TH.gene.exp.freq)
+				  }
 				  return(binExp.tb.i)
 									}))
 
-###		if(!is.null(out.prefix)){
-###			p <- ggplot(dat.plot.tb, aes(x=sig.score,y=dataset.id,color=dataset.id),fill="none") +
-###				ggridges::geom_density_ridges() +
-###				facet_wrap(~meta.cluster,ncol=4)
-###			ggsave(file=sprintf("%s.sigScore.density.pdf",out.prefix),width=15,height=12)
-###		}
+
 	}else if(method=="corrCtrl") {
 
 		dat.plot.tb <- as.data.table(ldply(seq_along(mcls),function(j){
@@ -397,6 +396,10 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 		idxCol.sigScore <- colnames(binExp.tb)[-c(1,2)]
 		binExp.tb$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb[,idxCol.sigScore,with=F],1,
                                                             which.max)]
+		colnames(binExp.tb)[seq_along(idxCol.sigScore)+2] <- sprintf("score.%s",idxCol.sigScore)
+		for(xx in idxCol.sigScore){
+			binExp.tb[[sprintf("bin.%s",xx)]] <- as.integer(binExp.tb[[sprintf("score.%s",xx)]] >= 1)
+		}
 	}
 
 	return(binExp.tb)
