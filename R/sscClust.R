@@ -372,7 +372,13 @@ ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorClust
     rownames(dat.mtx) <- dat.df[,1]
     dat.mtx <- dat.mtx[rownames(obj),]
     obj.ret <- ssc.build(dat.mtx,assay.name=assay.name,display.name=rowData(obj)$display.name)
-    colData(obj.ret)[,column] <- colnames(obj.ret)
+    if(is.factor(obj[[column]])){
+        ##alevels <- intersect(levels(obj[[column]]),colnames(obj.ret))
+        alevels <- levels(obj[[column]])
+        colData(obj.ret)[,column] <- factor(colnames(obj.ret),levels=alevels)
+    }else{
+        colData(obj.ret)[,column] <- colnames(obj.ret)
+    }
     return(obj.ret)
   }
 }
@@ -1800,10 +1806,11 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 #' @param k.row integer; number of clusters in the rows (default: 1)
 #' @param k.col integer; number of clusters in the columns (default: 1)
 #' @param palette.name character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)
+#' @param row.split vector; used for row; (default: NULL)
 #' @param annotation_legend_param list; (default: list())
 #' @param ann.bar.height double; height of the top annotation (default: 1.5)
 #' @param mytitle character; title of the figure (default: "")
-#' @param ... parameters pass to Heatmap()
+#' @param ... parameters pass to sscClust:::plot.matrix.simple()
 #' @importFrom ComplexHeatmap HeatmapAnnotation Heatmap decorate_annotation
 #' @importFrom circlize colorRamp2
 #' @importFrom gridBase baseViewports
@@ -1819,7 +1826,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                              do.clustering.row=T,do.clustering.col=T,
                              dend.col=FALSE,dend.row=FALSE,
                              clustering.distance="spearman",clustering.method="complete",k.row=1,k.col=1,
-                             palette.name=NULL,
+                             palette.name=NULL,row.split=NULL,
                              annotation_legend_param=list(),ann.bar.height=1.5, mytitle="",...)
 {
     requireNamespace("ComplexHeatmap")
@@ -1881,7 +1888,8 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                                                          legend_height=unit(2, "cm"))
                 }else{
                     group.value <- sort(unique(colData(obj)[,x]))
-                    colSet[[x]] <- structure(auto.colSet(length(group.value),name="Accent"),names=group.value)
+                    colSet[[x]] <- structure(sscClust:::auto.colSet(length(group.value),name="Accent"),
+                                             names=as.character(group.value))
                 }
             }
         }
@@ -1924,33 +1932,22 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     #legend("topright",legend=names(colSet),fill=colSet,border=colSet,cex=1.5,inset=c(-0.03,0),xpd=T)
 
     ### Integrating Grid Graphics Output with Base Graphics Output
-    vps <- baseViewports()
-    pushViewport(vps$inner, vps$figure, vps$plot)
+    vps <- gridBase::baseViewports()
+    grid::pushViewport(vps$inner, vps$figure, vps$plot)
 
     if(is.null(palette.name)){
         exp.palette <- rev(brewer.pal(n = 7, name = ifelse(do.scale,"RdBu","RdYlBu")))
     }else{
         exp.palette <- rev(brewer.pal(n = 7, name = palette.name))
     }
-    ht <- ComplexHeatmap::Heatmap(dat.plot, name=exp.title,
-                col = colorRamp2(seq(z.lo,z.hi,length=100),
-                                 colorRampPalette(exp.palette)(100),
-                                 space="LAB"),
-                column_dend_height = unit(6, "cm"), row_dend_width = unit(6, "cm"),
-                column_names_gp = grid::gpar(fontsize = 12*28/max(m,32)),
-                row_names_gp = grid::gpar(fontsize = 10*28/max(n,32)),
-                show_heatmap_legend = T, row_names_max_width = unit(10,"cm"),
-                ###top_annotation_height = top_annotation_height,
-                cluster_columns = dend.col,
-                cluster_rows = dend.row,
-                row_dend_reorder = FALSE, column_dend_reorder = FALSE,
-                heatmap_legend_param = list(grid_width = unit(0.8, "cm"),
-                                            grid_height = unit(0.8, "cm"),
-                                            at = seq(z.lo,z.hi,z.step),
-                                            title_gp = grid::gpar(fontsize = 14, fontface = "bold"),
-                                            label_gp = grid::gpar(fontsize = 12), color_bar = "continuous"),
-                top_annotation = ha.col,...)
-    ComplexHeatmap::draw(ht, newpage= FALSE)
+
+    ht <- plot.matrix.simple(dat.plot,out.prefix=NULL,exp.name=exp.title,show.number=F,
+                               do.clust=NULL,z.lo=z.lo,z.hi=z.hi,palatte=exp.palette,
+                               clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
+                               returnHT=TRUE,par.legend=list(at = seq(z.lo,z.hi,z.step)),
+                               top_annotation = ha.col,...)
+
+    ComplexHeatmap::draw(ht, newpage= FALSE,merge_legends = TRUE,split=row.split)
     if(!is.null(ha.col)){
         for(i in seq_along(names(ha.col@anno_list))){
           ComplexHeatmap::decorate_annotation(names(ha.col@anno_list)[i],

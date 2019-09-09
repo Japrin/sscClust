@@ -11,7 +11,7 @@ ssc.plot.heatmap(obj, assay.name = "exprs", out.prefix = NULL,
   z.hi = 2.5, z.step = 1, exp.title = "Exp", do.clustering.row = T,
   do.clustering.col = T, dend.col = FALSE, dend.row = FALSE,
   clustering.distance = "spearman", clustering.method = "complete",
-  k.row = 1, k.col = 1, palette.name = NULL,
+  k.row = 1, k.col = 1, palette.name = NULL, row.split = NULL,
   annotation_legend_param = list(), ann.bar.height = 1.5,
   mytitle = "", ...)
 }
@@ -66,13 +66,15 @@ ssc.plot.heatmap(obj, assay.name = "exprs", out.prefix = NULL,
 
 \item{palette.name}{character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)}
 
+\item{row.split}{vector; used for row; (default: NULL)}
+
 \item{annotation_legend_param}{list; (default: list())}
 
 \item{ann.bar.height}{double; height of the top annotation (default: 1.5)}
 
 \item{mytitle}{character; title of the figure (default: "")}
 
-\item{...}{parameters pass to Heatmap()}
+\item{...}{parameters pass to sscClust:::plot.matrix.simple()}
 }
 \description{
 plot heatmap
