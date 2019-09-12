@@ -1855,11 +1855,16 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                                 clustering.distance="spearman",clustering.method="complete",
                                 k.row=1,k.col=1)
     }else{
+        avg.colDat <- unique((colData(obj)[,unique(c(ave.by,columns,columns.order)),drop=F]))
         obj <- ssc.average.cell(obj,assay.name=assay.name,column=ave.by,ret.type="sce")
-        columns <- intersect(ave.by,columns)
-        columns.order <- intersect(ave.by,columns.order)
+        #columns <- intersect(ave.by,columns)
+        #columns.order <- intersect(ave.by,columns.order)
+        if(nrow(avg.colDat)==ncol(obj) && all(avg.colDat[[ave.by]] %in% colnames(obj)) ){
+            rownames(avg.colDat) <- avg.colDat[[ave.by]]
+            colData(obj) <- avg.colDat[colnames(obj),,drop=F]
+        }
     }
-
+    
     #### visualization of annotation on top of heatmap
     ha.col <- NULL
     annDF <- data.frame()
