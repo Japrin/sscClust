@@ -6,8 +6,10 @@
 \usage{
 classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
   out.prefix = NULL, adjB = NULL, meta.cluster = NULL,
-  method = "posFreq", sig.prevelance = 0.5, ntop = 10, ncores = 16,
-  TH.gene.exp.freq = 0.5)
+  method = "posFreq", verbose = F, sig.prevelance = 0.65,
+  ntop = 10, ncores = 16, bin.z.th = 0.3, prob.th = 0.8,
+  TH.gene.exp.freq = 0.65, TH.gene.exp.freq.train.pos = 0.8,
+  TH.gene.exp.freq.train.neg = 0.2, RF.selectVar = F)
 }
 \arguments{
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}
@@ -24,13 +26,25 @@ classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
 
 \item{method}{character; (default: "posFreq")}
 
+\item{verbose}{logical; (default: FALSE)}
+
 \item{sig.prevelance}{double; (default: 0.5)}
 
 \item{ntop}{integer; only use the ntop top genes (default: 10)}
 
 \item{ncores}{integer; number of CPU to used (default: 16)}
 
+\item{bin.z.th}{numeric; z score of 'epressed' genes must be larger than this value  (default: 0.3)}
+
+\item{prob.th}{numeric; probability threshold (default: 0.8)}
+
 \item{TH.gene.exp.freq}{double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)}
+
+\item{RF.selectVar}{logical; (default: FALSE)}
+
+\item{TH.gene.exp.freq.pos}{double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)}
+
+\item{TH.gene.exp.freq.neg}{double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)}
 }
 \description{
 plot genes expression in pairs of clusters to examine the correlation

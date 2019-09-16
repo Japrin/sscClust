@@ -328,6 +328,7 @@ expressedFraction.HiExpressorMean <- function(exp.bin,exp.norm,group,n.cores=NUL
 #' Wraper for running random forest classifier
 #'
 #' @importFrom varSelRF varSelRF
+#' @importFrom randomForest randomForest
 #' @importFrom stats predict
 #' @param xdata data frame or matrix; data used for training, with sample id in rows and variables in columns
 #' @param xlabel factor; classification label of the samples, with length equal to the number of rows in xdata
@@ -335,10 +336,11 @@ expressedFraction.HiExpressorMean <- function(exp.bin,exp.norm,group,n.cores=NUL
 #' @param do.norm logical; whether perform Z score normalization on data
 #' @param ntree integer; parameter of varSelRF::varSelRF
 #' @param ntreeIterat integer; parameter of varSelRF::varSelRF
+#' @param selectVar logical; wheter select variables (default: TRUE)
 #' @return List with the following elements:
 #' \item{ylabel}{ppredicted labels of the samples in ydata}
 #' \item{rfsel}{trained model; output of varSelRF()}
-run.RF <- function(xdata, xlabel, ydata, do.norm=F, ntree = 500, ntreeIterat = 200)
+run.RF <- function(xdata, xlabel, ydata, do.norm=F, ntree = 500, ntreeIterat = 200, selectVar=T)
 {
   #require("varSelRF")
   #require("randomForest")
@@ -351,17 +353,22 @@ run.RF <- function(xdata, xlabel, ydata, do.norm=F, ntree = 500, ntreeIterat = 2
     ydata <- scale(ydata,center = T,scale = T)
   }
   ### random forest
-  rfsel <- varSelRF::varSelRF(xdata, xlabel,
-                              ntree = ntree, ntreeIterat = ntreeIterat,
-                              whole.range = FALSE,keep.forest = T)
-  #rfsel$selected.vars %>% str %>% print
-  #rfsel$initialImportances %>% head %>% print
-  #rfsel$rf.model$confusion %>% print
-  yres <- predict(rfsel$rf.model, newdata = ydata[,rfsel$selected.vars],type = "prob")
+  if(selectVar){
+	  rf.model <- varSelRF::varSelRF(xdata, xlabel,
+								  ntree = ntree, ntreeIterat = ntreeIterat,
+								  whole.range = FALSE,keep.forest = T)
+	  #rfsel$selected.vars %>% str %>% print
+	  #rfsel$initialImportances %>% head %>% print
+	  #rfsel$rf.model$confusion %>% print
+	  yres <- predict(rf.model$rf.model, newdata = ydata[,rf.model$selected.vars],type = "prob")
+  }else{
+	rf.model <- randomForest::randomForest(xdata, xlabel,importance=T,proximity=T,ntree=ntree)
+	yres <- predict(rf.model,ydata,type="prob")
+  }
   cls.set <- colnames(yres)
   ylabel <- apply(yres,1,function(x){ cls.set[which.max(x)] })
   names(ylabel) <- rownames(ydata)
-  return(list("ylabel"=ylabel,"rfsel"=rfsel,"yres"=yres))
+  return(list("ylabel"=ylabel,"rfsel"=rf.model,"yres"=yres))
 }
 
 #' Wraper for running svm

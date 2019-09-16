@@ -5,7 +5,7 @@
 \title{Wraper for running random forest classifier}
 \usage{
 run.RF(xdata, xlabel, ydata, do.norm = F, ntree = 500,
-  ntreeIterat = 200)
+  ntreeIterat = 200, selectVar = T)
 }
 \arguments{
 \item{xdata}{data frame or matrix; data used for training, with sample id in rows and variables in columns}
@@ -19,6 +19,8 @@ run.RF(xdata, xlabel, ydata, do.norm = F, ntree = 500,
 \item{ntree}{integer; parameter of varSelRF::varSelRF}
 
 \item{ntreeIterat}{integer; parameter of varSelRF::varSelRF}
+
+\item{selectVar}{logical; wheter select variables (default: TRUE)}
 }
 \value{
 List with the following elements:
