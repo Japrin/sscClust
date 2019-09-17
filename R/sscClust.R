@@ -1847,6 +1847,10 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     if(n<3) { loginfo(sprintf("Too few genes: n=%s",n)); return(NULL) }
     if(m<3) { loginfo(sprintf("Too few samples: m=%s",m)); return(NULL) }
 
+    if (!is.null(row.split) && is.null(names(row.split))) {
+        names(row.split) <- rownames(obj)
+    }
+
     #### sort
     if(is.null(ave.by)){
         obj <- ssc.assay.hclust(obj,assay.name=assay.name,
@@ -1863,6 +1867,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
             rownames(avg.colDat) <- avg.colDat[[ave.by]]
             colData(obj) <- avg.colDat[colnames(obj),,drop=F]
         }
+        obj <- ssc.assay.hclust(obj,assay.name,order.col=do.clustering.col,order.row=do.clustering.row)
     }
     
     #### visualization of annotation on top of heatmap
@@ -1946,6 +1951,9 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
         exp.palette <- rev(brewer.pal(n = 7, name = palette.name))
     }
 
+    if(!is.null(row.split)){
+        row.split <- row.split[rownames(dat.plot)]
+    }
     ht <- plot.matrix.simple(dat.plot,out.prefix=NULL,exp.name=exp.title,show.number=F,
                                do.clust=NULL,z.lo=z.lo,z.hi=z.hi,palatte=exp.palette,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,

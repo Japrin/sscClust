@@ -372,6 +372,7 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 #' @param test.method character; (default: "fisher.test")
 #' @param group.filter character; (default: NULL)
 #' @param sort.freq logical; (default: FALSE)
+#' @param bar.position ; passed to ggbarplot's position (default: position_dodge2())
 #' @param cmp.var character; (default: "Species")
 #' @param group.var character; (default: "ClusterID")
 #' @param donor.var character; (default: "donor")
@@ -384,7 +385,7 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 #' @export
 plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
                         facet.ncol=3,plot.width=10,plot.height=5,test.method="fisher.test",
-						group.filter=NULL,sort.freq=F,
+						group.filter=NULL,sort.freq=F,bar.position=position_dodge2(),
                         cmp.var="Species",group.var="ClusterID",donor.var="donor",verbose=F,...)
 {
     require("ggpubr")
@@ -437,41 +438,48 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
     if(plot.type=="boxplot"){
         p <- ggboxplot(dat.spe.group.dist,x="group.var",y="freq",
                        color = "cmp.var", 
-                       add = "jitter",outlier.shape=NA,...) +
-                stat_compare_means(aes_string(group = "cmp.var"), label = "p.signif")
+                       add = "jitter",outlier.shape=NA,...)
+        if(test.method!=""){
+            p <- p + stat_compare_means(aes_string(group = "cmp.var"), label = "p.signif")
+        }
     }else if(plot.type=="boxplot2"){
         p <- ggboxplot(dat.spe.group.dist,x="cmp.var",y="freq",
                        color = "cmp.var", 
                        add = "jitter",outlier.shape=NA,...) +
                 facet_wrap(~group.var,ncol=facet.ncol,scales="free_y")+
-                expand_limits(y=0) +
-                stat_compare_means(label = "p.format")
+                expand_limits(y=0)
+        if(test.method!=""){
+            p <- p + stat_compare_means(label = "p.format")
+        }
     }else if(plot.type=="barplot"){
         dat.plot <- dat.spe.group.dist[,.(N=sum(.SD$N),NTotal=sum(.SD$NTotal),
                                           freq=mean(.SD$freq)),
                                         by=c("cmp.var","group.var")]
         dat.plot[,NOther:=NTotal-N]
-        #dat.plot.test <<- dat.plot
-        if(test.method=="prop.test"){
-            ann.tb <- dat.plot[,.(p.value=prop.test(.SD$N, .SD$NTotal)$p.value,
-                                  y_pos=max(.SD$freq)),
-                               by="group.var"]
-        }else if(test.method=="fisher.test"){
-            ann.tb <- dat.plot[,.(p.value=fisher.test(.SD[,c("N","NOther"),with=F])$p.value,
-                                  y_pos=max(.SD$freq)),
-                               by="group.var"]
-        }
-        ann.tb[,p.adj:=p.adjust(p.value,"fdr")]
-        ann.tb[,p.signif:="ns"]
-        ann.tb[p.adj<0.05,p.signif:="*"]
-        ann.tb[p.adj<0.01,p.signif:="**"]
-        ann.tb[p.adj<0.001,p.signif:="***"]
-        #ann.tb[,xmin:=as.numeric(factor(group.var))-0.2]
-        #ann.tb[,xmax:=as.numeric(factor(group.var))+0.2]
-
+        
         p <- ggbarplot(dat.plot,x="group.var",y="freq",fill="cmp.var",color=NA,
-                       position=position_dodge2(),...) +
-                geom_text(data=ann.tb,aes(x=group.var,y=y_pos,label=p.signif),vjust=-0.5)
+                       position=bar.position,...)
+
+        if(test.method!=""){
+            if(test.method=="prop.test"){
+                ann.tb <- dat.plot[,.(p.value=prop.test(.SD$N, .SD$NTotal)$p.value,
+                                      y_pos=max(.SD$freq)),
+                                   by="group.var"]
+            }else if(test.method=="fisher.test"){
+                ann.tb <- dat.plot[,.(p.value=fisher.test(.SD[,c("N","NOther"),with=F])$p.value,
+                                      y_pos=max(.SD$freq)),
+                                   by="group.var"]
+            }
+            ann.tb[,p.adj:=p.adjust(p.value,"fdr")]
+            ann.tb[,p.signif:="ns"]
+            ann.tb[p.adj<0.05,p.signif:="*"]
+            ann.tb[p.adj<0.01,p.signif:="**"]
+            ann.tb[p.adj<0.001,p.signif:="***"]
+            #ann.tb[,xmin:=as.numeric(factor(group.var))-0.2]
+            #ann.tb[,xmax:=as.numeric(factor(group.var))+0.2]
+
+            p <- p + geom_text(data=ann.tb,aes(x=group.var,y=y_pos,label=p.signif),vjust=-0.5)
+        }
 
     }
     p <- p + theme(axis.text.x = element_text(angle = 60, hjust = 1)) +

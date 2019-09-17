@@ -7,8 +7,8 @@
 plotDistFromCellInfoTable(obj, out.prefix, plot.type = "barplot",
   facet.ncol = 3, plot.width = 10, plot.height = 5,
   test.method = "fisher.test", group.filter = NULL, sort.freq = F,
-  cmp.var = "Species", group.var = "ClusterID", donor.var = "donor",
-  verbose = F, ...)
+  bar.position = position_dodge2(), cmp.var = "Species",
+  group.var = "ClusterID", donor.var = "donor", verbose = F, ...)
 }
 \arguments{
 \item{obj}{object; can be class of Seurat, SingleCellExperiment or data.frame;}
@@ -28,6 +28,8 @@ plotDistFromCellInfoTable(obj, out.prefix, plot.type = "barplot",
 \item{group.filter}{character; (default: NULL)}
 
 \item{sort.freq}{logical; (default: FALSE)}
+
+\item{bar.position}{; passed to ggbarplot's position (default: position_dodge2())}
 
 \item{cmp.var}{character; (default: "Species")}
 
