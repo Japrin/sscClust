@@ -842,7 +842,7 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 	}
 	group.dis <- NULL
     if(!is.null(group)){
-		tmp.group <- unlist(strsplit(group,":"))
+		tmp.group <- unlist(strsplit(as.character(group),":"))
 		group <- tmp.group[1]
 		if(length(tmp.group)>1){
 			group.dis <- tmp.group[2]

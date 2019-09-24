@@ -262,13 +262,13 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
         palatte <- rev(brewer.pal(n = 7,name = "RdYlBu"))
     }
     par.legend.used <- list(title = exp.name,
-                               grid_width = unit(0.8, "cm"),
-                               grid_height = unit(0.8, "cm"),
+                               grid_width = unit(0.4, "cm"),
+                               grid_height = unit(0.4, "cm"),
                                #legend_width=2,
-                               legend_height=unit(10,"cm"),
-                               title_gp = gpar(fontsize = 16, fontface = "bold"),
+                               legend_height=unit(6,"cm"),
+                               title_gp = gpar(fontsize = 10, fontface = "bold"),
                                #color_bar = "continuous",
-                               label_gp = gpar(fontsize = 14))
+                               label_gp = gpar(fontsize = 8))
     if(length(par.legend)>0){
         for(ipar in names(par.legend)){
             par.legend.used[[ipar]] <- par.legend[[ipar]]

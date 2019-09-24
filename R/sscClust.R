@@ -1317,6 +1317,10 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
           npts <- nrow(dat.plot)
           if(is.numeric(dat.plot[,cc])){
             nvalues <- Inf
+            if(clamp!="none"){
+                dat.plot[[cc]][ dat.plot[[cc]] < clamp[1] ] <- clamp[1]
+                dat.plot[[cc]][ dat.plot[[cc]] > clamp[2] ] <- clamp[2]
+            }
           }else{
             nvalues <- length(unique(dat.plot[,cc]))
           }
@@ -1957,7 +1961,8 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     ht <- plot.matrix.simple(dat.plot,out.prefix=NULL,exp.name=exp.title,show.number=F,
                                do.clust=NULL,z.lo=z.lo,z.hi=z.hi,palatte=exp.palette,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
-                               returnHT=TRUE,par.legend=list(at = seq(z.lo,z.hi,z.step)),
+                               returnHT=TRUE,
+                               #par.legend=list(at = seq(z.lo,z.hi,z.step)),
                                top_annotation = ha.col,...)
 
     ComplexHeatmap::draw(ht, newpage= FALSE,merge_legends = TRUE,split=row.split)
