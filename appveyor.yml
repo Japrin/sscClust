@@ -20,7 +20,7 @@ environment:
 
 build_script:
   - travis-tool.sh install_deps
-  - travis-tool.sh install_bioc_deps
+  - travis-tool.sh install_bioc_deps limma
   - travis-tool.sh r_binary_install curl pkgmaker
 #  - travis-tool.sh bioc_install SingleCellExperiment scran zinbwave BiocGenerics BiocParallel ComplexHeatmap uwot
   - travis-tool.sh install_github Japrin/SC3
