@@ -6,7 +6,7 @@ Author: Xianwen Ren, Liangtao Zheng
 Maintainer: Liangtao Zheng <tao2013@gmail.com>
 Description: A package implement mutilple functionalities which are commonly used in single cell RNAseq data analysis, 
     including variable genes identification, dimension reduction, clustering on reduced data. Currently, this package also 
-    wrap other clustering method designed specifically for single cell RNAseq data, including SC3, ZinbWave etc. In addition, 
+    wrap other clustering method designed specifically for single cell RNAseq data, including SC3 etc. In addition, 
     some new ideas were proposed, such as projecting data to a feature space using spearman correlation which make 
     visualiaztion and clustering more efficient, clustering with subsampling and classfification which make it feasible to 
     process thousands cells' data. 
@@ -14,9 +14,9 @@ License: GPL-3
 Encoding: UTF-8
 LazyData: true
 RoxygenNote: 6.1.1
-Depends: R (>= 3.6), SingleCellExperiment, scran, SC3, zinbwave, BiocParallel
+Depends: R (>= 3.5), SingleCellExperiment, scran, SC3, BiocParallel
 Imports: RColorBrewer, Rtsne, class, factoextra, cowplot, data.table, ggplot2, ggrepel, 
     ggpubr, MASS, ROCR, BiocGenerics, ComplexHeatmap, circlize, dendextend, moduleColor,
-    plyr, dplyr, gridBase, varSelRF, cluster, ADPclust, ks, fields, doParallel, 
-    igraph, densityClust, RhpcBLASctl, e1071, uwot, DelayedArray, 
-    DelayedMatrixStats, Matrix, dynamicTreeCut, limma
+    plyr, dplyr, gridBase, varSelRF, cluster, ADPclust, ks, fields, doParallel, extremevalues,
+    igraph, densityClust, RhpcBLASctl, e1071, uwot, DelayedArray, leiden,
+    DelayedMatrixStats, Matrix, dynamicTreeCut, limma, ggridges, mclust, randomForest

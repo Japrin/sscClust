@@ -443,7 +443,7 @@ ssc.assay.zscore <- function(obj,assay.name="exprs",assay.new=NULL,covar="patien
 #' @importFrom uwot umap
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
-#' @param method character; method to be used for dimension reduction, should be one of (pca, tsne, iCor, zinbwave). (default: "iCor")
+#' @param method character; method to be used for dimension reduction, should be one of (pca, tsne, iCor). (default: "iCor")
 #' @param method.vgene character; method to identify variable genes. (default: sd)
 #' @param method.tsne character; method to run tsne, one of "Rtsne", "FIt-SNE". (default: "Rtsne")
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
@@ -455,8 +455,6 @@ ssc.assay.zscore <- function(obj,assay.name="exprs",assay.new=NULL,covar="patien
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
 #' @param iCor.method character; method to calculate correlation between samples,
 #' should be one of "spearman" and "pearson". (default "spearman")
-#' @param zinbwave.K integer, zinbwave parameter, number of latent variables. (default: 20)
-#' @param zinbwave.X character, zinbwave parameter, cell-level covariates. (default: "~patient")
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
 #' @param seed integer; seed of random number generation. (default: NULL)
 #' @param out.prefix character; output prefix (default: NULL)
@@ -481,7 +479,6 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
                           pca.npc=NULL,
                           tSNE.usePCA=T,
                           tSNE.perplexity=30,
-                          zinbwave.K=20, zinbwave.X="~patient",
                           autoTSNE=T,
                           dim.name=NULL,
                           iCor.niter=1,iCor.method="spearman",
@@ -550,16 +547,6 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
       if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <-
           run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity,out.prefix=out.prefix,
                    n.cores=ncore,method=method.tsne)
-      }
-    }else if(method=="zinbwave"){
-      res.zinb <- run.zinbWave(obj,assay.name=assay.name,vgene=vgene,n.cores=ncore,
-                               zinbwave.K=zinbwave.K, zinbwave.X=zinbwave.X,verbose=F)
-      proj_data <- getW(res.zinb)
-      colnames(proj_data) <- sprintf("W%d",seq_len(ncol(proj_data)))
-      if(autoTSNE) {
-          reducedDim(obj,sprintf("%s.tsne",dim.name)) <-
-              run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity,out.prefix=out.prefix,
-                       n.cores=ncore,method=method.tsne)
       }
     }
     reducedDim(obj,dim.name) <- proj_data
@@ -970,15 +957,13 @@ ssc.clustSubsamplingClassification <- function(obj, assay.name="exprs",
 #' @param sd.n integer; top number of genes as variable genes (default 1500)
 #' @param de.n integer; number of differential genes used for refined geneset for another run of clustering (default 1500)
 #' @param method.reduction character; which dimention reduction method to be used, should be one of
-#' "iCor", "pca", "zinbwave" and "none". (default: "iCor")
+#' "iCor", "pca", and "none". (default: "iCor")
 #' @param method.clust character; clustering method to be used, should be one of "kmeans", "hclust", "SNN", "adpclust" and "SC3. (default: "kmeans")
 #' @param method.classify character; method used for classification, one of "knn" and "RF". (default: "knn")
 #' @param method.tsne character; method to run tsne, one of "Rtsne", "FIt-SNE". (default: "Rtsne")
 #' @param pca.npc integer; number of pc be used. Only for reduction method "pca". (default: NULL)
 #' @param iCor.niter integer; number of iteration of calculating the correlation. Used in reduction method "iCor". (default: 1)
 #' @param iCor.method character; correlation method, one of "spearman", "pearson" (default: "spearman")
-#' @param zinbwave.K integer, zinbwave parameter, number of latent variables. (default: 20)
-#' @param zinbwave.X character, zinbwave parameter, cell-level covariates. (default: "~patient")
 #' @param tSNE.perplexity double, perplexity parameter of tSNE. (default: 30)
 #' @param subsampling logical; whether cluster using the subsampling->cluster->classification method. (default: F)
 #' @param sub.frac numeric; subsample to frac of original samples. (default: 0.4)
@@ -1016,7 +1001,6 @@ ssc.run <- function(obj, assay.name="exprs",
                     pca.npc=NULL,
                     iCor.niter=1,
                     iCor.method="spearman",
-                    zinbwave.K=20, zinbwave.X="~patient",
                     tSNE.perplexity=30,
                     subsampling=F,
                     sub.frac=0.4,
@@ -1068,7 +1052,6 @@ ssc.run <- function(obj, assay.name="exprs",
                            pca.npc = pca.npc,
                            iCor.niter = iCor.niter,
                            iCor.method = iCor.method,
-                           zinbwave.K = zinbwave.K, zinbwave.X = zinbwave.X,
                            method.vgene=method.vgene,
                            method.tsne=method.tsne,tSNE.perplexity=tSNE.perplexity,
                            ncore = ncore,
@@ -1132,7 +1115,6 @@ ssc.run <- function(obj, assay.name="exprs",
                          pca.npc = pca.npc,
                          iCor.niter = iCor.niter,
                          iCor.method = iCor.method,
-                         zinbwave.K = zinbwave.K, zinbwave.X = zinbwave.X,
                          tSNE.perplexity=tSNE.perplexity,
                          ncore = ncore,
                          seed = seed,
@@ -1212,7 +1194,7 @@ ssc.run <- function(obj, assay.name="exprs",
       rowData(obj)[,"HVG.de"]  <- rownames(obj) %in% head(de.out$aov.out.sig$geneID,n=sd.n)
       ### for general visualization
       obj <- ssc.reduceDim(obj,assay.name=assay.name, method="tsne",method.tsne=method.tsne,
-                           zinbwave.K = zinbwave.K, zinbwave.X = zinbwave.X,tSNE.perplexity=tSNE.perplexity,
+                           tSNE.perplexity=tSNE.perplexity,
                            method.vgene="HVG.de",dim.name = sprintf("vis.tsne"))
     }
   }else{
@@ -1455,7 +1437,7 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 	  colnames(dat.plot.df.grpMean) <- c("gene",group.var,"meanExp")
 	  dat.plot.df <- dat.plot.df.grpMean[dat.plot.df,,on=c("gene",group.var)]
       dat.plot.df[,gene:=factor(gene,levels=colnames(dat.plot),ordered=T)]
-      
+
       if(is.null(clamp)){
           clamp <- quantile(dat.plot.df[[assay.name]],c(0.05,0.95))
       }
@@ -1722,7 +1704,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     if(!is.null(ncell.downsample)){
         obj <- ssc.downsample(obj, ncell.downsample=ncell.downsample, group.var=group.var,rn.seed=9999)
     }
-    
+
     clust <- colData(obj)[,group.var]
     if(is.null(group.list)){ group.list <- unique(clust) }
     batchV <- NULL
@@ -1758,7 +1740,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                                       group=xgroup,
                                       T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
                                       gid.mapping=gid.mapping, do.voom=F)
-		
+
     },.parallel=T)
     names(out) <- group.list
 
@@ -1873,7 +1855,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
         }
         obj <- ssc.assay.hclust(obj,assay.name,order.col=do.clustering.col,order.row=do.clustering.row)
     }
-    
+
     #### visualization of annotation on top of heatmap
     ha.col <- NULL
     annDF <- data.frame()

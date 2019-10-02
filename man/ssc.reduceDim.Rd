@@ -6,17 +6,16 @@
 \usage{
 ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
   method.vgene = "HVG.sd", method.tsne = "Rtsne", pca.npc = NULL,
-  tSNE.usePCA = T, tSNE.perplexity = 30, zinbwave.K = 20,
-  zinbwave.X = "~patient", autoTSNE = T, dim.name = NULL,
-  iCor.niter = 1, iCor.method = "spearman", reuse = F,
-  ncore = NULL, seed = NULL, out.prefix = NULL)
+  tSNE.usePCA = T, tSNE.perplexity = 30, autoTSNE = T,
+  dim.name = NULL, iCor.niter = 1, iCor.method = "spearman",
+  reuse = F, ncore = NULL, seed = NULL, out.prefix = NULL)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
 
 \item{assay.name}{character; which assay (default: "exprs")}
 
-\item{method}{character; method to be used for dimension reduction, should be one of (pca, tsne, iCor, zinbwave). (default: "iCor")}
+\item{method}{character; method to be used for dimension reduction, should be one of (pca, tsne, iCor). (default: "iCor")}
 
 \item{method.vgene}{character; method to identify variable genes. (default: sd)}
 
@@ -27,10 +26,6 @@ ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
 \item{tSNE.usePCA}{logical; whether use PCA before tSNE. Only for reduction method "tsne". (default: T)}
 
 \item{tSNE.perplexity}{logical; perplexity parameter. Used in all Rtsne() calling. (default: 30)}
-
-\item{zinbwave.K}{integer, zinbwave parameter, number of latent variables. (default: 20)}
-
-\item{zinbwave.X}{character, zinbwave parameter, cell-level covariates. (default: "~patient")}
 
 \item{autoTSNE}{logical; Wheter generate automatically a tSNE map when reduction method is "pca" or "iCor". (default: T)}
 

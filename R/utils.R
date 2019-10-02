@@ -521,35 +521,6 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
   return(obj)
 }
 
-#' Wraper for running ZinbWave
-#' @importFrom zinbwave zinbFit
-#' @importFrom RhpcBLASctl omp_set_num_threads
-#' @importFrom BiocParallel MulticoreParam
-#' @param obj object of \code{singleCellExperiment} class
-#' @param assay.name character; which assay to use for select genes (default: "exprs")
-#' @param vgene vector; only consider those specified genes if set. (default: NULL)
-#' @param out.prefix character, output prefix
-#' @param n.cores integer, number of cors to use. (default: 8)
-#' @param zinbwave.K integer, zinbwave parameter, number of latent variables. (default: 20)
-#' @param zinbwave.X character, zinbwave parameter, cell-level covariates. (default: "~patient")
-#' @param verbose logical, whether verbose output. (default: F)
-#' @details Run ZinbWave fitting
-#' @return an object of class ZinbModel
-#' @export
-run.zinbWave <- function(obj,assay.name="exprs", vgene=NULL,out.prefix="./zinbwave",n.cores=8,
-                         zinbwave.K=20,
-                         zinbwave.X="~patient",verbose=F)
-{
-  if(is.null(vgene)){
-    obj <- ssc.variableGene(obj,method = "HVG.sd",sd.n = 1500,assay.name = assay.name)
-    #vgene <- metadata(obj)$ssc$variable.gene$sd
-    vgene <- rowData(obj)[["HVG.sd"]]
-  }
-  RhpcBLASctl::omp_set_num_threads(1)
-  #### fitting
-  obj.zinb <- zinbFit(obj[vgene,], K=zinbwave.K, X=zinbwave.X, epsilon=1000,BPPARAM=MulticoreParam(n.cores),verbose=verbose)
-  return(obj.zinb)
-}
 
 #' Wraper for running FIt-SNE. Code from KlugerLab (https://github.com/KlugerLab/FIt-SNE)
 #' @param X matrix; samples in rows and variables in columns
@@ -834,7 +805,7 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     xdata <- as.matrix(xdata)
     f.gene <- rowVars(xdata)>0
     xdata <- xdata[f.gene,]
-    #### 
+    ####
 	if("_control" %in% xlabel){
 		x.levels <- c("_control",setdiff(unique(sort(xlabel)),"_control"))
 	}else{
