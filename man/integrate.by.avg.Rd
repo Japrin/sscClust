@@ -10,7 +10,7 @@ integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
   de.stat = "t", de.thres = 1, do.scale = F,
   par.clust = list(method = "SNN", SNN.k = 3, SNN.method = "leiden",
   resolution_parameter = 2.2), topGene.lo = -1.5, topGene.hi = 1.5,
-  topGene.step = 1, method.avg = "zscore", ...)
+  topGene.step = 1, myseed = 9997, method.avg = "zscore", ...)
 }
 \arguments{
 \item{sce.list}{list; list of object of \code{singleCellExperiment} class}
@@ -44,6 +44,8 @@ integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
 \item{topGene.hi}{double; for top gene heatmap.(default: 1.5)}
 
 \item{topGene.step}{double; for top gene heatmap.(default: 1)}
+
+\item{myseed}{integer; seed for random number generation.(default: 9997)}
 
 \item{method.avg}{character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")}
 

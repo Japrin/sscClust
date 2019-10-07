@@ -12,8 +12,8 @@ ssc.plot.heatmap(obj, assay.name = "exprs", out.prefix = NULL,
   do.clustering.col = T, dend.col = FALSE, dend.row = FALSE,
   clustering.distance = "spearman", clustering.method = "complete",
   k.row = 1, k.col = 1, palette.name = NULL, row.split = NULL,
-  annotation_legend_param = list(), ann.bar.height = 1.5,
-  mytitle = "", ...)
+  column.split = NULL, annotation_legend_param = list(),
+  ann.bar.height = 1.5, mytitle = "", ...)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -67,6 +67,8 @@ ssc.plot.heatmap(obj, assay.name = "exprs", out.prefix = NULL,
 \item{palette.name}{character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)}
 
 \item{row.split}{vector; used for row; (default: NULL)}
+
+\item{column.split}{vector; used for column; (default: NULL)}
 
 \item{annotation_legend_param}{list; (default: list())}
 

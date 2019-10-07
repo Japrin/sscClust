@@ -16,6 +16,7 @@
 #' @param topGene.lo double; for top gene heatmap.(default: -1.5)
 #' @param topGene.hi double; for top gene heatmap.(default: 1.5)
 #' @param topGene.step double; for top gene heatmap.(default: 1)
+#' @param myseed integer; seed for random number generation.(default: 9997)
 #' @param ... parameters passed to ssc.clusterMarkerGene
 #' @importFrom plyr llply
 #' @details method to calculate the average expression can be one of "mean", "zscore"
@@ -31,7 +32,7 @@ integrate.by.avg <- function(sce.list,
 							 de.stat="t",de.thres=1,do.scale=F,
 							 ###par.clust=list(deepSplit=4, minClusterSize=2,method="dynamicTreeCut"),
 							 par.clust=list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2),
-                             topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,
+                             topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,myseed=9997,
                              method.avg="zscore",...)
   {
     require("plyr")
@@ -106,6 +107,7 @@ integrate.by.avg <- function(sce.list,
 			gene.rank.tb <- dcast(gene.rank.tb,geneID~dataset.id,value.var="F.rank",fill=1)
 			gene.rank.tb$median.F.rank <- rowMedians(as.matrix(gene.rank.tb[,-c("geneID"),with=F]))
 			gene.rank.tb <- gene.rank.tb[order(median.F.rank),]
+			gene.rank.tb <- gene.rank.tb[geneID %in% gene.common,]
 			rowData(sce.pb)$median.F.rank <- gene.rank.tb[["median.F.rank"]][match(rownames(sce.pb),gene.rank.tb$geneID)]
 			gene.rank.tb.debug <<- gene.rank.tb
 			sce.pb.debug <<- sce.pb
@@ -158,10 +160,10 @@ integrate.by.avg <- function(sce.list,
 	if(do.scale){
 		assay(sce.pb,"exprs.scale") <- t(scale(t(assay(sce.pb,"exprs"))))
 		sce.pb <- ssc.reduceDim(sce.pb,assay.name="exprs.scale",
-								method="pca",method.vgene="gene.de.common", pca.npc=n.pc,seed=9997)
+								method="pca",method.vgene="gene.de.common", pca.npc=n.pc,seed=myseed)
 	}else{
 		sce.pb <- ssc.reduceDim(sce.pb,assay.name="exprs",
-								method="pca",method.vgene="gene.de.common", pca.npc=n.pc,seed=9997)
+								method="pca",method.vgene="gene.de.common", pca.npc=n.pc,seed=myseed)
 	}
 
     #ssc.plot.pca(sce.pb)
@@ -172,7 +174,7 @@ integrate.by.avg <- function(sce.list,
     colData(sce.pb)
 
     #### clustering the clusters
-	sce.pb <- do.call(ssc.clust,c(list(obj=sce.pb,method.reduction="pca", seed=9997),
+	sce.pb <- do.call(ssc.clust,c(list(obj=sce.pb,method.reduction="pca", seed=myseed),
 								 par.clust))
 
 	loginfo(sprintf("make some plots ..."))
@@ -309,6 +311,7 @@ rank.de.gene <- function(obj)
 #' @param TH.gene.exp.freq.pos double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)
 #' @param TH.gene.exp.freq.neg double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)
 #' @param RF.selectVar logical; (default: FALSE)
+#' @param obj.int object; (default: NULL)
 #' @import data.table
 #' @import ggplot2 
 #' @import ggridges
@@ -319,7 +322,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
                                     adjB=NULL,meta.cluster=NULL,method="posFreq",verbose=F,
                                     sig.prevelance=0.65,ntop=10,ncores=16,bin.z.th=0.3,prob.th=0.8,
 									TH.gene.exp.freq=0.65,TH.gene.exp.freq.train.pos=0.8,TH.gene.exp.freq.train.neg=0.2,
-									RF.selectVar=F)
+									RF.selectVar=F,obj.int=NULL,...)
 {
 
 	gene.core.tb <- gene.desc.top[median.rank<0.01 & freq.sig >sig.prevelance,]
@@ -331,6 +334,23 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 		mcls <- unique(gene.core.tb$meta.cluster)
 	}else{
 		mcls <- meta.cluster
+	}
+
+	if(!is.null(obj.int)){
+		gene.core.plot.tb <- gene.core.tb[meta.cluster %in% mcls,][!duplicated(geneID),]
+		ssc.plot.heatmap(obj.int,
+						 out.prefix=sprintf("%s.gene.top%d.prev%4.2f.sel",out.prefix,ntop,sig.prevelance),
+						 columns="meta.cluster",columns.order="meta.cluster",
+						 gene.desc=gene.core.plot.tb,
+						 row.split=gene.core.plot.tb$Group,
+						 column.split=obj.int$meta.cluster,
+						 row_gap = unit(0, "mm"), column_gap = unit(0, "mm"),
+						 row_title_rot = 0, column_title_gp = gpar(fontsize = 0),
+						 border = TRUE,
+						 pdf.width=20,pdf.height=10,do.scale=F,
+						 z.lo=-15,z.hi=15,z.step=3,
+						 do.clustering.row=F,
+						 do.clustering.col=T)
 	}
 
 	RhpcBLASctl::omp_set_num_threads(1)
@@ -352,15 +372,16 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 				  rownames(dat.block) <- rowData(obj)[rownames(dat.block),"display.name"]
 				  #### binarize all sig genes
 				  dat.block.th <- (dat.block > bin.z.th)
-				  dat.block.bin <- laply(seq_len(nrow(dat.block)),function(j){
-					  gene.j <- rownames(dat.block)[j]
-					  dat.binExp <- binarizeExp(dat.block[j,],
-												#out.prefix=sprintf("%s.gene.dist.%s.%s.png",out.prefix,dataset.id,gene.j),
-												G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,run.extremevalue=F,
-												draw.CI=T, zero.as.low=T,my.seed=9997)
-					  structure(dat.binExp$o.df$Exp,names=rownames(dat.binExp$o.df))
-							   },.parallel=T)
-				  dat.block.bin <- dat.block.bin & dat.block.th
+###				  dat.block.bin <- laply(seq_len(nrow(dat.block)),function(j){
+###					  gene.j <- rownames(dat.block)[j]
+###					  dat.binExp <- binarizeExp(dat.block[j,],
+###												#out.prefix=sprintf("%s.gene.dist.%s.%s.png",out.prefix,dataset.id,gene.j),
+###												G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,run.extremevalue=F,
+###												draw.CI=T, zero.as.low=T,my.seed=9997)
+###					  structure(dat.binExp$o.df$Exp,names=rownames(dat.binExp$o.df))
+###							   },.parallel=T)
+###				  dat.block.bin <- dat.block.bin & dat.block.th
+				  dat.block.bin <- dat.block.th
 				  rownames(dat.block.bin) <- rownames(dat.block)
 				  ### classification criteria
 				  mcls.bin <- sapply(mcls,function(x){
@@ -532,17 +553,19 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
   
   quantEstDist <- mclust::quantileMclust(x_mix, p = ppoints(length(x)))
   quantSample <- sort(x_mix$data)
-  quantEstDist.debug <<- quantEstDist
-  x.debug <<- x
-  x_mix.debug <<- x_mix
+  #quantEstDist.debug <<- quantEstDist
+  #x.debug <<- x
+  #x_mix.debug <<- x_mix
   ret.gof <- list(R2=NA)
-  tryCatch({
-	  res.lm <- lm(y~x,data=data.frame(x=quantEstDist,y=quantSample))
-	  res.lm.summ <- summary(res.lm)
-	  ret.gof <- list(R2=res.lm.summ$r.squared)
-  },error=function(e){
-	  print(e)
-  })
+  if(verbose){
+	  tryCatch({
+		  res.lm <- lm(y~x,data=data.frame(x=quantEstDist,y=quantSample))
+		  res.lm.summ <- summary(res.lm)
+		  ret.gof <- list(R2=res.lm.summ$r.squared)
+	  },error=function(e){
+		  print(e)
+	  })
+  }
 
   dat.extra <- NULL
   if(run.extremevalue){

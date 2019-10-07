@@ -263,25 +263,14 @@ ssc.assay.hclust <- function(obj,assay.name="exprs",
 #' @param obj object of \code{singleCellExperiment} class
 #' @param columns.order character; columns of colData(obj) used for ordering (default: NULL)
 #' @param gene.desc data.frame; it must contain columns geneID and Group (default: NULL)
-#' @importFrom BiocGenerics rbind
+#' @import data.table
 #' @export
 ssc.order <- function(obj,columns.order=NULL,gene.desc=NULL)
 {
     if(!is.null(gene.desc) && ("Group" %in% colnames(gene.desc)) && ("geneID" %in% colnames(gene.desc))){
-        obj.tmp <- NULL
-        #### Todo: change to 'ldply' style
-        for(g.cls in unique(gene.desc$Group))
-        {
-            g.desc <- subset(gene.desc,Group==g.cls)
-            if(is.null(obj.tmp)){
-                obj.tmp <- obj[g.desc$geneID,]
-            }else{
-                obj.tmp <- BiocGenerics::rbind(obj.tmp,obj[g.desc$geneID,])
-            }
-        }
-        obj <- obj.tmp
-        obj.tmp <- NULL
-        gc()
+		gene.desc <- as.data.table(gene.desc)
+		gene.desc <- gene.desc[order(Group),]
+        obj <- obj[gene.desc$geneID,]
     }
     if(!is.null(columns.order)){
         annDF <- as.data.frame(colData(obj)[columns.order])
@@ -732,7 +721,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     }else if(SNN.method=="betweenness"){
       clust.res <- igraph::cluster_edge_betweenness(snn.gr)
     }else if(SNN.method=="leiden"){
-      clust.res <- leiden::leiden(igraph::as_adjacency_matrix(snn.gr),...)
+      clust.res <- leiden::leiden(igraph::as_adjacency_matrix(snn.gr),seed=myseed,...)
 	  clust.res <- list(membership=clust.res)
 	}
     metadata(obj)$ssc$clust.res[["snn.gr"]] <- snn.gr
@@ -1811,6 +1800,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 #' @param k.col integer; number of clusters in the columns (default: 1)
 #' @param palette.name character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)
 #' @param row.split vector; used for row; (default: NULL)
+#' @param column.split vector; used for column; (default: NULL)
 #' @param annotation_legend_param list; (default: list())
 #' @param ann.bar.height double; height of the top annotation (default: 1.5)
 #' @param mytitle character; title of the figure (default: "")
@@ -1830,7 +1820,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                              do.clustering.row=T,do.clustering.col=T,
                              dend.col=FALSE,dend.row=FALSE,
                              clustering.distance="spearman",clustering.method="complete",k.row=1,k.col=1,
-                             palette.name=NULL,row.split=NULL,
+                             palette.name=NULL,row.split=NULL,column.split=NULL,
                              annotation_legend_param=list(),ann.bar.height=1.5, mytitle="",...)
 {
     requireNamespace("ComplexHeatmap")
@@ -1853,6 +1843,9 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
 
     if (!is.null(row.split) && is.null(names(row.split))) {
         names(row.split) <- rownames(obj)
+    }
+    if (!is.null(column.split) && is.null(names(column.split))) {
+        names(column.split) <- colnames(obj)
     }
 
     #### sort
@@ -1958,11 +1951,14 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     if(!is.null(row.split)){
         row.split <- row.split[rownames(dat.plot)]
     }
+    if(!is.null(column.split)){
+        column.split <- column.split[colnames(dat.plot)]
+    }
     ht <- plot.matrix.simple(dat.plot,out.prefix=NULL,exp.name=exp.title,show.number=F,
                                do.clust=NULL,z.lo=z.lo,z.hi=z.hi,palatte=exp.palette,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
-                               returnHT=TRUE,
-                               #par.legend=list(at = seq(z.lo,z.hi,z.step)),
+                               returnHT=TRUE,column_split=column.split,
+                               par.legend=list(at = seq(z.lo,z.hi,z.step)),
                                top_annotation = ha.col,...)
 
     ComplexHeatmap::draw(ht, newpage= FALSE,merge_legends = TRUE,split=row.split)

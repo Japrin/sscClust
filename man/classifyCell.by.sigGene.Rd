@@ -9,7 +9,8 @@ classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
   method = "posFreq", verbose = F, sig.prevelance = 0.65,
   ntop = 10, ncores = 16, bin.z.th = 0.3, prob.th = 0.8,
   TH.gene.exp.freq = 0.65, TH.gene.exp.freq.train.pos = 0.8,
-  TH.gene.exp.freq.train.neg = 0.2, RF.selectVar = F)
+  TH.gene.exp.freq.train.neg = 0.2, RF.selectVar = F, obj.int = NULL,
+  ...)
 }
 \arguments{
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}
@@ -41,6 +42,8 @@ classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
 \item{TH.gene.exp.freq}{double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)}
 
 \item{RF.selectVar}{logical; (default: FALSE)}
+
+\item{obj.int}{object; (default: NULL)}
 
 \item{TH.gene.exp.freq.pos}{double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)}
 
