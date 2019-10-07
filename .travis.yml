@@ -3,7 +3,6 @@ sudo: required
 cache: packages
 bioc_packages:
   - SingleCellExperiment
-  - zinbwave
   - BiocGenerics
   - BiocParallel
   - ComplexHeatmap

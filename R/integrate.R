@@ -178,10 +178,10 @@ integrate.by.avg <- function(sce.list,
 								 par.clust))
 
 	loginfo(sprintf("make some plots ..."))
-    
+
 	p <- ssc.plot.tsne(sce.pb,columns = "dataset.id",reduced.name = "pca.tsne",size=3)
     ggsave(sprintf("%s.pca.tsne.aid.pdf",out.prefix),width=5,height=4)
-	
+
     #p <- ssc.plot.tsne(sce.pb,columns = "pca.hclust.k0",
     #               reduced.name = "pca.tsne",
     #               size=3)
@@ -254,7 +254,7 @@ integrate.by.avg <- function(sce.list,
 							   do.clustering.col=T
 							   )
 	}
-	
+
 	#### heatmap show average expression of specified genes
     ###return(list("sce.pb"=sce.pb,"branch.out"=branch.out))
     metadata(sce.pb)$ssc$gene.de.list <- gene.de.list
@@ -295,7 +295,7 @@ rank.de.gene <- function(obj)
 
 #' plot genes expression in pairs of clusters to examine the correlation
 #' @param obj.list object; named list of object of \code{singleCellExperiment} class
-#' @param gene.desc.top data.frame; signature genes 
+#' @param gene.desc.top data.frame; signature genes
 #' @param assay.name character; which assay (default: "exprs")
 #' @param out.prefix character; output prefix (default: NULL).
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
@@ -313,7 +313,7 @@ rank.de.gene <- function(obj)
 #' @param RF.selectVar logical; (default: FALSE)
 #' @param obj.int object; (default: NULL)
 #' @import data.table
-#' @import ggplot2 
+#' @import ggplot2
 #' @import ggridges
 #' @importFrom  ggpubr ggscatter
 #' @details classify cells using the signature genes
@@ -487,7 +487,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 										},.parallel=T)
 			return(dat.plot.j)
 		}))
-		
+
 		binExp.tb <- dcast(dat.plot.tb,cellID+dataset.id~meta.cluster,value.var="sig.score")
 		idxCol.sigScore <- colnames(binExp.tb)[-c(1,2)]
 		binExp.tb$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb[,idxCol.sigScore,with=F],1,
@@ -517,7 +517,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 #' @param my.seed integer; [default: 9997]
 #' @param ... parameters passed to plot.densityMclust
 #' @import data.table
-#' @import ggplot2 
+#' @import ggplot2
 #' @import mclust
 #' @details use mixture model to classify each data point. If G is null, the largest component is corresponding to binarized expression 1, and other components are corresponding to binarized expressed 0.
 #' @export
@@ -550,7 +550,7 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
   set.seed(my.seed)
   x_mix <- mclust::densityMclust(x,G=G,modelNames=c("E","V"))
   x_mix_summary <- summary(x_mix)
-  
+
   quantEstDist <- mclust::quantileMclust(x_mix, p = ppoints(length(x)))
   quantSample <- sort(x_mix$data)
   #quantEstDist.debug <<- quantEstDist
@@ -588,7 +588,7 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 	  if(!is.null(e.TH)){
 		abline(v=e.TH,lty=2,col="red")
 	  }
-	  
+
 	  for(i in 1:x_mix_summary$G)
 	  {
 		i_mean<-x_mix_summary$mean[i]
@@ -609,9 +609,9 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 	  },error=function(e){ cat(sprintf("Error in  densityMclust.diagnostic(x_mix,type = \"qq\")\n")); print(e); e })
 	  dev.off()
   }
-  
-  o.df[names(x_mix$classification),"classification"] <- x_mix$classification 
-  o.df[names(x_mix$classification),"bin.Exp"] <- x_mix$classification 
+
+  o.df[names(x_mix$classification),"classification"] <- x_mix$classification
+  o.df[names(x_mix$classification),"bin.Exp"] <- x_mix$classification
   colnames(o.df)[2] <- e.name
   if(is.null(G)){
 	  if(topNAsHi==0){
@@ -619,11 +619,11 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 	  }else{
 		iG.2nd <- x_mix$G-topNAsHi
 	  }
-      f.low <- o.df[[e.name]] <= iG.2nd 
+      f.low <- o.df[[e.name]] <= iG.2nd
       o.df[[e.name]][f.low] <- 0
       o.df[[e.name]][!f.low] <- 1
   }else if(!is.null(G) && x_mix_summary$G==3){
-	  ### determin which classes 'not-expressed' and which classes 'expressed'	
+	  ### determin which classes 'not-expressed' and which classes 'expressed'
 	  i_mean<-x_mix_summary$mean
 	  i_sd<-sqrt(x_mix_summary$variance)
 	  ci95.1 <- qnorm(c(0.0013,0.9987),i_mean[1],i_sd[1])
@@ -683,15 +683,14 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 #' @param out.prefix character; output prefix [default: NULL]
 #' @param e.name character; name of the expression metric [default: "Exp"]
 #' @import data.table
-#' @import ggplot2 
-#' @import extremevalues
+#' @import ggplot2
 #' @details outlier detection using extremevalues
 #' @export
 classify.outlier <- function(x,out.prefix=NULL,e.name="Exp")
 {
 	##### outlier detection (use method I at last)
-	K <- getOutliers(x,method="I",distribution="normal")
-	L <- getOutliers(x,method="II",distribution="normal")
+	K <- extremevalues::getOutliers(x,method="I",distribution="normal")
+	L <- extremevalues::getOutliers(x,method="II",distribution="normal")
 
 	ii <- seq(K$limit[1], K$limit[2],0.01)
     x.fit <- dnorm(ii,mean = K$mu,sd = K$sigma)
@@ -710,11 +709,11 @@ classify.outlier <- function(x,out.prefix=NULL,e.name="Exp")
     if(!is.null(out.prefix)){
         pdf(sprintf("%s.extremevalues.outlier.pdf",out.prefix),width = 10,height = 6)
         opar <- par(mfrow=c(1,2))
-        outlierPlot(x,K,mode="qq")
-        outlierPlot(x,L,mode="residual")
+        extremevalues::outlierPlot(x,K,mode="qq")
+        extremevalues::outlierPlot(x,L,mode="residual")
         dev.off()
         par(opar)
-    
+
 	    p <- ggplot(ret.1, aes(score)) + geom_density(colour="black") + theme_bw() +
 		        geom_line(data=ret.2,aes(x=score,y=density),colour="red") +
 		        geom_vline(xintercept = K$limit,linetype=2)
