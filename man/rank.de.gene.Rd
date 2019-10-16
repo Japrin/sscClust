@@ -4,10 +4,12 @@
 \alias{rank.de.gene}
 \title{get gene ranking table from obj}
 \usage{
-rank.de.gene(obj)
+rank.de.gene(obj, group = "pca.SNN.kauto")
 }
 \arguments{
 \item{obj}{object; object of \code{singleCellExperiment} class}
+
+\item{group}{character; columan name in colData(obj)}
 }
 \value{
 a gene table

@@ -265,14 +265,15 @@ integrate.by.avg <- function(sce.list,
 
 #' get gene ranking table from obj
 #' @param obj object; object of \code{singleCellExperiment} class
+#' @param group character; columan name in colData(obj)
 #' @import data.table
 #' @importFrom plyr ldply
 #' @details rank genes
 #' @return a gene table
-rank.de.gene <- function(obj)
+rank.de.gene <- function(obj,group="pca.SNN.kauto")
 {
-	gene.desc.top <- as.data.table(ldply(unique(sort(obj$pca.SNN.kauto)),function(x){
-											 obj.x <- obj[,obj$pca.SNN.kauto==x]
+	gene.desc.top <- as.data.table(ldply(unique(sort(obj[[group]])),function(x){
+											 obj.x <- obj[,obj[[group]]==x]
 											 ret.tb <- data.table(geneID=rownames(obj.x),
 														geneSymbol=rowData(obj.x)$display.name,
 														meta.cluster=x,
@@ -325,15 +326,19 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 									RF.selectVar=F,obj.int=NULL,...)
 {
 
-	gene.core.tb <- gene.desc.top[median.rank<0.01 & freq.sig >sig.prevelance,]
+	gene.core.tb <- gene.desc.top[median.rank<0.01 & freq.sig >= sig.prevelance,][order(meta.cluster),]
 	if(!is.null(ntop)){
 		gene.core.tb <- gene.core.tb[,head(.SD,n=ntop),by=c("meta.cluster")]
 	}
 
 	if(is.null(meta.cluster)){
-		mcls <- unique(gene.core.tb$meta.cluster)
+		mcls <- sort(unique(gene.core.tb$meta.cluster))
 	}else{
-		mcls <- meta.cluster
+		mcls <- sort(meta.cluster)
+	}
+
+	if(!is.null(out.prefix)){
+		write.table(gene.core.tb,sprintf("%s.gene.core.tb.top%d.txt",out.prefix,ntop),row.names=F,sep="\t",quote=F)
 	}
 
 	if(!is.null(obj.int)){
@@ -351,6 +356,24 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 						 z.lo=-15,z.hi=15,z.step=3,
 						 do.clustering.row=F,
 						 do.clustering.col=T)
+
+		g.desc <- ldply(sort(unique(gene.desc.top$meta.cluster)),function(mcls){
+					dat.plot <- gene.desc.top[meta.cluster==mcls,]
+					dat.plot <- dat.plot[freq.sig>0.3 & median.rank < 0.1,]
+					g.desc <- head(dat.plot[geneID %in% rownames(obj.int),],n=30)
+					ssc.plot.heatmap(obj.int,out.prefix=sprintf("%s.gene.top%d.prev%4.2f.sel.%s",
+																out.prefix,ntop,sig.prevelance,mcls),
+							   columns="meta.cluster",columns.order="meta.cluster",
+							   gene.desc=g.desc,
+							   pdf.width=20,pdf.height=10,do.scale=F,
+							   z.lo=-15,z.hi=15,z.step=3,
+							   do.clustering.row=F,
+							   do.clustering.col=T
+							   )
+					return(g.desc)
+				   },.parallel=T)
+
+
 	}
 
 	RhpcBLASctl::omp_set_num_threads(1)
@@ -458,7 +481,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 					  gene.plot <- gene.core.tb[meta.cluster==xx,][["geneID"]]
 					  obj.tmp <- ssc.build(dat.block[gene.plot,binExp.tb.i$cellID,drop=F],assay.name="scaled.exprs")
 					  cat(sprintf("all(colnames(obj.tmp)==binExp.tb.i$cellID):\n"))
-					  all(colnames(obj.tmp)==binExp.tb.i$cellID)
+					  print(all(colnames(obj.tmp)==binExp.tb.i$cellID))
 					  colData(obj.tmp) <- DataFrame(binExp.tb.i)
 					  colnames(obj.tmp) <- binExp.tb.i$cellID
 					  p <- ssc.plot.violin(obj.tmp,"scaled.exprs",gene=gene.plot,
