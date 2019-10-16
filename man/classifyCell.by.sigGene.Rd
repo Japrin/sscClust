@@ -4,18 +4,19 @@
 \alias{classifyCell.by.sigGene}
 \title{plot genes expression in pairs of clusters to examine the correlation}
 \usage{
-classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
+classifyCell.by.sigGene(obj.list, gene.core.tb, assay.name = "exprs",
   out.prefix = NULL, adjB = NULL, meta.cluster = NULL,
-  method = "posFreq", verbose = F, sig.prevelance = 0.65,
-  ntop = 10, ncores = 16, bin.z.th = 0.3, prob.th = 0.8,
+  method = "posFreq", gene.pos.tb = NULL, gene.neg.tb = NULL,
+  meta.info.tb = NULL, ndownsample = 1500, myseed = 123456,
+  verbose = F, sig.prevelance = 0.65, ntop = 10, ncores = 16,
+  bin.z.pos.th = 0.3, bin.z.neg.th = 0.3, prob.th = 0.8,
   TH.gene.exp.freq = 0.65, TH.gene.exp.freq.train.pos = 0.8,
-  TH.gene.exp.freq.train.neg = 0.2, RF.selectVar = F, obj.int = NULL,
-  ...)
+  TH.gene.exp.freq.train.neg = 0.2, RF.selectVar = F, ...)
 }
 \arguments{
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}
 
-\item{gene.desc.top}{data.frame; signature genes}
+\item{gene.core.tb}{data.frame; signature genes}
 
 \item{assay.name}{character; which assay (default: "exprs")}
 
@@ -27,6 +28,16 @@ classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
 
 \item{method}{character; (default: "posFreq")}
 
+\item{gene.pos.tb}{data.frame; signature genes (positive)}
+
+\item{gene.neg.tb}{data.frame; signature genes (negative)}
+
+\item{meta.info.tb}{data.frame; cell information table (default: NULL)}
+
+\item{ndownsample}{integer; number of cells (default: 1500)}
+
+\item{myseed}{integer; seed for random number generation.(default: 123456)}
+
 \item{verbose}{logical; (default: FALSE)}
 
 \item{sig.prevelance}{double; (default: 0.5)}
@@ -35,15 +46,15 @@ classifyCell.by.sigGene(obj.list, gene.desc.top, assay.name = "exprs",
 
 \item{ncores}{integer; number of CPU to used (default: 16)}
 
-\item{bin.z.th}{numeric; z score of 'epressed' genes must be larger than this value  (default: 0.3)}
+\item{bin.z.pos.th}{numeric; z score of 'epressed' genes must be larger than this value  (default: 0.3)}
+
+\item{bin.z.neg.th}{numeric; z score of 'not epressed' genes must be less than this value  (default: 0.3)}
 
 \item{prob.th}{numeric; probability threshold (default: 0.8)}
 
 \item{TH.gene.exp.freq}{double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)}
 
 \item{RF.selectVar}{logical; (default: FALSE)}
-
-\item{obj.int}{object; (default: NULL)}
 
 \item{TH.gene.exp.freq.pos}{double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)}
 

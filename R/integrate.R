@@ -296,7 +296,12 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto")
 
 #' plot genes expression in pairs of clusters to examine the correlation
 #' @param obj.list object; named list of object of \code{singleCellExperiment} class
-#' @param gene.desc.top data.frame; signature genes
+#' @param gene.core.tb data.frame; signature genes 
+#' @param gene.pos.tb data.frame; signature genes (positive)
+#' @param gene.neg.tb data.frame; signature genes (negative)
+#' @param meta.info.tb data.frame; cell information table (default: NULL)
+#' @param ndownsample integer; number of cells (default: 1500)
+#' @param myseed integer; seed for random number generation.(default: 123456)
 #' @param assay.name character; which assay (default: "exprs")
 #' @param out.prefix character; output prefix (default: NULL).
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
@@ -306,106 +311,89 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto")
 #' @param sig.prevelance double; (default: 0.5)
 #' @param ntop integer; only use the ntop top genes (default: 10)
 #' @param ncores integer; number of CPU to used (default: 16)
-#' @param bin.z.th numeric; z score of 'epressed' genes must be larger than this value  (default: 0.3)
+#' @param bin.z.pos.th numeric; z score of 'epressed' genes must be larger than this value  (default: 0.3)
+#' @param bin.z.neg.th numeric; z score of 'not epressed' genes must be less than this value  (default: 0.3)
 #' @param prob.th numeric; probability threshold (default: 0.8)
 #' @param TH.gene.exp.freq double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)
 #' @param TH.gene.exp.freq.pos double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)
 #' @param TH.gene.exp.freq.neg double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)
 #' @param RF.selectVar logical; (default: FALSE)
-#' @param obj.int object; (default: NULL)
 #' @import data.table
 #' @import ggplot2
 #' @import ggridges
 #' @importFrom  ggpubr ggscatter
 #' @details classify cells using the signature genes
 #' @export
-classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",out.prefix=NULL,
-                                    adjB=NULL,meta.cluster=NULL,method="posFreq",verbose=F,
-                                    sig.prevelance=0.65,ntop=10,ncores=16,bin.z.th=0.3,prob.th=0.8,
-									TH.gene.exp.freq=0.65,TH.gene.exp.freq.train.pos=0.8,TH.gene.exp.freq.train.neg=0.2,
-									RF.selectVar=F,obj.int=NULL,...)
+classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out.prefix=NULL,
+                                    adjB=NULL,meta.cluster=NULL,method="posFreq",
+									gene.pos.tb=NULL,gene.neg.tb=NULL,
+									meta.info.tb=NULL,ndownsample=1500,myseed=123456,
+									verbose=F,
+                                    sig.prevelance=0.65,ntop=10,ncores=16,
+									bin.z.pos.th=0.3,bin.z.neg.th=0.3,
+									prob.th=0.8,
+									TH.gene.exp.freq=0.65,
+									TH.gene.exp.freq.train.pos=0.8,TH.gene.exp.freq.train.neg=0.2,
+									RF.selectVar=F,...)
 {
-
-	gene.core.tb <- gene.desc.top[median.rank<0.01 & freq.sig >= sig.prevelance,][order(meta.cluster),]
-	if(!is.null(ntop)){
-		gene.core.tb <- gene.core.tb[,head(.SD,n=ntop),by=c("meta.cluster")]
-	}
-
 	if(is.null(meta.cluster)){
 		mcls <- sort(unique(gene.core.tb$meta.cluster))
 	}else{
 		mcls <- sort(meta.cluster)
 	}
 
-	if(!is.null(out.prefix)){
-		write.table(gene.core.tb,sprintf("%s.gene.core.tb.top%d.txt",out.prefix,ntop),row.names=F,sep="\t",quote=F)
-	}
-
-	if(!is.null(obj.int)){
-		gene.core.plot.tb <- gene.core.tb[meta.cluster %in% mcls,][!duplicated(geneID),]
-		ssc.plot.heatmap(obj.int,
-						 out.prefix=sprintf("%s.gene.top%d.prev%4.2f.sel",out.prefix,ntop,sig.prevelance),
-						 columns="meta.cluster",columns.order="meta.cluster",
-						 gene.desc=gene.core.plot.tb,
-						 row.split=gene.core.plot.tb$Group,
-						 column.split=obj.int$meta.cluster,
-						 row_gap = unit(0, "mm"), column_gap = unit(0, "mm"),
-						 row_title_rot = 0, column_title_gp = gpar(fontsize = 0),
-						 border = TRUE,
-						 pdf.width=20,pdf.height=10,do.scale=F,
-						 z.lo=-15,z.hi=15,z.step=3,
-						 do.clustering.row=F,
-						 do.clustering.col=T)
-
-		g.desc <- ldply(sort(unique(gene.desc.top$meta.cluster)),function(mcls){
-					dat.plot <- gene.desc.top[meta.cluster==mcls,]
-					dat.plot <- dat.plot[freq.sig>0.3 & median.rank < 0.1,]
-					g.desc <- head(dat.plot[geneID %in% rownames(obj.int),],n=30)
-					ssc.plot.heatmap(obj.int,out.prefix=sprintf("%s.gene.top%d.prev%4.2f.sel.%s",
-																out.prefix,ntop,sig.prevelance,mcls),
-							   columns="meta.cluster",columns.order="meta.cluster",
-							   gene.desc=g.desc,
-							   pdf.width=20,pdf.height=10,do.scale=F,
-							   z.lo=-15,z.hi=15,z.step=3,
-							   do.clustering.row=F,
-							   do.clustering.col=T
-							   )
-					return(g.desc)
-				   },.parallel=T)
-
-
-	}
-
 	RhpcBLASctl::omp_set_num_threads(1)
 	registerDoParallel(cores = ncores)
 
-	if(method=="posFreq") {
+	getExpDataFromGeneSymbol <- function(obj,assay.name,gene.used,adjB=NULL){
+		dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+		#### adjB
+		if(!is.null(adjB)){
+		  dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+		}
+		dat.block <- t(scale(t(dat.block)))
+		rownames(dat.block) <- rowData(obj)[rownames(dat.block),"display.name"]
+		return(dat.block)
+	}
 
+	if(method=="posFreq"){
 		binExp.tb <- as.data.table(ldply(seq_along(obj.list),function(i){
 				  obj <- obj.list[[i]]
 				  dataset.id <- names(obj.list)[i]
 				  gene.used <- rownames(obj)[match(gene.core.tb$geneSymbol,rowData(obj)$display.name)]
 				  gene.used <- unique(gene.used[!is.na(gene.used)])
-				  dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
-				  #### adjB
-				  if(!is.null(adjB)){
-					  dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
-				  }
-				  dat.block <- t(scale(t(dat.block)))
-				  rownames(dat.block) <- rowData(obj)[rownames(dat.block),"display.name"]
+				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB)
 				  #### binarize all sig genes
-				  dat.block.th <- (dat.block > bin.z.th)
-###				  dat.block.bin <- laply(seq_len(nrow(dat.block)),function(j){
-###					  gene.j <- rownames(dat.block)[j]
-###					  dat.binExp <- binarizeExp(dat.block[j,],
-###												#out.prefix=sprintf("%s.gene.dist.%s.%s.png",out.prefix,dataset.id,gene.j),
-###												G=NULL,topNAsHi=0,e.TH=NULL,e.name="Exp",verbose=T,run.extremevalue=F,
-###												draw.CI=T, zero.as.low=T,my.seed=9997)
-###					  structure(dat.binExp$o.df$Exp,names=rownames(dat.binExp$o.df))
-###							   },.parallel=T)
-###				  dat.block.bin <- dat.block.bin & dat.block.th
+				  dat.block.th <- (dat.block > bin.z.pos.th)
 				  dat.block.bin <- dat.block.th
-				  rownames(dat.block.bin) <- rownames(dat.block)
+
+				  gene.pos.info <- NULL
+				  gene.neg.info <- NULL
+				  if(!is.null(gene.pos.tb)){
+					  gene.pos.info <- llply(sort(unique(gene.pos.tb$meta.cluster)),function(xx){
+								gene.xx <- gene.pos.tb[meta.cluster==xx,][["geneSymbol"]]
+								gene.xx <- rownames(obj)[match(gene.xx,rowData(obj)$display.name)]
+								gene.xx <- unique(gene.xx[!is.na(gene.xx)])
+								dat.xx <- getExpDataFromGeneSymbol(obj,assay.name,gene.xx,adjB=adjB)
+								dat.xx.th <- colSums(dat.xx > bin.z.pos.th)==length(gene.xx)
+								names(dat.xx.th) <- colnames(dat.xx)
+								return(dat.xx.th)
+														})
+					  names(gene.pos.info) <- sort(unique(gene.pos.tb$meta.cluster))
+				  }
+				  if(!is.null(gene.neg.tb)){
+					  gene.neg.info <- llply(sort(unique(gene.neg.tb$meta.cluster)),function(xx){
+								gene.xx <- gene.neg.tb[meta.cluster==xx,][["geneSymbol"]]
+								gene.xx <- rownames(obj)[match(gene.xx,rowData(obj)$display.name)]
+								gene.xx <- unique(gene.xx[!is.na(gene.xx)])
+								dat.xx <- getExpDataFromGeneSymbol(obj,assay.name,gene.xx,adjB=adjB)
+								dat.xx.th <- colSums(dat.xx < bin.z.neg.th)==length(gene.xx)
+								names(dat.xx.th) <- colnames(dat.xx)
+								return(dat.xx.th)
+														})
+					  names(gene.neg.info) <- sort(unique(gene.neg.tb$meta.cluster))
+				  }
+
 				  ### classification criteria
 				  mcls.bin <- sapply(mcls,function(x){
 							gene.sig <- gene.core.tb[meta.cluster==x,][["geneSymbol"]]
@@ -416,8 +404,9 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 							return(ret)
 							   })
 
-				  binExp.tb.i <- cbind(data.table(cellID=rownames(mcls.bin),dataset.id=names(obj.list)[i]),
-										mcls.bin)
+				  binExp.tb.i <- cbind(data.table(cellID=rownames(mcls.bin),
+												  dataset.id=names(obj.list)[i]),
+									   mcls.bin)
 				  idxCol.sigScore <- colnames(binExp.tb.i)[-c(1,2)]
 				  binExp.tb.i$meta.cluster.top <- idxCol.sigScore[apply(binExp.tb.i[,idxCol.sigScore,with=F],1,
                                                             which.max)]
@@ -427,8 +416,16 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 				  }
 				  #### chose most likely and least likely cells for training
 				  rf.tb <- as.data.table(ldply(idxCol.sigScore,function(xx){
-					  cell.pos <- as.integer(binExp.tb.i[[sprintf("score.%s",xx)]] >= TH.gene.exp.freq.train.pos)
+					  cell.pos <- binExp.tb.i[[sprintf("score.%s",xx)]] >= TH.gene.exp.freq.train.pos
+					  if(!is.null(gene.pos.info) && !is.null(gene.pos.info[[xx]])){
+						  cell.pos <- cell.pos & gene.pos.info[[xx]]
+					  }
+					  if(!is.null(gene.neg.info) && !is.null(gene.neg.info[[xx]])){
+						  cell.pos <- cell.pos & gene.neg.info[[xx]]
+					  }
+					  cell.pos <- as.integer(cell.pos)
 					  cell.neg <- as.integer(binExp.tb.i[[sprintf("score.%s",xx)]] < TH.gene.exp.freq.train.neg)
+
 					  if(sum(cell.neg)>sum(cell.pos)){
 						  cell.neg <- sample(binExp.tb.i$cellID[which(cell.neg>0)],sum(cell.pos))
 						  cell.pos <- binExp.tb.i$cellID[which(cell.pos>0)]
@@ -436,7 +433,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 						  cell.pos <- sample(binExp.tb.i$cellID[which(cell.pos>0)],sum(cell.neg))
 						  cell.neg <- binExp.tb.i$cellID[which(cell.neg>0)]
 					  }
-					  gene.train <- gene.core.tb[meta.cluster==xx,][["geneID"]]
+					  gene.train <- gene.core.tb[meta.cluster==xx,][["geneSymbol"]]
 					  dat.train <- rbind(t(dat.block[gene.train,cell.pos,drop=F]),
 										 t(dat.block[gene.train,cell.neg,drop=F]))
 					  dat.train.label <- factor(c(rep("pos",length(cell.pos)),rep("neg",length(cell.neg))))
@@ -489,11 +486,10 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 					  ggsave(sprintf("%s.RF.%s.%s.pdf",out.prefix,dataset.id,xx),p,width=7,height=9)
 												  },.parallel=T)
 				  }
-
 				  return(binExp.tb.i)
-									}))
+							   }))
 
-	}else if(method=="corrCtrl") {
+	}else if(method=="corrCtrl"){
 
 		dat.plot.tb <- as.data.table(ldply(seq_along(mcls),function(j){
 			gene.core.tb.j <- gene.core.tb[meta.cluster==mcls[j],]
@@ -519,11 +515,161 @@ classifyCell.by.sigGene <- function(obj.list,gene.desc.top,assay.name="exprs",ou
 		for(xx in idxCol.sigScore){
 			binExp.tb[[sprintf("bin.%s",xx)]] <- as.integer(binExp.tb[[sprintf("score.%s",xx)]] >= 1)
 		}
-	}
+	}else if(method=="pool" && !is.null(meta.info.tb)){
 
+		exp.z.tb <- as.data.table(ldply(seq_along(obj.list),function(i){
+				  obj <- obj.list[[i]]
+				  dataset.id <- names(obj.list)[i]
+				  gene.used <- rownames(obj)[match(gene.core.tb$geneSymbol,rowData(obj)$display.name)]
+				  gene.used <- unique(gene.used[!is.na(gene.used)])
+				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB)
+				  ret.tb <- data.table(cellID=colnames(dat.block))
+				  ret.tb$meta.cluster=meta.info.tb$metaCluster[match(ret.tb$cellID,meta.info.tb$cellID)]
+				  ret.tb$ClusterID=meta.info.tb$ClusterID[match(ret.tb$cellID,meta.info.tb$cellID)]
+				  ret.tb <- cbind(ret.tb,t(dat.block))
+				  ret.tb$cellID <- sprintf("%s.%s",dataset.id,ret.tb$cellID)
+				  return(ret.tb)
+		}))
+		set.seed(myseed)
+		exp.z.tb <- exp.z.tb[sample(nrow(exp.z.tb),replace=F),]
+		dat.train.tb <- exp.z.tb[meta.cluster %in% unique(sort(gene.core.tb$meta.cluster)),
+								 ][,head(.SD,n=ndownsample),by="meta.cluster"]
+		#dat.train.tb[1:4,1:5]
+		res.RF <-	sscClust:::run.RF(as.matrix(dat.train.tb[,-c(1,2,3)]),
+									  factor(dat.train.tb$meta.cluster),
+									  as.matrix(exp.z.tb[,-c(1,2,3)]), do.norm=F,
+									  ntree = 500, ntreeIterat = 500,selectVar=RF.selectVar)
+		if(verbose){
+			saveRDS(res.RF,file=sprintf("%s.res.RF.rds",out.prefix))
+		}
+
+		out.tb <- exp.z.tb[,c(1,2)]
+		colnames(out.tb)[2] <- "meta.cluster.raw"
+		out.tb$meta.cluster.RF <- res.RF$ylabel
+		cls.set <- colnames(res.RF$yres)
+		out.tb$meta.cluster.RF <- apply(res.RF$yres,1,function(x){ cls.set[which.max(x)] })
+		out.tb$meta.cluster.RF.prob <- apply(res.RF$yres,1,function(x){ max(x) })
+		out.tb$meta.cluster.RF.sec <- apply(res.RF$yres,1,function(x){ cls.set[order(-x)[2]] })
+		out.tb$meta.cluster.RF.sec.prob <- apply(res.RF$yres,1, function(x){ x[order(-x)[2]] })
+		prob.mtx <- res.RF$yres
+		colnames(prob.mtx) <- sprintf("RF.prob.%s",colnames(prob.mtx))
+		out.tb <- cbind(out.tb,prob.mtx)
+
+		out.tb[,table(meta.cluster.RF,meta.cluster.raw)]
+		meta.info.tb.a <- as.data.table(meta.info.tb)[,-c("metaCluster","metaCluster.old")]
+		meta.info.tb.a[,cellID.raw:=sprintf("%s",cellID)]
+		meta.info.tb.a[,cellID:=sprintf("%s.%s",dataset,cellID)]
+		binExp.tb <- merge(meta.info.tb.a,out.tb,by="cellID")
+		binExp.tb[,table(meta.cluster.raw,meta.cluster.RF)]
+
+	}
 	return(binExp.tb)
 }
 
+#' plot signature genes
+#' @param obj.list object; named list of object of \code{singleCellExperiment} class
+#' @param gene.core.tb data.frame; signature genes 
+#' @param out.prefix character; output prefix 
+#' @param meta.info.tb data.frame; cell information table (default: NULL)
+#' @param meta.col character; column in meta.info.tb, by which to group cells (default: "meta.cluster")
+#' @param assay.name character; which assay (default: "exprs")
+#' @param adjB character; batch column of the colData(obj). (default: NULL)
+#' @param meta.cluster character; (default: NULL)
+#' @param verbose logical; (default: FALSE)
+#' @param ptype character; (default: "heatmap")
+#' @param ncores integer; number of CPU to used (default: 16)
+#' @import data.table
+#' @import ggplot2
+#' @import ggridges
+#' @importFrom  ggpubr ggscatter
+#' @details make some plot(s) of signature genes
+#' @export
+plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
+                                    adjB=NULL,meta.cluster=NULL,
+									meta.info.tb=NULL,meta.col="metaCluster",
+									verbose=F,ptype="heatmap", ncores=16)
+{
+	if(is.null(meta.cluster)){
+		mcls <- sort(unique(gene.core.tb$meta.cluster))
+	}else{
+		mcls <- sort(meta.cluster)
+	}
+
+	RhpcBLASctl::omp_set_num_threads(1)
+	registerDoParallel(cores = ncores)
+
+	getExpDataFromGeneSymbol <- function(obj,assay.name,gene.used,adjB=NULL){
+		dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+		#### adjB
+		if(!is.null(adjB)){
+		  dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+		}
+		dat.block <- t(scale(t(dat.block)))
+		rownames(dat.block) <- rowData(obj)[rownames(dat.block),"display.name"]
+		return(dat.block)
+	}
+	
+	if(ptype=="heatmap"){
+		exp.z.tb <- as.data.table(ldply(seq_along(obj.list),function(i){
+				  obj <- obj.list[[i]]
+				  dataset.id <- names(obj.list)[i]
+				  gene.used <- rownames(obj)[match(gene.core.tb$geneSymbol,rowData(obj)$display.name)]
+				  gene.used <- unique(gene.used[!is.na(gene.used)])
+				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB)
+				  ret.tb <- data.table(cellID=colnames(dat.block))
+				  ret.tb$meta.cluster=meta.info.tb[[meta.col]][match(ret.tb$cellID,meta.info.tb$cellID)]
+				  ret.tb$ClusterID=meta.info.tb$ClusterID[match(ret.tb$cellID,meta.info.tb$cellID)]
+				  ret.tb <- cbind(ret.tb,t(dat.block))
+				  ret.tb$cellID <- sprintf("%s.%s",dataset.id,ret.tb$cellID)
+				  return(ret.tb)
+		}))
+		exp.z.tb.debug <<- exp.z.tb
+		exp.z.ave.tb <- melt(exp.z.tb[,-c("cellID")],
+				   id.vars=c("meta.cluster","ClusterID"))[,.(value=mean(value)),by=c("meta.cluster","ClusterID","variable")]
+		exp.z.ave.tb <- dcast(exp.z.ave.tb,meta.cluster+ClusterID~variable)
+		###exp.z.ave.tb[1:4,1:5]
+
+		sce.tmp <- ssc.build(t(exp.z.ave.tb[,-c("meta.cluster","ClusterID")]))
+		colnames(sce.tmp) <- exp.z.ave.tb$ClusterID
+		sce.tmp$ClusterID <- exp.z.ave.tb$ClusterID
+		##sce.tmp$meta.cluster <- exp.z.ave.tb$meta.cluster
+		##colData(sce.tmp)[[meta.col]] <- exp.z.ave.tb$meta.cluster
+		sce.tmp[[meta.col]] <- exp.z.ave.tb$meta.cluster
+		gene.core.plot.tb <- gene.core.tb[!duplicated(geneID),]
+		ssc.plot.heatmap(sce.tmp[,!grepl("^unk",sce.tmp[[meta.col]])],
+				 out.prefix=sprintf("%s.gene.core.zscore.%s",out.prefix,meta.col),
+				 columns=meta.col,columns.order=meta.col,
+				 gene.desc=gene.core.plot.tb,
+				 row.split=gene.core.plot.tb$Group,
+				 column.split=sce.tmp[[meta.col]],
+				 row_gap = unit(0, "mm"), column_gap = unit(0, "mm"),
+				 row_title_rot = 0, column_title_gp = gpar(fontsize = 0),
+				 border = TRUE,
+				 pdf.width=20,pdf.height=10,do.scale=F,
+				 z.lo=-0.8,z.hi=0.8,z.step=0.2,exp.title="Z-Score",
+				 do.clustering.row=F,
+				 do.clustering.col=T)
+	}else if(ptype=="violin"){
+		l_ply(seq_along(obj.list),function(i){
+			obj <- obj.list[[i]]
+			dataset.id <- names(obj.list)[i]
+			loginfo(sprintf("plotting violin (%s):",dataset.id))
+			l_ply(mcls,function(xx){
+				  gene.plot <- gene.core.tb[meta.cluster==xx,][["geneSymbol"]]
+				  gene.used <- rownames(obj)[match(gene.plot,rowData(obj)$display.name)]
+				  gene.used <- unique(gene.used[!is.na(gene.used)])
+				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB)
+				  ##colnames(dat.block) <- sprintf("%s.%s",dataset.id,colnames(dat.block))
+				  obj.tmp <- ssc.build(dat.block[,],assay.name="scaled.exprs")
+				  obj.tmp[[meta.col]] <- meta.info.tb[[meta.col]][match(colnames(obj.tmp),
+																		meta.info.tb$cellID)]
+				  p <- ssc.plot.violin(obj.tmp,"scaled.exprs",gene=rownames(obj.tmp),
+									   group.var=sprintf(meta.col),clamp=c(0,6))
+				  ggsave(sprintf("%s.RF.%s.%s.pdf",out.prefix,dataset.id,xx),p,width=7,height=9)
+											  },.parallel=T)
+								  })
+	}
+}
 
 #' binarize the expression value using the distribution
 #' @param x object; vector
