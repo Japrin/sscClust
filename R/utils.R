@@ -877,7 +877,8 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 
     .getStatistics <- function(inDat,str.note=NULL,stat="mean"){
         .Grp.stat <- t(apply(inDat,1,function(x){
-                                 .mexp <- aggregate(x ~ design.df$xlabel, FUN = if(stat=="mean") mean else if(stat=="sd") sd)
+                                 .mexp <- aggregate(x ~ design.df$xlabel,
+													FUN = if(stat=="mean") mean else if(stat=="sd") sd else if(stat=="length") length)
                                  structure(.mexp[,2],names=sprintf("%s.%s",stat,.mexp[,1]))
 								  }))
         if(!is.null(str.note)){
@@ -888,28 +889,40 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     }
     if(verbose>0){
         if(!is.null(batch)){
-             betaV <- fit.00$coefficients
-             betaV[is.na(betaV)] <- 0
-             idx.batch <- grep("^batch",colnames(design),value = T)
-             xdata.rmBE <- as.matrix(xdata) - betaV[,idx.batch,drop=F] %*% t(design[,idx.batch,drop=F])
+            betaV <- fit.00$coefficients
+            betaV[is.na(betaV)] <- 0
+            idx.batch <- grep("^batch",colnames(design),value = T)
+            xdata.rmBE <- as.matrix(xdata) - betaV[,idx.batch,drop=F] %*% t(design[,idx.batch,drop=F])
             .Grp.mean.df <- .getStatistics(xdata.rmBE,str.note="rmBE")
+			xdata.scale <- t(scale(t(xdata.rmBE)))
+            .Grp.mean.scale.df <- .getStatistics(xdata.scale,str.note="scale")
             all.table <- merge(all.table,.Grp.mean.df)
+            all.table <- merge(all.table,.Grp.mean.scale.df)
 			all.table$meanExp <- all.table[[sprintf("mean.%s.rmBE",group.label)]]
+			all.table$meanScale <- all.table[[sprintf("mean.%s.scale",group.label)]]
 			if(verbose>1){
 				.Grp.sd.df <- .getStatistics(xdata.rmBE,str.note="rmBE",stat="sd")
 				all.table <- merge(all.table,.Grp.sd.df)
 				colName.sd <- grep("^sd.",colnames(all.table),value=T)
 				all.table$SNR <- all.table$logFC/rowSums(all.table[,colName.sd,with=F])
+				.Grp.n.df <- .getStatistics(xdata.rmBE,stat="length")
+				all.table <- merge(all.table,.Grp.n.df)
 			}
         }else{
             .Grp.mean.df <- .getStatistics(xdata)
+			xdata.scale <- t(scale(t(xdata)))
+            .Grp.mean.scale.df <- .getStatistics(xdata.scale,str.note="scale")
             all.table <- merge(all.table,.Grp.mean.df)
+            all.table <- merge(all.table,.Grp.mean.scale.df)
 			all.table$meanExp <- all.table[[sprintf("mean.%s",group.label)]]
+			all.table$meanScale <- all.table[[sprintf("mean.%s.scale",group.label)]]
 			if(verbose>1){
 				.Grp.sd.df <- .getStatistics(xdata,stat="sd")
 				all.table <- merge(all.table,.Grp.sd.df)
 				colName.sd <- grep("^sd.",colnames(all.table),value=T)
 				all.table$SNR <- all.table$logFC/rowSums(all.table[,colName.sd,with=F])
+				.Grp.n.df <- .getStatistics(xdata,stat="length")
+				all.table <- merge(all.table,.Grp.n.df)
 			}
         }
     }

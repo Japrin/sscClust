@@ -1705,7 +1705,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
         cat("WARN: clusters<2 or no obj provided or not all clusters have more than 1 samples\n")
         return(NULL)
     }
-    if(!all(stat.clust[group.list]>2)){
+    if(!all(stat.clust[group.list]>=2)){
         cat("WARN: not all clusters specified have more than 2 samples\n")
         return(NULL)
     }

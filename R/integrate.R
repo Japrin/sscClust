@@ -272,6 +272,7 @@ integrate.by.avg <- function(sce.list,
 #' @return a gene table
 rank.de.gene <- function(obj,group="pca.SNN.kauto")
 {
+	#### To do: add diff between this - max_other(not this)
 	gene.desc.top <- as.data.table(ldply(unique(sort(obj[[group]])),function(x){
 											 obj.x <- obj[,obj[[group]]==x]
 											 ret.tb <- data.table(geneID=rownames(obj.x),
@@ -281,7 +282,7 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto")
 														N.sig=rowSums(assay(obj.x,"sig")),
 														meta.cluster.size=ncol(obj.x))
 											 ret.tb[,freq.sig:=N.sig/meta.cluster.size]
-											 anames <- intersect(assayNames(obj.x),c("logFC","t","SNR","meanExp"))
+											 anames <- intersect(assayNames(obj.x),c("logFC","t","SNR","meanExp","meanScale"))
 											 for(aa in anames){
 												 ret.tb[[sprintf("median.%s",aa)]] <- rowMedians(assay(obj.x,aa))
 											 }
@@ -578,6 +579,9 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 #' @param verbose logical; (default: FALSE)
 #' @param ptype character; (default: "heatmap")
 #' @param ncores integer; number of CPU to used (default: 16)
+#' @param p.ncol integer; number of columns in the violin plot (default: 2)
+#' @param pdf.width double; width of the output plot (default: NULL)
+#' @param pdf.height double; height of the output plot (default: NULL)
 #' @import data.table
 #' @import ggplot2
 #' @import ggridges
@@ -587,6 +591,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
                                     adjB=NULL,meta.cluster=NULL,
 									meta.info.tb=NULL,meta.col="metaCluster",
+									p.ncol=2,pdf.width=NULL,pdf.height=NULL,
 									verbose=F,ptype="heatmap", ncores=16)
 {
 	if(is.null(meta.cluster)){
@@ -636,6 +641,10 @@ plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
 		##colData(sce.tmp)[[meta.col]] <- exp.z.ave.tb$meta.cluster
 		sce.tmp[[meta.col]] <- exp.z.ave.tb$meta.cluster
 		gene.core.plot.tb <- gene.core.tb[!duplicated(geneID),]
+		o.width <- 20
+		o.height <- 10
+		if(!is.null(pdf.width)){ o.width <- pdf.width }
+		if(!is.null(pdf.height)){ o.height <- pdf.height }
 		ssc.plot.heatmap(sce.tmp[,!grepl("^unk",sce.tmp[[meta.col]])],
 				 out.prefix=sprintf("%s.gene.core.zscore.%s",out.prefix,meta.col),
 				 columns=meta.col,columns.order=meta.col,
@@ -645,11 +654,15 @@ plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
 				 row_gap = unit(0, "mm"), column_gap = unit(0, "mm"),
 				 row_title_rot = 0, column_title_gp = gpar(fontsize = 0),
 				 border = TRUE,
-				 pdf.width=20,pdf.height=10,do.scale=F,
+				 pdf.width=o.width,pdf.height=o.height,do.scale=F,
 				 z.lo=-0.8,z.hi=0.8,z.step=0.2,exp.title="Z-Score",
 				 do.clustering.row=F,
 				 do.clustering.col=T)
 	}else if(ptype=="violin"){
+		o.width <- 35 
+		o.height <- 9
+		if(!is.null(pdf.width)){ o.width <- pdf.width }
+		if(!is.null(pdf.height)){ o.height <- pdf.height }
 		l_ply(seq_along(obj.list),function(i){
 			obj <- obj.list[[i]]
 			dataset.id <- names(obj.list)[i]
@@ -660,12 +673,12 @@ plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
 				  gene.used <- unique(gene.used[!is.na(gene.used)])
 				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB)
 				  ##colnames(dat.block) <- sprintf("%s.%s",dataset.id,colnames(dat.block))
-				  obj.tmp <- ssc.build(dat.block[,],assay.name="scaled.exprs")
+				  obj.tmp <- ssc.build(dat.block[,,drop=F],assay.name="scaled.exprs")
 				  obj.tmp[[meta.col]] <- meta.info.tb[[meta.col]][match(colnames(obj.tmp),
 																		meta.info.tb$cellID)]
 				  p <- ssc.plot.violin(obj.tmp,"scaled.exprs",gene=rownames(obj.tmp),
-									   group.var=sprintf(meta.col),clamp=c(0,6))
-				  ggsave(sprintf("%s.RF.%s.%s.pdf",out.prefix,dataset.id,xx),p,width=7,height=9)
+									   group.var=sprintf(meta.col),clamp=c(0,6),p.ncol=p.ncol)
+				  ggsave(sprintf("%s.RF.%s.%s.pdf",out.prefix,dataset.id,xx),p,width=o.width,height=o.height)
 											  },.parallel=T)
 								  })
 	}
