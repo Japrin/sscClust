@@ -205,38 +205,18 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
         clust.row <- do.clust
         clust.column <- do.clust
     }
-    scoreVec = function(x) {
-        score = 0
-        if(all(x<1)){ x <- x^100 }
-        x <- x/sum(x)
-        m <- length(x)
-        score <- sum(score.alpha^(-seq_len(m)) * x)
-        if(is.na(score)) { score <- 0 }
-        return(score)
-    }
     if(!is.null(row.split) && is.null(names(row.split))){
         names(row.split) <- rownames(dat)
     }
-    dat.ordered <- dat
-    if(clust.row=="cutreeDynamic"){
-        res.clust.row <- run.cutreeDynamic(dat,method.hclust="ward.D2",deepSplit=1)
-        dat.ordered <- dat[res.clust.row$hclust$order,]
-        clust.row <- res.clust.row$branch
-    }
-    if(clust.column=="cutreeDynamic"){
-        res.clust.column <- run.cutreeDynamic(t(dat),method.hclust="ward.D2",deepSplit=1)
-        dat.ordered <- dat[,res.clust.column$hclust$order]
-        clust.column <- res.clust.column$branch
-    }
-    if(waterfall.column){
-        scoresC <- apply(dat.ordered, 2, scoreVec)
-        dat <- dat[,order(scoresC,decreasing = T)]
-    }
-    if(waterfall.row){
-        scoresR <- apply(dat.ordered, 1, scoreVec)
-        dat <- dat[order(scoresR,decreasing = T),]
-        if(!is.null(row.ann.dat)){ row.ann.dat <- row.ann.dat[order(scoresR,decreasing = T),] }
-    }
+	dat.list <- matrix.waterfall(dat,score.alpha=score.alpha,clust.row=clust.row,clust.column=clust.column,
+							waterfall.column=waterfall.column,waterfall.row=waterfall.row,
+							type.return="list")
+	dat <- dat.list[["dat"]]
+	clust.column <- dat.list[["clust.column"]]
+	clust.row <- dat.list[["clust.row"]]
+	scoresR <- dat.list[["scoresR"]]
+	scoresC <- dat.list[["scoresC"]]
+    if(!is.null(row.ann.dat)){ row.ann.dat <- row.ann.dat[order(scoresR,decreasing = T),] }
 
 	if(!is.null(out.prefix)){
         pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height)
@@ -495,5 +475,62 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
         return(p)
     }
 }
+
+#' make the matrix looks like "waterfall" (typically genes expression)
+#' @param dat matrix; matrix
+#' @param clust.row logical, character or dendrogram; passed to cluster_rows of Heatmap (default: FALSE)
+#' @param clust.column logical, character or dendrogram; passed to cluster_columns of Heatmap (default: FALSE)
+#' @param waterfall.row logical, order rows to make plot like waterfall (default: FALSE)
+#' @param waterfall.column logical, order rows to make plot like waterfall (default: FALSE)
+#' @param score.alpha double; for row/column score; (default: 1.5)
+#' @param type.return character; return type; (default: "matrix")
+#' @import data.table
+#' @import ggplot2
+#' @importFrom stats dist
+#' @export
+matrix.waterfall <- function(dat,score.alpha=1.5,clust.row=FALSE,clust.column=FALSE,
+							 waterfall.column=F,waterfall.row=F,
+							 type.return="matrix")
+{
+    scoreVec = function(x) {
+        score = 0
+        if(all(x<1)){ x <- x^100 }
+        x <- x/sum(x)
+        m <- length(x)
+        score <- sum(score.alpha^(-seq_len(m)) * x)
+        if(is.na(score)) { score <- 0 }
+        return(score)
+    }
+	scoresC <- NULL
+	scoresR <- NULL
+    dat.ordered <- dat
+    if(clust.row=="cutreeDynamic"){
+        res.clust.row <- run.cutreeDynamic(dat,method.hclust="ward.D2",deepSplit=1)
+        dat.ordered <- dat[res.clust.row$hclust$order,]
+        clust.row <- res.clust.row$branch
+    }
+    if(clust.column=="cutreeDynamic"){
+        res.clust.column <- run.cutreeDynamic(t(dat),method.hclust="ward.D2",deepSplit=1)
+        dat.ordered <- dat[,res.clust.column$hclust$order]
+        clust.column <- res.clust.column$branch
+    }
+    if(waterfall.column){
+        scoresC <- apply(dat.ordered, 2, scoreVec)
+        dat <- dat[,order(scoresC,decreasing = T)]
+    }
+    if(waterfall.row){
+        scoresR <- apply(dat.ordered, 1, scoreVec)
+        dat <- dat[order(scoresR,decreasing = T),]
+        #if(!is.null(row.ann.dat)){ row.ann.dat <- row.ann.dat[order(scoresR,decreasing = T),] }
+    }
+	if(type.return=="matrix"){
+		return(dat)
+	}else if(type.return=="list"){
+		return(list("dat"=dat,
+					"clust.column"=clust.column,"clust.row"=clust.row,
+					"scoresC"=scoresC,"scoresR"=scoresR))
+	}
+}
+
 
 

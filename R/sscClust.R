@@ -1954,6 +1954,164 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     if(!is.null(out.prefix)){ dev.off() }
 }
 
+#' plot gene expression density
+#' @param obj object of \code{singleCellExperiment} class
+#' @param out.prefix character; output prefix. required
+#' @param gene.id should be in rownames(obj); genes to plot
+#' @param gene.symbol should be in rowData(obj)[,"display.name"]; genes to plot
+#' @param assay.name character; which assay (default: "exprs")
+#' @param pallete.name character; pallete to use. (default: "heat")
+#' @param expT double; expression threshold of the genes. (default: c(0.3,0.3))
+#' @param ann.txt.dis double; adjust the position of the annotation text (default: 0.3)
+#' @param ann.txt.cex double; cex for annotation text (default: 1.2)
+#' @param my.title character; title of the figure (default: "")
+#' @importFrom ks kde
+#' @importFrom fields image.plot
+#' @importFrom scales viridis_pal
+#' @details make density plot of genes. Note, density estimation from ggplot2 is different (and not so 'effective' as that from ks::kde). One of gene.id and gene.symbol must be provided.
+#' @export
+ssc.plotGeneDensity <- function(obj,out.prefix,gene.id,gene.symbol,assay.name="norm_exprs",
+								expT=c(0.3,0.3),pallete.name="heat",
+								#adjB=NULL,do.scale=F,
+								ann.txt.dis=0.3,ann.txt.cex=1.2,my.title="")
+{
+
+	if(missing(gene.id) && missing(gene.symbol)){
+		warning("No gene.id or gene.symbol provided!")
+		return(NULL)
+	}
+	if(missing(gene.id) && !is.null(gene.symbol)){
+		gene.list <- rowData(obj)[,"display.name"][which(rowData(obj)[,"display.name"] %in% gene.symbol)]
+	}else{
+		gene.id <- intersect(rownames(obj),gene.id)
+		gene.list <- rowData(obj)[,"display.name"][gene.id]
+	}
+	if(length(gene.list)==0){ 
+		warning("No data found for the provided genes!")
+		return(NULL)
+	}
+	obj <- obj[names(gene.list),]
+	dat.block <- as.matrix(assay(obj,sprintf("%s",assay.name)))
+	dat.plot <- cbind(data.table(cellID=colnames(obj)),(t(dat.block)))
+	gene.list <- rowData(obj)[,"display.name"]
+
+	if(length(gene.list)==2){
+		colnames(dat.plot)[c(2,3)] <- c("x","y")
+		par.old = par(no.readonly = T)
+
+		.density <- ks::kde(dat.plot[,c("x","y")])
+		.density.x <- density(dat.plot$x)
+		.density.y <- density(dat.plot$y)
+		zz <- c(5,10,20,30,40,50,60,70,80,90,95)
+		if(pallete.name=="heat"){
+			col.den2d <- c("transparent", rev(heat.colors(length(zz))))
+		}else if(pallete.name=="rainbow"){
+			col.den2d <- c("transparent", rev(rainbow(length(zz), end = 4/6)))
+		}else if(pallete.name=="viridis"){
+			col.den2d <- c("transparent", (scales::viridis_pal()(length(zz))))
+		}
+
+		dat.plot.x.range <- pretty(range(dat.plot$x))
+		dat.plot.y.range <- pretty(range(dat.plot$y))
+		dat.plot.x.range <- c(dat.plot.x.range[1],dat.plot.x.range[length(dat.plot.x.range)])
+		dat.plot.y.range <- c(dat.plot.y.range[1],dat.plot.y.range[length(dat.plot.y.range)])
+
+		mar.left <- 7
+		pdf(sprintf("%s.dens2D.pdf",out.prefix),width = 8,height = 7)
+		par(mar = c(0.8,mar.left,1,0),cex.lab=2,cex.axis=1.5)
+		#layout(matrix(1:6, nrow = 2, byrow = T), widths = c(10,3,2.5), heights = c(3,10))
+		nf <- layout(matrix(c(4,4,4,1,0,0,2,3,5),3,3,byrow = TRUE), c(10,3,2.5), c(1.5,3,10))
+		#layout.show(nf)
+		#dev.off()
+
+		### upper
+		plot(NULL, type = "n",  ylab = "",xlab="", xlim = dat.plot.x.range, ylim = c(0, max(.density.x$y)),
+			 main = NA, axes = F, xaxs="i")
+		lines(.density.x, col = "darkblue", lwd = 2)
+		abline(v=expT[1],col="red4",lty=2,lwd=1.5)
+		title(ylab = "density", line = 4.5)
+		axis(2, las = 1)
+
+		### main
+		par(mar = c(6,mar.left,0,0))
+	#	plot(NULL, type = "n",  ylab = "", xlim = dat.plot.x.range, ylim = dat.plot.y.range,
+	#		 main = NA, axes = F, xaxs="i",yaxs="i",xlab="")
+		plot(.density,display="filled.contour2", cont=zz,xlab="", ylab="",col=col.den2d,
+			 xlim=dat.plot.x.range,ylim=dat.plot.y.range)
+		title(ylab = gene.list[2], line = 4.5)
+		title(xlab = gene.list[1])
+		.addAnn <- function()
+		{
+			abline(v=expT[1],col="red4",lty=2,lwd=1.5)
+			abline(h=expT[2],col="red4",lty=2,lwd=1.5)
+			nn <- sum(dat.plot$x >= expT[1] & dat.plot$y >= expT[2])
+			##mtext(text = sprintf("%4.2f %%\n(%d/%d)",nn*100/nrow(dat.plot),nn,nrow(dat.plot)),side = 3,line=-2.0,adj = 0.95,xpd=T)
+			text(par('usr')[2],par('usr')[4]-ann.txt.dis,
+				 labels = sprintf("%4.2f %%\n(%d/%d)", nn*100/nrow(dat.plot),nn,nrow(dat.plot)),
+				 adj = 1.1,xpd=T,cex=ann.txt.cex)
+			nn <- sum(dat.plot$x < expT[1] & dat.plot$y >= expT[2])
+			##mtext(text = sprintf("%4.2f %%\n(%d/%d)",nn*100/nrow(dat.plot),nn,nrow(dat.plot)),side = 3,line=-2.0,adj = 0.05,xpd=T)
+			text(expT[1],par('usr')[4]-ann.txt.dis,
+				 labels = sprintf("%4.2f %%\n(%d/%d)",nn*100/nrow(dat.plot),nn,nrow(dat.plot)),
+				 adj = 1.1,xpd=T,cex=ann.txt.cex)
+			nn <- sum(dat.plot$x < expT[1] & dat.plot$y < expT[2])
+			text(expT[1],expT[2]-ann.txt.dis,
+				 labels = sprintf("%4.2f %%\n(%d/%d)",nn*100/nrow(dat.plot),nn,nrow(dat.plot)),
+				 adj=1.1,xpd=T,cex=ann.txt.cex)
+			nn <- sum(dat.plot$x >= expT[1] & dat.plot$y < expT[2])
+			text(par('usr')[2],expT[2]-ann.txt.dis,
+				 labels = sprintf("%4.2f %%\n(%d/%d)",nn*100/nrow(dat.plot),nn,nrow(dat.plot)),
+				 adj=1.1,xpd=T,cex=ann.txt.cex)
+	#        mtext(text=sprintf("Pearson Cor: %4.2f (p value: %4.2e)",
+	#						   cor.pcc.out$estimate,cor.pcc.out$p.value),
+	#			  side=3,line=2.5,adj=0.5)
+	#        mtext(text=sprintf("Spearman Cor: %4.2f (p value: %4.2e)",
+	#						   cor.spe.out$estimate,cor.spe.out$p.value),
+	#			  side=3,line=1.5,adj=0.5)
+	#        mtext(text=sprintf("%s",sample.id),side=3,line=0.5,adj=0.5)
+		}
+		.addAnn()
+		box()
+
+		# right density plot
+		par(mar = c(6,0.8,0,1))
+		plot(NULL, type = "n", xlab = "density",ylab="",
+			 ylim = dat.plot.y.range, xlim = c(0, max(.density.y$y)),
+			 main = NA, axes = F, yaxs="i")
+		lines(x=.density.y$y,y = .density.y$x, col = "darkblue", lwd = 2)
+		abline(h=expT[2],col="red4",lty=2,lwd=1.5)
+		axis(1,hadj = 0)
+
+		### title
+		par(mar=c(0,mar.left,0,4))
+		plot.new()
+		mtext(text=my.title,side=3,cex=1.8,line=-3,adj=0.5)
+		
+		### legend
+		par(mar = c(6,0.25,0,1))
+		plot.new()
+		fields::image.plot(zlim=c(0,zz[length(zz)]),legend.only=TRUE,add=T,
+				   col = col.den2d,
+				   axis.args=list( at=zz, labels=sprintf("%s%%",100-zz)),
+				   legend.width=12,legend.mar=28)
+		par(par.old)
+		dev.off()
+
+		###### density estimation from ggplot2 is different (and not so 'effective' as that from ks::kde)
+		#	p <- ggplot(dat.plot, aes(x, y)) +
+		#		geom_point(alpha=0.5,size=0,color="white") +
+		#		#stat_density2d(geom="tile", aes(fill = ..density..), contour = FALSE,bins=150) +
+		#		#geom_density2d(bins=150) +
+		#		#ggalt::stat_bkde2d(bandwidth=c(0.1,0.1),aes(fill = ..nlevel..), geom = "polygon")+
+		#        scale_fill_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd"))+
+		#		#geom_contour() +
+		#		#guides(fill = guide_colorbar(barwidth = 0.5, barheight = 10)) +
+		#		theme_bw()
+		#	p2 <- ggExtra::ggMarginal(p, type = 'density')
+		#	ggsave(sprintf("%s.test.00.pdf",out.prefix),p2,width=6,height=4)
+	}
+}
+
 #' downsample
 #' @param obj object of \code{singleCellExperiment} class
 #' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
@@ -2054,6 +2212,43 @@ ssc.moduleScore <- function(obj, features, pool = NULL,
 	rownames(features.scores.use) <- names(features)
 	features.scores.use <- as.data.frame(x = t(x = features.scores.use))
 	obj[[colnames(x = features.scores.use)]] <- features.scores.use[[1]]
+	return(obj)
+}
+
+#' scale the data
+#' @param obj object of \code{singleCellExperiment} class
+#' @param gene.id should be in rownames(obj); genes to plot
+#' @param gene.symbol should be in rowData(obj)[,"display.name"]; genes to plot
+#' @param assay.name character; which assay (default: "exprs")
+#' @param adjB character; batch column of the colData(obj). (default: NULL)
+#' @param do.scale logical; whether scale the data. (default: F)
+#' @details scale the data specified in assay.name, then store the scaled data to ${assay.name}.scale. One of gene.id and gene.symbol must be provided.
+#' @export
+ssc.scale <- function(obj,gene.id,gene.symbol,assay.name="norm_exprs",adjB=NULL,do.scale=F)
+{
+	if(missing(gene.id) && missing(gene.symbol)){
+		warning("No gene.id or gene.symbol provided!")
+		return(NULL)
+	}
+	if(missing(gene.id) && !is.null(gene.symbol)){
+		gene.list <- rowData(obj)[,"display.name"][which(rowData(obj)[,"display.name"] %in% gene.symbol)]
+	}else{
+		gene.id <- intersect(rownames(obj),gene.id)
+		gene.list <- rowData(obj)[,"display.name"][gene.id]
+	}
+	if(length(gene.list)==0){ 
+		warning("No data found for the provided genes!")
+		return(NULL)
+	}
+	obj <- obj[names(gene.list),]
+	dat.block <- assay(obj,assay.name)
+	if(!is.null(adjB)){
+		dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+	}
+	if(do.scale){
+		dat.block <- t(scale(t(dat.block)))
+	}
+	assay(obj,sprintf("%s.scale",assay.name)) <- dat.block
 	return(obj)
 }
 
