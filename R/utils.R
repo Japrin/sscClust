@@ -128,7 +128,7 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
                              verbose=F,n.cores=NULL,
                              gid.mapping=NULL)
 {
-  clustNames <- unique(xlabel)
+  clustNames <- unique(as.character(xlabel))
   xdata <- as.matrix(xdata)
   ### check rownames and colnames
   if(is.null(rownames(xdata))){

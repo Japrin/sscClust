@@ -174,7 +174,8 @@ plot.density2D <- function(x,peaks=NULL)
 #' @param row.split vector; used for row; (default: NULL)
 #' @param returnHT logical; whether return HT; (default: FALSE)
 #' @param par.legend list; lengend parameters, used to overwrite the default setting; (default: list())
-#' @param score.alpha double; for row/column score; (default: 1.5)
+#' @param par.heatmap list; other heatmap parameters, (default: list())
+#' @param par.warterfall list; parameters for warterfall, sucah as score.alpha
 #' @param pdf.width double; width of the output plot (default: 22)
 #' @param pdf.height double; height of the output plot (default: 22)
 #' @param exp.name character; showd in the legend (default: "Count")
@@ -191,7 +192,8 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
                                waterfall.row=FALSE,waterfall.column=FALSE,
                                row.ann.dat=NULL,row.split=NULL,returnHT=FALSE,
-                               par.legend=list(),score.alpha=1.5,
+                               par.legend=list(),par.heatmap=list(),
+							   par.warterfall=list(score.alpha=1.5,do.norm=T),
                                pdf.width=8,pdf.height=8,exp.name="Count",...)
 {
     require("gplots")
@@ -208,9 +210,9 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
     if(!is.null(row.split) && is.null(names(row.split))){
         names(row.split) <- rownames(dat)
     }
-	dat.list <- matrix.waterfall(dat,score.alpha=score.alpha,clust.row=clust.row,clust.column=clust.column,
-							waterfall.column=waterfall.column,waterfall.row=waterfall.row,
-							type.return="list")
+	dat.list <- do.call(matrix.waterfall,c(list(dat=dat,clust.row=clust.row,clust.column=clust.column,
+												waterfall.column=waterfall.column,waterfall.row=waterfall.row,
+												type.return="list"),par.warterfall))
 	dat <- dat.list[["dat"]]
 	clust.column <- dat.list[["clust.column"]]
 	clust.row <- dat.list[["clust.row"]]
@@ -254,16 +256,25 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
             par.legend.used[[ipar]] <- par.legend[[ipar]]
         }
     }
+	par.heatmap.used <- list(cex.row=1,cex.column=1)
+	if(length(par.heatmap)>0){
+		for(ipar in names(par.heatmap)){
+			par.heatmap.used[[ipar]] <- par.heatmap[[ipar]]
+		}
+	}
+	.cex.row <- par.heatmap.used[["cex.row"]]
+	.cex.column <- par.heatmap.used[["cex.column"]]
+
     if(!is.null(row.split)){
         row.split <- row.split[rownames(dat)]
     }
 
-    ht <- ComplexHeatmap::Heatmap(dat, name = exp.name,
+    ht <- ComplexHeatmap::Heatmap(dat, name = mytitle,
                   col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
                   cluster_columns=clust.column,cluster_rows=clust.row,
                   row_dend_reorder = FALSE, column_dend_reorder = FALSE,
-                  column_names_gp = gpar(fontsize = 12*28/max(m,32)),
-                  row_names_gp = gpar(fontsize = 10*28/max(n,32)),
+                  column_names_gp = gpar(fontsize = 12*28*.cex.column/max(m,32)),
+                  row_names_gp = gpar(fontsize = 10*28*.cex.row/max(n,32)),
                   row_dend_width = unit(4, "cm"),
                   column_dend_height = unit(4, "cm"),
                   show_row_dend = show.dendrogram,
@@ -372,9 +383,9 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
     require("ggplot2")
     require("plyr")
     require("ggsignif")
-    if(class(obj)=="Seurat"){
+    if("Seurat" %in% class(obj)){
         dat.tb <- as.data.table(obj[[]])
-    }else if(class(obj)=="SingleCellExperiment"){
+    }else if("SingleCellExperiment" %in% class(obj)){
         dat.tb <- as.data.table(colData(obj))
     }else if(is.data.frame(obj)){
         dat.tb <- as.data.table(obj)
@@ -462,18 +473,23 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
         }
 
     }
-    p <- p + theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
-                coord_cartesian(clip="off")
-    if(verbose){
-        write.table(dat.spe.group.dist, sprintf("%s.dist.%s.%s.freq.txt",out.prefix,cmp.var,group.var),
-                    row.names=F,sep="\t",quote=F)
-    }
-    if(!is.null(out.prefix)){
-        ggsave(sprintf("%s.dist.%s.%s.%s.freq.pdf",out.prefix,plot.type,cmp.var,group.var),
-               width=plot.width,height=plot.height)
-    }else{
-        return(p)
-    }
+
+	if(plot.type=="none"){
+		return(dat.spe.group.dist)
+	}else{
+		p <- p + theme(axis.text.x = element_text(angle = 60, hjust = 1)) +
+					coord_cartesian(clip="off")
+		if(verbose){
+			write.table(dat.spe.group.dist, sprintf("%s.dist.%s.%s.freq.txt",out.prefix,cmp.var,group.var),
+						row.names=F,sep="\t",quote=F)
+		}
+		if(!is.null(out.prefix)){
+			ggsave(sprintf("%s.dist.%s.%s.%s.freq.pdf",out.prefix,plot.type,cmp.var,group.var),
+				   width=plot.width,height=plot.height)
+		}else{
+			return(p)
+		}
+	}
 }
 
 #' make the matrix looks like "waterfall" (typically genes expression)
@@ -483,6 +499,7 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
 #' @param waterfall.row logical, order rows to make plot like waterfall (default: FALSE)
 #' @param waterfall.column logical, order rows to make plot like waterfall (default: FALSE)
 #' @param score.alpha double; for row/column score; (default: 1.5)
+#' @param do.norm logical; normalized the data before calculating scores?; (default: TRUE)
 #' @param type.return character; return type; (default: "matrix")
 #' @import data.table
 #' @import ggplot2
@@ -490,12 +507,12 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
 #' @export
 matrix.waterfall <- function(dat,score.alpha=1.5,clust.row=FALSE,clust.column=FALSE,
 							 waterfall.column=F,waterfall.row=F,
-							 type.return="matrix")
+							 type.return="matrix",do.norm=T)
 {
     scoreVec = function(x) {
         score = 0
         if(all(x<1)){ x <- x^100 }
-        x <- x/sum(x)
+		if(do.norm){ x <- x/sum(x) }
         m <- length(x)
         score <- sum(score.alpha^(-seq_len(m)) * x)
         if(is.na(score)) { score <- 0 }
@@ -521,7 +538,6 @@ matrix.waterfall <- function(dat,score.alpha=1.5,clust.row=FALSE,clust.column=FA
     if(waterfall.row){
         scoresR <- apply(dat.ordered, 1, scoreVec)
         dat <- dat[order(scoresR,decreasing = T),]
-        #if(!is.null(row.ann.dat)){ row.ann.dat <- row.ann.dat[order(scoresR,decreasing = T),] }
     }
 	if(type.return=="matrix"){
 		return(dat)

@@ -6,7 +6,7 @@
 \usage{
 matrix.waterfall(dat, score.alpha = 1.5, clust.row = FALSE,
   clust.column = FALSE, waterfall.column = F, waterfall.row = F,
-  type.return = "matrix")
+  type.return = "matrix", do.norm = T)
 }
 \arguments{
 \item{dat}{matrix; matrix}
@@ -22,6 +22,8 @@ matrix.waterfall(dat, score.alpha = 1.5, clust.row = FALSE,
 \item{waterfall.row}{logical, order rows to make plot like waterfall (default: FALSE)}
 
 \item{type.return}{character; return type; (default: "matrix")}
+
+\item{do.norm}{logical; normalized the data before calculating scores?; (default: TRUE)}
 }
 \description{
 make the matrix looks like "waterfall" (typically genes expression)

@@ -9,8 +9,9 @@
   palatte = NULL, clust.row = FALSE, clust.column = FALSE,
   show.dendrogram = FALSE, waterfall.row = FALSE,
   waterfall.column = FALSE, row.ann.dat = NULL, row.split = NULL,
-  returnHT = FALSE, par.legend = list(), score.alpha = 1.5,
-  pdf.width = 8, pdf.height = 8, exp.name = "Count", ...)
+  returnHT = FALSE, par.legend = list(), par.heatmap = list(),
+  par.warterfall = list(score.alpha = 1.5, do.norm = T), pdf.width = 8,
+  pdf.height = 8, exp.name = "Count", ...)
 }
 \arguments{
 \item{dat}{matrix; matrix}
@@ -47,7 +48,9 @@
 
 \item{par.legend}{list; lengend parameters, used to overwrite the default setting; (default: list())}
 
-\item{score.alpha}{double; for row/column score; (default: 1.5)}
+\item{par.heatmap}{list; other heatmap parameters, (default: list())}
+
+\item{par.warterfall}{list; parameters for warterfall, sucah as score.alpha}
 
 \item{pdf.width}{double; width of the output plot (default: 22)}
 
