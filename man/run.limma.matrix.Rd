@@ -4,10 +4,21 @@
 \alias{run.limma.matrix}
 \title{run limma, given an expression matrix}
 \usage{
-run.limma.matrix(xdata, xlabel, batch = NULL, out.prefix = NULL,
-  ncell.downsample = NULL, T.fdr = 0.05, T.logFC = 1, verbose = 0,
-  n.cores = NULL, group = NULL, gid.mapping = NULL, do.voom = F,
-  rn.seed = 9999)
+run.limma.matrix(
+  xdata,
+  xlabel,
+  batch = NULL,
+  out.prefix = NULL,
+  ncell.downsample = NULL,
+  T.fdr = 0.05,
+  T.logFC = 1,
+  verbose = 0,
+  n.cores = NULL,
+  group = NULL,
+  gid.mapping = NULL,
+  do.voom = F,
+  rn.seed = 9999
+)
 }
 \arguments{
 \item{xdata}{data frame or matrix; rows for genes and columns for samples}

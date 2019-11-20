@@ -4,9 +4,17 @@
 \alias{ssc.variableGene}
 \title{Identify variable genes}
 \usage{
-ssc.variableGene(obj, method = "HVG.sd", sd.n = 1500,
-  mean.thre = 0.1, fdr.thre = 0.001, assay.name = "exprs",
-  var.block = NULL, reuse = F, out.prefix = NULL)
+ssc.variableGene(
+  obj,
+  method = "HVG.sd",
+  sd.n = 1500,
+  mean.thre = 0.1,
+  fdr.thre = 0.001,
+  assay.name = "exprs",
+  var.block = NULL,
+  reuse = F,
+  out.prefix = NULL
+)
 }
 \arguments{
 \item{obj}{object of SingleCellExperiment}

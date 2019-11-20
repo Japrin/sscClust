@@ -17,6 +17,7 @@
 #' @param topGene.hi double; for top gene heatmap.(default: 1.5)
 #' @param topGene.step double; for top gene heatmap.(default: 1)
 #' @param myseed integer; seed for random number generation.(default: 9997)
+#' @param verbose logical; verbose level.(default: FALSE)
 #' @param ... parameters passed to ssc.clusterMarkerGene
 #' @importFrom plyr llply
 #' @details method to calculate the average expression can be one of "mean", "zscore"
@@ -32,7 +33,7 @@ integrate.by.avg <- function(sce.list,
 							 de.stat="t",de.thres=1,do.scale=F,
 							 ###par.clust=list(deepSplit=4, minClusterSize=2,method="dynamicTreeCut"),
 							 par.clust=list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2),
-                             topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,myseed=9997,
+                             topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,myseed=9997,verbose=F,
                              method.avg="zscore",...)
   {
     require("plyr")
@@ -115,6 +116,24 @@ integrate.by.avg <- function(sce.list,
 				gene.de.common <- head(gene.rank.tb$geneID,n=de.thres)
 			}else{
 				gene.de.common <- gene.rank.tb[median.F.rank < de.thres,][["geneID"]]
+			}
+			if(verbose){
+
+				.dat.plot <- gene.rank.tb
+				.dat.plot$rank <- order(gene.rank.tb$median.F.rank)
+				.dat.plot$used <- FALSE
+				.dat.plot[rank<=de.thres,used:=TRUE]
+				p <- ggplot(.dat.plot,aes(x=rank,y=median.F.rank)) +
+						geom_point(aes(color=used),shape=20) +
+						xlab("Genes") + ylab("Median of\nPercentage Rank") +
+						theme_bw() + 
+						coord_flip() + scale_x_reverse() +
+						theme(axis.title=element_text(size=18)) + 
+						theme(axis.text=element_text(size=15))
+				if(de.thres>=1){ p <- p + geom_vline(xintercept=de.thres,linetype=2,color="black") }
+				#ggsave(sprintf("%s.Frank.rank.png",out.prefix),width=6,height=2.5)
+				ggsave(sprintf("%s.Frank.rank.png",out.prefix),width=4,height=6)
+
 			}
 		}else{
 			loginfo(sprintf("use deg "))
@@ -236,7 +255,7 @@ integrate.by.avg <- function(sce.list,
 					g.desc <- head(gene.core.tb[geneID %in% rownames(sce.pb),],n=30)
 					ssc.plot.heatmap(sce.pb,out.prefix=sprintf("%s.gene.top.meta.cluster.%s",out.prefix,mcls),
 							   columns="pca.SNN.kauto",columns.order="pca.SNN.kauto",
-							   gene.desc=g.desc,
+							   gene.desc=g.desc,mytitle=sprintf("%s",mcls),
 							   pdf.width=20,pdf.height=10,do.scale=F,
 							   z.lo=topGene.lo,z.hi=topGene.hi,z.step=topGene.step,
 							   do.clustering.row=F,
@@ -249,6 +268,7 @@ integrate.by.avg <- function(sce.list,
 							   columns="pca.SNN.kauto",columns.order="pca.SNN.kauto",
 							   gene.desc=as.data.table(g.desc)[!duplicated(geneID),],
 							   pdf.width=20,pdf.height=15,do.scale=F,
+							   mytitle=sprintf("all meta-clusters"),
 							   z.lo=topGene.lo,z.hi=topGene.hi,z.step=topGene.step,
 							   do.clustering.row=F,
 							   do.clustering.col=T

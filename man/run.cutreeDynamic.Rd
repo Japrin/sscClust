@@ -4,8 +4,13 @@
 \alias{run.cutreeDynamic}
 \title{run dynamicTreeCut::cutreeDynamic on rows of the given matrix}
 \usage{
-run.cutreeDynamic(dat, method.hclust = "ward.D2", deepSplit = 4,
-  minClusterSize = 2, ...)
+run.cutreeDynamic(
+  dat,
+  method.hclust = "ward.D2",
+  deepSplit = 4,
+  minClusterSize = 2,
+  ...
+)
 }
 \arguments{
 \item{deepSplit}{integer; passed to dynamicTreeCut::cutreeDynamic}

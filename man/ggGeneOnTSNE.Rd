@@ -4,10 +4,22 @@
 \alias{ggGeneOnTSNE}
 \title{Plot gene expression on tSNE map}
 \usage{
-ggGeneOnTSNE(Y, dat.map, gene.to.show, out.prefix = NULL, p.ncol = 3,
-  xlim = NULL, ylim = NULL, size = NULL, pt.alpha = 0.5,
-  pt.order = "value", clamp = NULL, width = 9, height = 8,
-  scales = "fixed")
+ggGeneOnTSNE(
+  Y,
+  dat.map,
+  gene.to.show,
+  out.prefix = NULL,
+  p.ncol = 3,
+  xlim = NULL,
+  ylim = NULL,
+  size = NULL,
+  pt.alpha = 0.5,
+  pt.order = "value",
+  clamp = NULL,
+  width = 9,
+  height = 8,
+  scales = "fixed"
+)
 }
 \arguments{
 \item{Y}{matrix or data.frame; Gene expression data, rownames shoud be gene id, colnames

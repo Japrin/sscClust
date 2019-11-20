@@ -4,12 +4,25 @@
 \alias{ssc.clust}
 \title{Perform clustering using reduced data}
 \usage{
-ssc.clust(obj, assay.name = "exprs", method.reduction = "iCor",
-  method = "kmeans", k.batch = 2:6, method.vgene = "HVG.sd",
-  SNN.k = 10, SNN.method = "eigen", SC3.biology = T,
-  SC3.markerplot.width = 15, dpclust.rho = NULL,
-  dpclust.delta = NULL, parlist = NULL, out.prefix = NULL,
-  seed = NULL, ncore = NULL, ...)
+ssc.clust(
+  obj,
+  assay.name = "exprs",
+  method.reduction = "iCor",
+  method = "kmeans",
+  k.batch = 2:6,
+  method.vgene = "HVG.sd",
+  SNN.k = 10,
+  SNN.method = "eigen",
+  SC3.biology = T,
+  SC3.markerplot.width = 15,
+  dpclust.rho = NULL,
+  dpclust.delta = NULL,
+  parlist = NULL,
+  out.prefix = NULL,
+  seed = NULL,
+  ncore = NULL,
+  ...
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

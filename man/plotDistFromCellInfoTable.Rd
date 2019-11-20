@@ -4,11 +4,23 @@
 \alias{plotDistFromCellInfoTable}
 \title{plot distribution using cell info table}
 \usage{
-plotDistFromCellInfoTable(obj, out.prefix, plot.type = "barplot",
-  facet.ncol = 3, plot.width = 10, plot.height = 5,
-  test.method = "fisher.test", group.filter = NULL, sort.freq = F,
-  bar.position = position_dodge2(), cmp.var = "Species",
-  group.var = "ClusterID", donor.var = "donor", verbose = F, ...)
+plotDistFromCellInfoTable(
+  obj,
+  out.prefix,
+  plot.type = "barplot",
+  facet.ncol = 3,
+  plot.width = 10,
+  plot.height = 5,
+  test.method = "fisher.test",
+  group.filter = NULL,
+  sort.freq = F,
+  bar.position = position_dodge2(),
+  cmp.var = "Species",
+  group.var = "ClusterID",
+  donor.var = "donor",
+  verbose = F,
+  ...
+)
 }
 \arguments{
 \item{obj}{object; can be class of Seurat, SingleCellExperiment or data.frame;}

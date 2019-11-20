@@ -4,11 +4,24 @@
 \alias{ssc.reduceDim}
 \title{Reduce dimension by various methods}
 \usage{
-ssc.reduceDim(obj, assay.name = "exprs", method = "iCor",
-  method.vgene = "HVG.sd", method.tsne = "Rtsne", pca.npc = NULL,
-  tSNE.usePCA = T, tSNE.perplexity = 30, autoTSNE = T,
-  dim.name = NULL, iCor.niter = 1, iCor.method = "spearman",
-  reuse = F, ncore = NULL, seed = NULL, out.prefix = NULL)
+ssc.reduceDim(
+  obj,
+  assay.name = "exprs",
+  method = "iCor",
+  method.vgene = "HVG.sd",
+  method.tsne = "Rtsne",
+  pca.npc = NULL,
+  tSNE.usePCA = T,
+  tSNE.perplexity = 30,
+  autoTSNE = T,
+  dim.name = NULL,
+  iCor.niter = 1,
+  iCor.method = "spearman",
+  reuse = F,
+  ncore = NULL,
+  seed = NULL,
+  out.prefix = NULL
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

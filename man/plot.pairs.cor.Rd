@@ -4,9 +4,17 @@
 \alias{plot.pairs.cor}
 \title{plot genes expression in pairs of clusters to examine the correlation}
 \usage{
-\method{plot}{pairs.cor}(sce.pb, assay.name, x.cluster, out.prefix,
-  genes = NULL, gene.highlight = NULL, plot.ncol = 7,
-  plot.width = 22, plot.height = 22)
+\method{plot}{pairs.cor}(
+  sce.pb,
+  assay.name,
+  x.cluster,
+  out.prefix,
+  genes = NULL,
+  gene.highlight = NULL,
+  plot.ncol = 7,
+  plot.width = 22,
+  plot.height = 22
+)
 }
 \arguments{
 \item{sce.pb}{object; object of \code{singleCellExperiment} class}

@@ -4,8 +4,14 @@
 \alias{ssc.scale}
 \title{scale the data}
 \usage{
-ssc.scale(obj, gene.id, gene.symbol, assay.name = "norm_exprs",
-  adjB = NULL, do.scale = F)
+ssc.scale(
+  obj,
+  gene.id,
+  gene.symbol,
+  assay.name = "norm_exprs",
+  adjB = NULL,
+  do.scale = F
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

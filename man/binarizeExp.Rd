@@ -4,10 +4,21 @@
 \alias{binarizeExp}
 \title{binarize the expression value using the distribution}
 \usage{
-binarizeExp(x, out.prefix = NULL, G = NULL, topNAsHi = 1,
-  e.TH = NULL, e.name = "Exp", verbose = F, draw.CI = T,
-  zero.as.low = T, run.extremevalue = F, zero.notUsed = F,
-  my.seed = 9997, ...)
+binarizeExp(
+  x,
+  out.prefix = NULL,
+  G = NULL,
+  topNAsHi = 1,
+  e.TH = NULL,
+  e.name = "Exp",
+  verbose = F,
+  draw.CI = T,
+  zero.as.low = T,
+  run.extremevalue = F,
+  zero.notUsed = F,
+  my.seed = 9997,
+  ...
+)
 }
 \arguments{
 \item{x}{object; vector}

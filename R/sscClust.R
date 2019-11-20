@@ -1780,6 +1780,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 #' @param clustering.method character; method for hclust (default: "complete")
 #' @param k.row integer; number of clusters in the rows (default: 1)
 #' @param k.col integer; number of clusters in the columns (default: 1)
+#' @param returnHT logical; whether return HT; (default: FALSE)
 #' @param palette.name character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)
 #' @param row.split vector; used for row; (default: NULL)
 #' @param column.split vector; used for column; (default: NULL)
@@ -1801,7 +1802,9 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                              do.scale=TRUE,z.lo=-2.5,z.hi=2.5,z.step=1,exp.title="Exp",
                              do.clustering.row=T,do.clustering.col=T,
                              dend.col=FALSE,dend.row=FALSE,
-                             clustering.distance="spearman",clustering.method="complete",k.row=1,k.col=1,
+                             clustering.distance="spearman",clustering.method="complete",
+							 k.row=1,k.col=1,
+							 returnHT=FALSE,
                              palette.name=NULL,row.split=NULL,column.split=NULL,
                              annotation_legend_param=list(),ann.bar.height=1.5, mytitle="",...)
 {
@@ -1914,15 +1917,17 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     }
 
     ##### plot
-    if(!is.null(out.prefix)){ pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height) }
-    par(mar=c(4,12,4,4))
-    plot.new()
-    title(main = mytitle,cex.main=2)
-    #legend("topright",legend=names(colSet),fill=colSet,border=colSet,cex=1.5,inset=c(-0.03,0),xpd=T)
-
-    ### Integrating Grid Graphics Output with Base Graphics Output
-    vps <- gridBase::baseViewports()
-    grid::pushViewport(vps$inner, vps$figure, vps$plot)
+	if(!is.null(out.prefix))
+	{
+		pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height)
+		par(mar=c(4,12,4,4))
+		plot.new()
+		title(main = mytitle,cex.main=2)
+		##legend("topright",legend=names(colSet),fill=colSet,border=colSet,cex=1.5,inset=c(-0.03,0),xpd=T)
+		### Integrating Grid Graphics Output with Base Graphics Output
+		vps <- gridBase::baseViewports()
+		grid::pushViewport(vps$inner, vps$figure, vps$plot)
+	}
 
     if(is.null(palette.name)){
         exp.palette <- rev(brewer.pal(n = 7, name = ifelse(do.scale,"RdBu","RdYlBu")))
@@ -1941,17 +1946,21 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
                                returnHT=TRUE,column_split=column.split,
                                par.legend=list(at = seq(z.lo,z.hi,z.step)),
+							   mytitle=mytitle,
                                top_annotation = ha.col,...)
 
-    ComplexHeatmap::draw(ht, newpage= FALSE,merge_legends = TRUE,split=row.split)
-    if(!is.null(ha.col)){
-        for(i in seq_along(names(ha.col@anno_list))){
-          ComplexHeatmap::decorate_annotation(names(ha.col@anno_list)[i],
-                                {grid.text(names(ha.col@anno_list)[i], unit(-4, "mm"),
-                                           gp=grid::gpar(fontsize=14),just = "right")})
-        }
-    }
-    if(!is.null(out.prefix)){ dev.off() }
+	if(!is.null(out.prefix)){
+		ComplexHeatmap::draw(ht, newpage= FALSE,merge_legends = TRUE,split=row.split)
+		if(!is.null(ha.col)){
+			for(i in seq_along(names(ha.col@anno_list))){
+			  ComplexHeatmap::decorate_annotation(names(ha.col@anno_list)[i],
+									{grid.text(names(ha.col@anno_list)[i], unit(-4, "mm"),
+											   gp=grid::gpar(fontsize=14),just = "right")})
+			}
+		}
+		dev.off()
+	}
+	if(returnHT){ return(ht) }
 }
 
 #' plot gene expression density

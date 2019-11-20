@@ -4,13 +4,30 @@
 \alias{integrate.by.avg}
 \title{integrate dataset by calculating the average expression and then clustering the pseudo bulk data}
 \usage{
-integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
-  is.avg = FALSE, ncores = 6, use.deg = TRUE, gene.de.list = NULL,
-  avg.by = "majorCluster", n.downsample = NULL, n.pc = 15,
-  de.stat = "t", de.thres = 1, do.scale = F,
+integrate.by.avg(
+  sce.list,
+  out.prefix,
+  assay.name = "exprs",
+  is.avg = FALSE,
+  ncores = 6,
+  use.deg = TRUE,
+  gene.de.list = NULL,
+  avg.by = "majorCluster",
+  n.downsample = NULL,
+  n.pc = 15,
+  de.stat = "t",
+  de.thres = 1,
+  do.scale = F,
   par.clust = list(method = "SNN", SNN.k = 3, SNN.method = "leiden",
-  resolution_parameter = 2.2), topGene.lo = -1.5, topGene.hi = 1.5,
-  topGene.step = 1, myseed = 9997, method.avg = "zscore", ...)
+    resolution_parameter = 2.2),
+  topGene.lo = -1.5,
+  topGene.hi = 1.5,
+  topGene.step = 1,
+  myseed = 9997,
+  verbose = F,
+  method.avg = "zscore",
+  ...
+)
 }
 \arguments{
 \item{sce.list}{list; list of object of \code{singleCellExperiment} class}
@@ -46,6 +63,8 @@ integrate.by.avg(sce.list, out.prefix, assay.name = "exprs",
 \item{topGene.step}{double; for top gene heatmap.(default: 1)}
 
 \item{myseed}{integer; seed for random number generation.(default: 9997)}
+
+\item{verbose}{logical; verbose level.(default: FALSE)}
 
 \item{method.avg}{character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")}
 

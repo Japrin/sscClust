@@ -4,17 +4,40 @@
 \alias{fftRtsne}
 \title{Wraper for running FIt-SNE. Code from KlugerLab (https://github.com/KlugerLab/FIt-SNE)}
 \usage{
-fftRtsne(X, dims = 2, perplexity = 30, theta = 0.5,
-  max_iter = 1000, fft_not_bh = TRUE, ann_not_vptree = TRUE,
-  stop_early_exag_iter = 250, exaggeration_factor = 12,
-  no_momentum_during_exag = FALSE, start_late_exag_iter = -1,
-  late_exag_coeff = 1, mom_switch_iter = 250, momentum = 0.5,
-  final_momentum = 0.8, learning_rate = 200, n_trees = 50,
-  search_k = -1, rand_seed = -1, nterms = 3,
-  intervals_per_integer = 1, min_num_intervals = 50, K = -1,
-  sigma = -30, initialization = NULL, out_prefix = NULL,
-  load_affinities = NULL, fast_tsne_path = NULL, nthreads = 0,
-  perplexity_list = NULL, get_costs = FALSE, ...)
+fftRtsne(
+  X,
+  dims = 2,
+  perplexity = 30,
+  theta = 0.5,
+  max_iter = 1000,
+  fft_not_bh = TRUE,
+  ann_not_vptree = TRUE,
+  stop_early_exag_iter = 250,
+  exaggeration_factor = 12,
+  no_momentum_during_exag = FALSE,
+  start_late_exag_iter = -1,
+  late_exag_coeff = 1,
+  mom_switch_iter = 250,
+  momentum = 0.5,
+  final_momentum = 0.8,
+  learning_rate = 200,
+  n_trees = 50,
+  search_k = -1,
+  rand_seed = -1,
+  nterms = 3,
+  intervals_per_integer = 1,
+  min_num_intervals = 50,
+  K = -1,
+  sigma = -30,
+  initialization = NULL,
+  out_prefix = NULL,
+  load_affinities = NULL,
+  fast_tsne_path = NULL,
+  nthreads = 0,
+  perplexity_list = NULL,
+  get_costs = FALSE,
+  ...
+)
 }
 \arguments{
 \item{X}{matrix; samples in rows and variables in columns}

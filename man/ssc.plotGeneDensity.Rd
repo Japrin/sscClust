@@ -4,10 +4,18 @@
 \alias{ssc.plotGeneDensity}
 \title{plot gene expression density}
 \usage{
-ssc.plotGeneDensity(obj, out.prefix, gene.id, gene.symbol,
-  assay.name = "norm_exprs", expT = c(0.3, 0.3),
-  pallete.name = "heat", ann.txt.dis = 0.3, ann.txt.cex = 1.2,
-  my.title = "")
+ssc.plotGeneDensity(
+  obj,
+  out.prefix,
+  gene.id,
+  gene.symbol,
+  assay.name = "norm_exprs",
+  expT = c(0.3, 0.3),
+  pallete.name = "heat",
+  ann.txt.dis = 0.3,
+  ann.txt.cex = 1.2,
+  my.title = ""
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

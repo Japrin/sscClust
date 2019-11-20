@@ -4,8 +4,17 @@
 \alias{ssc.moduleScore}
 \title{Add module scores for gene expression programs in single cells. Mofidy from Seurat::AddModuleScore}
 \usage{
-ssc.moduleScore(obj, features, pool = NULL, nbin = 24, ctrl = 100,
-  assay.name = "exprs", adjB = NULL, do.scale = T, seed = 1)
+ssc.moduleScore(
+  obj,
+  features,
+  pool = NULL,
+  nbin = 24,
+  ctrl = 100,
+  assay.name = "exprs",
+  adjB = NULL,
+  do.scale = T,
+  seed = 1
+)
 }
 \arguments{
 \item{obj}{object of SingleCellExperiment}

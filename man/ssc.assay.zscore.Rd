@@ -4,8 +4,15 @@
 \alias{ssc.assay.zscore}
 \title{scale the assay per gene}
 \usage{
-ssc.assay.zscore(obj, assay.name = "exprs", assay.new = NULL,
-  covar = "patient", n.cores = NULL, z.lo = NULL, z.hi = NULL)
+ssc.assay.zscore(
+  obj,
+  assay.name = "exprs",
+  assay.new = NULL,
+  covar = "patient",
+  n.cores = NULL,
+  z.lo = NULL,
+  z.hi = NULL
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

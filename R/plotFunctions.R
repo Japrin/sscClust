@@ -159,7 +159,7 @@ plot.density2D <- function(x,peaks=NULL)
 #' plot matrix (typically genes expression)
 #' @param dat matrix; matrix
 #' @param out.prefix character; output prefix.
-#' @param mytitle character; (default: "")
+#' @param mytitle character; (default: "Heatmap")
 #' @param show.number logical; (default: TRUE)
 #' @param do.clust logical, character or dendrogram; passed to both cluster_columns and cluster_rows of Heatmap. Higher priority than clust.row and clust.column (default: NULL)
 #' @param clust.row logical, character or dendrogram; passed to cluster_rows of Heatmap (default: FALSE)
@@ -187,7 +187,7 @@ plot.density2D <- function(x,peaks=NULL)
 #' @importFrom dynamicTreeCut cutreeDynamic
 #' @details plot matrix
 #' @export
-plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="",show.number=TRUE,
+plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number=TRUE,
                                do.clust=NULL,z.lo=NULL,z.hi=NULL,palatte=NULL,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
                                waterfall.row=FALSE,waterfall.column=FALSE,

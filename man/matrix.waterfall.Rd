@@ -4,9 +4,16 @@
 \alias{matrix.waterfall}
 \title{make the matrix looks like "waterfall" (typically genes expression)}
 \usage{
-matrix.waterfall(dat, score.alpha = 1.5, clust.row = FALSE,
-  clust.column = FALSE, waterfall.column = F, waterfall.row = F,
-  type.return = "matrix", do.norm = T)
+matrix.waterfall(
+  dat,
+  score.alpha = 1.5,
+  clust.row = FALSE,
+  clust.column = FALSE,
+  waterfall.column = F,
+  waterfall.row = F,
+  type.return = "matrix",
+  do.norm = T
+)
 }
 \arguments{
 \item{dat}{matrix; matrix}

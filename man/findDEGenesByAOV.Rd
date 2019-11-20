@@ -4,10 +4,19 @@
 \alias{findDEGenesByAOV}
 \title{differential expression analysis}
 \usage{
-findDEGenesByAOV(xdata, xlabel, batch = NULL, out.prefix = NULL,
-  mod = NULL, F.FDR.THRESHOLD = 0.01, HSD.FDR.THRESHOLD = 0.01,
-  HSD.FC.THRESHOLD = 1, verbose = F, n.cores = NULL,
-  gid.mapping = NULL)
+findDEGenesByAOV(
+  xdata,
+  xlabel,
+  batch = NULL,
+  out.prefix = NULL,
+  mod = NULL,
+  F.FDR.THRESHOLD = 0.01,
+  HSD.FDR.THRESHOLD = 0.01,
+  HSD.FC.THRESHOLD = 1,
+  verbose = F,
+  n.cores = NULL,
+  gid.mapping = NULL
+)
 }
 \arguments{
 \item{xdata}{data frame or matrix; rows for genes and columns for samples}

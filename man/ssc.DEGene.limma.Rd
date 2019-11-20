@@ -4,11 +4,21 @@
 \alias{ssc.DEGene.limma}
 \title{identify differential genes of each cluster (comparing the cluster with all others), using limma}
 \usage{
-ssc.DEGene.limma(obj, assay.name = "exprs", ncell.downsample = NULL,
-  group.var = "majorCluster", group.list = NULL,
-  group.mode = "multi", batch = NULL, out.prefix = NULL,
-  n.cores = NULL, do.plot = T, T.fdr = 0.01, T.logFC = 1,
-  verbose = 0)
+ssc.DEGene.limma(
+  obj,
+  assay.name = "exprs",
+  ncell.downsample = NULL,
+  group.var = "majorCluster",
+  group.list = NULL,
+  group.mode = "multi",
+  batch = NULL,
+  out.prefix = NULL,
+  n.cores = NULL,
+  do.plot = T,
+  T.fdr = 0.01,
+  T.logFC = 1,
+  verbose = 0
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

@@ -4,10 +4,22 @@
 \alias{plotSigGene}
 \title{plot signature genes}
 \usage{
-plotSigGene(obj.list, gene.core.tb, out.prefix, assay.name = "exprs",
-  adjB = NULL, meta.cluster = NULL, meta.info.tb = NULL,
-  meta.col = "metaCluster", p.ncol = 2, pdf.width = NULL,
-  pdf.height = NULL, verbose = F, ptype = "heatmap", ncores = 16)
+plotSigGene(
+  obj.list,
+  gene.core.tb,
+  out.prefix,
+  assay.name = "exprs",
+  adjB = NULL,
+  meta.cluster = NULL,
+  meta.info.tb = NULL,
+  meta.col = "metaCluster",
+  p.ncol = 2,
+  pdf.width = NULL,
+  pdf.height = NULL,
+  verbose = F,
+  ptype = "heatmap",
+  ncores = 16
+)
 }
 \arguments{
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}

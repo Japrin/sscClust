@@ -4,8 +4,13 @@
 \alias{ssc.plot.silhouette}
 \title{Wraper for silhouette()}
 \usage{
-ssc.plot.silhouette(obj, cluster.label, reducedDim.name = "iCor.tsne",
-  do.plot = T, ...)
+ssc.plot.silhouette(
+  obj,
+  cluster.label,
+  reducedDim.name = "iCor.tsne",
+  do.plot = T,
+  ...
+)
 }
 \arguments{
 \item{obj}{object of \code{SingleCellExperiment}}

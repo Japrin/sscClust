@@ -4,14 +4,32 @@
 \alias{classifyCell.by.sigGene}
 \title{plot genes expression in pairs of clusters to examine the correlation}
 \usage{
-classifyCell.by.sigGene(obj.list, gene.core.tb, assay.name = "exprs",
-  out.prefix = NULL, adjB = NULL, meta.cluster = NULL,
-  method = "posFreq", gene.pos.tb = NULL, gene.neg.tb = NULL,
-  meta.info.tb = NULL, ndownsample = 1500, myseed = 123456,
-  verbose = F, sig.prevelance = 0.65, ntop = 10, ncores = 16,
-  bin.z.pos.th = 0.3, bin.z.neg.th = 0.3, prob.th = 0.8,
-  TH.gene.exp.freq = 0.65, TH.gene.exp.freq.train.pos = 0.8,
-  TH.gene.exp.freq.train.neg = 0.2, RF.selectVar = F, ...)
+classifyCell.by.sigGene(
+  obj.list,
+  gene.core.tb,
+  assay.name = "exprs",
+  out.prefix = NULL,
+  adjB = NULL,
+  meta.cluster = NULL,
+  method = "posFreq",
+  gene.pos.tb = NULL,
+  gene.neg.tb = NULL,
+  meta.info.tb = NULL,
+  ndownsample = 1500,
+  myseed = 123456,
+  verbose = F,
+  sig.prevelance = 0.65,
+  ntop = 10,
+  ncores = 16,
+  bin.z.pos.th = 0.3,
+  bin.z.neg.th = 0.3,
+  prob.th = 0.8,
+  TH.gene.exp.freq = 0.65,
+  TH.gene.exp.freq.train.pos = 0.8,
+  TH.gene.exp.freq.train.neg = 0.2,
+  RF.selectVar = F,
+  ...
+)
 }
 \arguments{
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}

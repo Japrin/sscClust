@@ -4,9 +4,15 @@
 \alias{ssc.average.cell}
 \title{calcualte the average expression of cells of each group}
 \usage{
-ssc.average.cell(obj, assay.name = "exprs", gene = NULL,
-  column = "majorCluster", ncell.downsample = NULL, avg = "mean",
-  ret.type = "data.melt")
+ssc.average.cell(
+  obj,
+  assay.name = "exprs",
+  gene = NULL,
+  column = "majorCluster",
+  ncell.downsample = NULL,
+  avg = "mean",
+  ret.type = "data.melt"
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

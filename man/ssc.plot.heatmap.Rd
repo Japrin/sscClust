@@ -4,16 +4,40 @@
 \alias{ssc.plot.heatmap}
 \title{plot heatmap}
 \usage{
-ssc.plot.heatmap(obj, assay.name = "exprs", out.prefix = NULL,
-  ncell.downsample = NULL, ave.by = NULL, columns = NULL,
-  columns.order = NULL, gene.desc = NULL, colSet = list(),
-  pdf.width = 16, pdf.height = 15, do.scale = TRUE, z.lo = -2.5,
-  z.hi = 2.5, z.step = 1, exp.title = "Exp", do.clustering.row = T,
-  do.clustering.col = T, dend.col = FALSE, dend.row = FALSE,
-  clustering.distance = "spearman", clustering.method = "complete",
-  k.row = 1, k.col = 1, palette.name = NULL, row.split = NULL,
-  column.split = NULL, annotation_legend_param = list(),
-  ann.bar.height = 1.5, mytitle = "", ...)
+ssc.plot.heatmap(
+  obj,
+  assay.name = "exprs",
+  out.prefix = NULL,
+  ncell.downsample = NULL,
+  ave.by = NULL,
+  columns = NULL,
+  columns.order = NULL,
+  gene.desc = NULL,
+  colSet = list(),
+  pdf.width = 16,
+  pdf.height = 15,
+  do.scale = TRUE,
+  z.lo = -2.5,
+  z.hi = 2.5,
+  z.step = 1,
+  exp.title = "Exp",
+  do.clustering.row = T,
+  do.clustering.col = T,
+  dend.col = FALSE,
+  dend.row = FALSE,
+  clustering.distance = "spearman",
+  clustering.method = "complete",
+  k.row = 1,
+  k.col = 1,
+  returnHT = FALSE,
+  palette.name = NULL,
+  row.split = NULL,
+  column.split = NULL,
+  annotation_legend_param = list(),
+  ann.bar.height = 1.5,
+  mytitle = "",
+  ...
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
@@ -63,6 +87,8 @@ ssc.plot.heatmap(obj, assay.name = "exprs", out.prefix = NULL,
 \item{k.row}{integer; number of clusters in the rows (default: 1)}
 
 \item{k.col}{integer; number of clusters in the columns (default: 1)}
+
+\item{returnHT}{logical; whether return HT; (default: FALSE)}
 
 \item{palette.name}{character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)}
 

@@ -4,10 +4,20 @@
 \alias{ssc.plot.violin}
 \title{Plot violin}
 \usage{
-ssc.plot.violin(obj, assay.name = "exprs", gene = NULL,
-  columns = NULL, group.var = "majorCluster", clamp = c(0, 12),
-  adjB = NULL, do.scale = F, out.prefix = NULL, p.ncol = 1,
-  base_aspect_ratio = 1.1, ...)
+ssc.plot.violin(
+  obj,
+  assay.name = "exprs",
+  gene = NULL,
+  columns = NULL,
+  group.var = "majorCluster",
+  clamp = c(0, 12),
+  adjB = NULL,
+  do.scale = F,
+  out.prefix = NULL,
+  p.ncol = 1,
+  base_aspect_ratio = 1.1,
+  ...
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

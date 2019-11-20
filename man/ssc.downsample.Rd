@@ -4,8 +4,12 @@
 \alias{ssc.downsample}
 \title{downsample}
 \usage{
-ssc.downsample(obj, ncell.downsample = NULL,
-  group.var = "majorCluster", rn.seed = 9999)
+ssc.downsample(
+  obj,
+  ncell.downsample = NULL,
+  group.var = "majorCluster",
+  rn.seed = 9999
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}

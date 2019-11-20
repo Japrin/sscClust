@@ -4,21 +4,38 @@
 \alias{plot.matrix.simple}
 \title{plot matrix (typically genes expression)}
 \usage{
-\method{plot}{matrix.simple}(dat, out.prefix = NULL, mytitle = "",
-  show.number = TRUE, do.clust = NULL, z.lo = NULL, z.hi = NULL,
-  palatte = NULL, clust.row = FALSE, clust.column = FALSE,
-  show.dendrogram = FALSE, waterfall.row = FALSE,
-  waterfall.column = FALSE, row.ann.dat = NULL, row.split = NULL,
-  returnHT = FALSE, par.legend = list(), par.heatmap = list(),
-  par.warterfall = list(score.alpha = 1.5, do.norm = T), pdf.width = 8,
-  pdf.height = 8, exp.name = "Count", ...)
+\method{plot}{matrix.simple}(
+  dat,
+  out.prefix = NULL,
+  mytitle = "Heatmap",
+  show.number = TRUE,
+  do.clust = NULL,
+  z.lo = NULL,
+  z.hi = NULL,
+  palatte = NULL,
+  clust.row = FALSE,
+  clust.column = FALSE,
+  show.dendrogram = FALSE,
+  waterfall.row = FALSE,
+  waterfall.column = FALSE,
+  row.ann.dat = NULL,
+  row.split = NULL,
+  returnHT = FALSE,
+  par.legend = list(),
+  par.heatmap = list(),
+  par.warterfall = list(score.alpha = 1.5, do.norm = T),
+  pdf.width = 8,
+  pdf.height = 8,
+  exp.name = "Count",
+  ...
+)
 }
 \arguments{
 \item{dat}{matrix; matrix}
 
 \item{out.prefix}{character; output prefix.}
 
-\item{mytitle}{character; (default: "")}
+\item{mytitle}{character; (default: "Heatmap")}
 
 \item{show.number}{logical; (default: TRUE)}
 

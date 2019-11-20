@@ -4,8 +4,15 @@
 \alias{run.tSNE}
 \title{Wraper for running Rtsne}
 \usage{
-run.tSNE(idata, tSNE.usePCA = T, tSNE.perplexity = 30,
-  method = "Rtsne", n.cores = NULL, out.prefix = NULL, ...)
+run.tSNE(
+  idata,
+  tSNE.usePCA = T,
+  tSNE.perplexity = 30,
+  method = "Rtsne",
+  n.cores = NULL,
+  out.prefix = NULL,
+  ...
+)
 }
 \arguments{
 \item{idata}{matrix; expression data with sample id in rows and variables in columns}

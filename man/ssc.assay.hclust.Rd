@@ -4,9 +4,16 @@
 \alias{ssc.assay.hclust}
 \title{sort by hierarchical clustering}
 \usage{
-ssc.assay.hclust(obj, assay.name = "exprs", order.col = FALSE,
-  order.row = FALSE, clustering.distance = "spearman",
-  clustering.method = "complete", k.row = 1, k.col = 1)
+ssc.assay.hclust(
+  obj,
+  assay.name = "exprs",
+  order.col = FALSE,
+  order.row = FALSE,
+  clustering.distance = "spearman",
+  clustering.method = "complete",
+  k.row = 1,
+  k.col = 1
+)
 }
 \arguments{
 \item{obj}{object of \code{singleCellExperiment} class}
