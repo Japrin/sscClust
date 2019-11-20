@@ -447,6 +447,7 @@ ssc.assay.zscore <- function(obj,assay.name="exprs",assay.new=NULL,covar="patien
 #' @param reuse logical; don't calculate if the query is already available. (default: F)
 #' @param seed integer; seed of random number generation. (default: NULL)
 #' @param out.prefix character; output prefix (default: NULL)
+#' @param ... parameters passed to RD methods
 #' @param ncore integer; nuber of CPU cores to use. if NULL, automatically detect the number. (default: NULL)
 #' @details If the reduction method is "pca", the function will call prcomp() and estimate the number of top PC should be used
 #' in downstream analysis using and "elbow" based method, then the samples coordinates in the space spaned by the top PC would
@@ -471,7 +472,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
                           autoTSNE=T,
                           dim.name=NULL,
                           iCor.niter=1,iCor.method="spearman",
-                          reuse=F,ncore=NULL,seed=NULL,out.prefix=NULL)
+                          reuse=F,ncore=NULL,seed=NULL,out.prefix=NULL,...)
 {
   row.sd <- apply(assay(obj,assay.name),1,sd)
   col.sd <- apply(assay(obj,assay.name),2,sd)
@@ -519,11 +520,11 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
         if(autoTSNE){
             reducedDim(obj,sprintf("%s.tsne",dim.name)) <-
                 run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity,
-                         out.prefix=out.prefix,n.cores=ncore,method=method.tsne)
+                         out.prefix=out.prefix,n.cores=ncore,method=method.tsne,...)
         }
     }else if(method=="tsne"){
       proj_data <- run.tSNE(BiocGenerics::t(assay(obj[vgene,],assay.name)),tSNE.usePCA,tSNE.perplexity,
-                            out.prefix=out.prefix,n.cores=ncore,method=method.tsne)
+                            out.prefix=out.prefix,n.cores=ncore,method=method.tsne,...)
     }else if(method=="umap"){
         proj_data <- umap(BiocGenerics::t(assay(obj[vgene,],assay.name)), init = "spca",pca=50,n_threads = ncore)
     }else if(method=="iCor"){
@@ -535,7 +536,7 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
       }
       if(autoTSNE) { reducedDim(obj,sprintf("%s.tsne",dim.name)) <-
           run.tSNE(proj_data,tSNE.usePCA=F,tSNE.perplexity,out.prefix=out.prefix,
-                   n.cores=ncore,method=method.tsne)
+                   n.cores=ncore,method=method.tsne,...)
       }
     }
     reducedDim(obj,dim.name) <- proj_data

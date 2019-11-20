@@ -30,13 +30,15 @@ fftRtsne(
   K = -1,
   sigma = -30,
   initialization = NULL,
+  data_path = NULL,
+  result_path = NULL,
   out_prefix = NULL,
   load_affinities = NULL,
   fast_tsne_path = NULL,
   nthreads = 0,
   perplexity_list = NULL,
   get_costs = FALSE,
-  ...
+  df = 1
 )
 }
 \arguments{
@@ -101,8 +103,6 @@ fftRtsne(
 \item{perplexity_list}{list;}
 
 \item{get_costs}{logical;}
-
-\item{...}{parameter passed}
 }
 \value{
 a matrix with samples in rows and tSNE coordinate in columns

@@ -20,7 +20,8 @@ ssc.reduceDim(
   reuse = F,
   ncore = NULL,
   seed = NULL,
-  out.prefix = NULL
+  out.prefix = NULL,
+  ...
 )
 }
 \arguments{
@@ -57,6 +58,8 @@ should be one of "spearman" and "pearson". (default "spearman")}
 \item{seed}{integer; seed of random number generation. (default: NULL)}
 
 \item{out.prefix}{character; output prefix (default: NULL)}
+
+\item{...}{parameters passed to RD methods}
 }
 \value{
 an object of \code{SingleCellExperiment} class with reduced data added to the reducedDim slot.
