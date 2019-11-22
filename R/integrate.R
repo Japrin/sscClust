@@ -884,11 +884,12 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 #' @param x object; vector
 #' @param out.prefix character; output prefix [default: NULL]
 #' @param e.name character; name of the expression metric [default: "Exp"]
+#' @param th.score numeric; numeic vector to show the threshold specified manually [default: NULL]
 #' @import data.table
 #' @import ggplot2
 #' @details outlier detection using extremevalues
 #' @export
-classify.outlier <- function(x,out.prefix=NULL,e.name="Exp")
+classify.outlier <- function(x,out.prefix=NULL,e.name="Exp",th.score=NULL)
 {
 	##### outlier detection (use method I at last)
 	K <- extremevalues::getOutliers(x,method="I",distribution="normal")
@@ -909,16 +910,20 @@ classify.outlier <- function(x,out.prefix=NULL,e.name="Exp")
 
 	##### plot #####
     if(!is.null(out.prefix)){
-        pdf(sprintf("%s.extremevalues.outlier.pdf",out.prefix),width = 10,height = 6)
+        ##pdf(sprintf("%s.extremevalues.outlier.pdf",out.prefix),width = 10,height = 6)
+        png(sprintf("%s.extremevalues.outlier.png",out.prefix),width = 1000,height = 600)
         opar <- par(mfrow=c(1,2))
         extremevalues::outlierPlot(x,K,mode="qq")
         extremevalues::outlierPlot(x,L,mode="residual")
         dev.off()
         par(opar)
 
-	    p <- ggplot(ret.1, aes(score)) + geom_density(colour="black") + theme_bw() +
+	    p <- ggplot(ret.1, aes(o.Exp)) + geom_density(colour="black") + theme_bw() +
 		        geom_line(data=ret.2,aes(x=score,y=density),colour="red") +
-		        geom_vline(xintercept = K$limit,linetype=2)
+		        geom_vline(xintercept = K$limit,linetype=2,colour="orange")
+	    if(!is.null(th.score)){
+			p <- p + geom_vline(xintercept = th.score,linetype=2,colour="black")
+		}
 	    ggsave(filename = sprintf("%s.extremevalues.density.pdf",out.prefix),width = 4,height = 3)
     }
     return(list("score.cls.tb"=ret.1,"fit.value.tb"=ret.2,"K"=K,"R2"=K$R2))

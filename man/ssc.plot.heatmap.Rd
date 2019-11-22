@@ -92,7 +92,7 @@ ssc.plot.heatmap(
 
 \item{palette.name}{character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)}
 
-\item{row.split}{vector; used for row; (default: NULL)}
+\item{row.split}{vector; used for row; must be named or is corresponding to the rows of obj (default: NULL)}
 
 \item{column.split}{vector; used for column; (default: NULL)}
 

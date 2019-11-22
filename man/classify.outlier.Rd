@@ -4,7 +4,7 @@
 \alias{classify.outlier}
 \title{outlier detection using extremevalues}
 \usage{
-classify.outlier(x, out.prefix = NULL, e.name = "Exp")
+classify.outlier(x, out.prefix = NULL, e.name = "Exp", th.score = NULL)
 }
 \arguments{
 \item{x}{object; vector}
@@ -12,6 +12,8 @@ classify.outlier(x, out.prefix = NULL, e.name = "Exp")
 \item{out.prefix}{character; output prefix [default: NULL]}
 
 \item{e.name}{character; name of the expression metric [default: "Exp"]}
+
+\item{th.score}{numeric; numeic vector to show the threshold specified manually [default: NULL]}
 }
 \description{
 outlier detection using extremevalues

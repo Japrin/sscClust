@@ -319,7 +319,7 @@ ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorClust
   }
 
   cls <- sort(unique(colData(obj)[,column]))
-  data.melt.df <- ldply(cls,function(x){
+  data.melt.df <- as.data.table(ldply(cls,function(x){
     obj.in <- obj[,colData(obj)[,column]==x]
     avg.in <- NULL
     avg.in <- Matrix::rowMeans(assay(obj.in,assay.name))
@@ -341,24 +341,25 @@ ssc.average.cell <- function(obj,assay.name="exprs",gene=NULL,column="majorClust
 	  dat.ret$avg[is.na(dat.ret$avg)] <- 0
 	  return(dat.ret)
     }
-  })
+  }))
   if(ret.type=="data.melt"){
     return(data.melt.df)
   }else if(ret.type=="data.dcast"){
     dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
-    rownames(dat.df) <- dat.df[,1]
+    ##rownames(dat.df) <- dat.df[,1]
+    setkey(dat.df,"geneID")
     dat.df <- dat.df[rownames(obj),]
     return(dat.df)
   }else if(ret.type=="data.mtx"){
     dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
     dat.mtx <- as.matrix(dat.df[,-1])
-    rownames(dat.mtx) <- dat.df[,1]
+    rownames(dat.mtx) <- dat.df[[1]]
     dat.mtx <- dat.mtx[rownames(obj),]
     return(dat.mtx)
   }else if(ret.type=="sce"){
     dat.df <- dcast(data.melt.df,geneID~cls,value.var="avg")
     dat.mtx <- as.matrix(dat.df[,-1])
-    rownames(dat.mtx) <- dat.df[,1]
+    rownames(dat.mtx) <- dat.df[[1]]
     dat.mtx <- dat.mtx[rownames(obj),]
     obj.ret <- ssc.build(dat.mtx,assay.name=assay.name,display.name=rowData(obj)$display.name)
     if(is.factor(obj[[column]])){
@@ -1318,6 +1319,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
           }
           p <- p + theme_bw() + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE) +
             ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size=if(nvalues<=26) 4 else 2.0),
+														   ncol=if(nvalues>10 && !is.infinite(nvalues)) ceiling(nvalues/10) else NULL,
                                                            label.theme = element_text(size=8)))
 
           return(p)
@@ -1783,7 +1785,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 #' @param k.col integer; number of clusters in the columns (default: 1)
 #' @param returnHT logical; whether return HT; (default: FALSE)
 #' @param palette.name character; which palette to use, such as "RdBu","RdYlBu" (default: NULL)
-#' @param row.split vector; used for row; (default: NULL)
+#' @param row.split vector; used for row; must be named or is corresponding to the rows of obj (default: NULL)
 #' @param column.split vector; used for column; (default: NULL)
 #' @param annotation_legend_param list; (default: list())
 #' @param ann.bar.height double; height of the top annotation (default: 1.5)
@@ -1828,7 +1830,7 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
     if(m<3) { loginfo(sprintf("Too few samples: m=%s",m)); return(NULL) }
 
     if (!is.null(row.split) && is.null(names(row.split))) {
-        names(row.split) <- rownames(obj)
+        names(row.split) <- unname(rowData(obj)$display.name)
     }
     if (!is.null(column.split) && is.null(names(column.split))) {
         names(column.split) <- colnames(obj)
@@ -1952,13 +1954,13 @@ ssc.plot.heatmap <- function(obj, assay.name="exprs",out.prefix=NULL,
 
 	if(!is.null(out.prefix)){
 		ComplexHeatmap::draw(ht, newpage= FALSE,merge_legends = TRUE,split=row.split)
-		if(!is.null(ha.col)){
-			for(i in seq_along(names(ha.col@anno_list))){
-			  ComplexHeatmap::decorate_annotation(names(ha.col@anno_list)[i],
-									{grid.text(names(ha.col@anno_list)[i], unit(-4, "mm"),
-											   gp=grid::gpar(fontsize=14),just = "right")})
-			}
-		}
+#		if(!is.null(ha.col)){
+#			for(i in seq_along(names(ha.col@anno_list))){
+#			  ComplexHeatmap::decorate_annotation(names(ha.col@anno_list)[i],
+#									{grid.text(names(ha.col@anno_list)[i], unit(-4, "mm"),
+#											   gp=grid::gpar(fontsize=14),just = "right")})
+#			}
+#		}
 		dev.off()
 	}
 	if(returnHT){ return(ht) }
@@ -2243,7 +2245,7 @@ ssc.scale <- function(obj,gene.id,gene.symbol,assay.name="norm_exprs",adjB=NULL,
 	if(missing(gene.id) && !is.null(gene.symbol)){
 		gene.list <- rowData(obj)[,"display.name"][which(rowData(obj)[,"display.name"] %in% gene.symbol)]
 	}else{
-		gene.id <- intersect(rownames(obj),gene.id)
+		gene.id <- intersect(gene.id,rownames(obj))
 		gene.list <- rowData(obj)[,"display.name"][gene.id]
 	}
 	if(length(gene.list)==0){ 
