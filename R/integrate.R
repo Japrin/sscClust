@@ -315,7 +315,8 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto")
 	return(gene.desc.top)
 }
 
-#' plot genes expression in pairs of clusters to examine the correlation
+
+#' classify cells using signature genes
 #' @param obj.list object; named list of object of \code{singleCellExperiment} class
 #' @param gene.core.tb data.frame; signature genes 
 #' @param gene.pos.tb data.frame; signature genes (positive)
@@ -339,6 +340,7 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto")
 #' @param TH.gene.exp.freq.pos double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)
 #' @param TH.gene.exp.freq.neg double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)
 #' @param RF.selectVar logical; (default: FALSE)
+#' @param ... parameters passed to some method
 #' @import data.table
 #' @import ggplot2
 #' @import ggridges
@@ -587,6 +589,132 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 	return(binExp.tb)
 }
 
+
+#' classify cells using pre-trained model
+#' @param obj.list object; named list of object of \code{singleCellExperiment} class
+#' @param mod.rf object; pre-trained model used for prediction
+#' @param assay.name character; which assay (default: "exprs")
+#' @param out.prefix character; output prefix (default: NULL).
+#' @param adjB character; batch column of the colData(obj). (default: NULL)
+#' @param meta.info.tb data.frame; cell information table (default: NULL)
+#' @param pad.missing logical; (default: FALSE)
+#' @param allZeroAsLow logical; (default: FALSE)
+#' @param verbose logical; (default: FALSE)
+#' @param ncores integer; number of CPU to used (default: 16)
+#' @param ... parameters passed to some method
+#' @import data.table
+#' @import ggplot2
+#' @import ggridges
+#' @importFrom  ggpubr ggscatter
+#' @details classify cells using pre-trained model, which can be obtained by run classifyCell.by.sigGene()
+#' @export
+classifyCell.by.model <- function(obj.list,mod.rf,assay.name="exprs",out.prefix=NULL,
+                                    adjB=NULL, meta.info.tb=NULL,
+									pad.missing=F,allZeroAsLow=F,
+									verbose=F,ncores=16, ...)
+{
+
+	RhpcBLASctl::omp_set_num_threads(1)
+	registerDoParallel(cores = ncores)
+
+	getExpDataFromGeneSymbol <- function(obj,assay.name,gene.used,adjB=NULL,gene.pad=NULL,allZeroAsLow=F){
+		gene.used <- intersect(gene.used,rownames(obj))
+		dat.block <- assay(obj,assay.name)[gene.used,,drop=F]
+		rownames(dat.block) <- rowData(obj)[rownames(dat.block),"display.name"]
+		if(!is.null(gene.pad)){
+			mtx.pad <- matrix(rep(0,length(gene.pad)*ncol(dat.block)),nrow=length(gene.pad))
+			rownames(mtx.pad) <- gene.pad
+			dat.block <- rbind(dat.block,mtx.pad)
+		}
+		#### adjB
+		if(!is.null(adjB)){
+			dat.block <- simple.removeBatchEffect(dat.block,batch=obj[[adjB]])
+		}
+		if(allZeroAsLow){
+			f.gene <- rowSums(dat.block==0)==ncol(dat.block)
+			dat.block.a <- t(scale(t(dat.block[!f.gene,,drop=F])))
+			#### z-score 10000 is very low
+			if(sum(f.gene)>0)
+			{
+				dat.block.b <- matrix(rep(-10000,sum(f.gene)*ncol(dat.block)),nrow=sum(f.gene))
+				rownames(dat.block.b) <- rownames(dat.block)[f.gene]
+				dat.block <- rbind(dat.block.a,dat.block.b)
+			}else{
+				dat.block <- dat.block.a
+			}
+		}else{
+			dat.block <- t(scale(t(dat.block)))
+		}
+		return(dat.block)
+	}
+	
+
+	{
+
+		exp.z.tb <- as.data.table(ldply(seq_along(obj.list),function(i){
+				  obj <- obj.list[[i]]
+				  dataset.id <- names(obj.list)[i]
+				  gene.used <- rownames(obj)[match(rownames(mod.rf$importance),rowData(obj)$display.name)]
+				  gene.pad <- NULL
+				  if(any(is.na(gene.used))){
+					  if(!pad.missing){
+						  cat(sprintf("Not all gene(s) found in dataset %s \n",dataset.id))
+						  return(NULL)
+					  }else{
+						  idx.na <- which(is.na(gene.used))
+						  gene.pad <- rownames(mod.rf$importance)[idx.na]
+					  }
+				  }
+				  ###cat(sprintf("dataset: %s\n",dataset.id))
+				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB,
+														gene.pad=gene.pad,allZeroAsLow=allZeroAsLow)
+				  if(sum(is.na(dat.block)) > 0){
+					  cat(sprintf("NA value(s) found in dataset %s (may casuesed by all 0s in some genes)\n",dataset.id))
+					  return(NULL)
+				  }
+				  dat.block <- dat.block[rownames(mod.rf$importance),]
+
+				  ret.tb <- data.table(cellID=colnames(dat.block))
+				  #ret.tb$meta.cluster=meta.info.tb$metaCluster[match(ret.tb$cellID,meta.info.tb$cellID)]
+				  #ret.tb$ClusterID=meta.info.tb$ClusterID[match(ret.tb$cellID,meta.info.tb$cellID)]
+				  ret.tb <- cbind(ret.tb,t(dat.block))
+				  ret.tb$cellID <- sprintf("%s.%s",dataset.id,ret.tb$cellID)
+				  return(ret.tb)
+		}))
+
+		##### predict
+		ydata <- as.matrix(exp.z.tb[,-c(1)])
+		rownames(ydata) <- exp.z.tb$cellID
+		yres <- predict(mod.rf,ydata,type="prob")
+		cls.set <- colnames(yres)
+		ylabel <- apply(yres,1,function(x){ cls.set[which.max(x)] })
+		names(ylabel) <- rownames(ydata)
+
+	    ### output table
+		out.tb <- data.table(cellID=exp.z.tb$cellID)
+		out.tb$meta.cluster.RF <- ylabel
+		out.tb$meta.cluster.RF.prob <- apply(yres,1,function(x){ max(x) })
+		out.tb$meta.cluster.RF.sec <- apply(yres,1,function(x){ cls.set[order(-x)[2]] })
+		out.tb$meta.cluster.RF.sec.prob <- apply(yres,1, function(x){ x[order(-x)[2]] })
+		prob.mtx <- yres
+		colnames(prob.mtx) <- sprintf("RF.prob.%s",colnames(prob.mtx))
+		out.tb <- cbind(out.tb,prob.mtx)
+
+		if(!is.null(meta.info.tb)){
+			meta.info.tb.a <- as.data.table(meta.info.tb)
+			meta.info.tb.a[,cellID.raw:=sprintf("%s",cellID)]
+			meta.info.tb.a[,cellID:=sprintf("%s.%s",dataset,cellID)]
+			meta.info.tb.a[,meta.cluster.raw:=""]
+			meta.info.tb.b <- merge(meta.info.tb.a,out.tb,by="cellID")
+		}else{
+			meta.info.tb.b <- out.tb
+		}
+
+	}
+	return(meta.info.tb.b)
+}
+
+
 #' plot signature genes
 #' @param obj.list object; named list of object of \code{singleCellExperiment} class
 #' @param gene.core.tb data.frame; signature genes 
@@ -598,6 +726,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 #' @param meta.cluster character; (default: NULL)
 #' @param verbose logical; (default: FALSE)
 #' @param ptype character; (default: "heatmap")
+#' @param ... parameters passed to plotting methods
 #' @param ncores integer; number of CPU to used (default: 16)
 #' @param p.ncol integer; number of columns in the violin plot (default: 2)
 #' @param pdf.width double; width of the output plot (default: NULL)
@@ -612,7 +741,7 @@ plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
                                     adjB=NULL,meta.cluster=NULL,
 									meta.info.tb=NULL,meta.col="metaCluster",
 									p.ncol=2,pdf.width=NULL,pdf.height=NULL,
-									verbose=F,ptype="heatmap", ncores=16)
+									verbose=F,ptype="heatmap", ncores=16,...)
 {
 	if(is.null(meta.cluster)){
 		mcls <- sort(unique(gene.core.tb$meta.cluster))
@@ -677,9 +806,9 @@ plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
 				 pdf.width=o.width,pdf.height=o.height,do.scale=F,
 				 z.lo=-0.8,z.hi=0.8,z.step=0.2,exp.title="Z-Score",
 				 do.clustering.row=F,
-				 do.clustering.col=T)
+				 do.clustering.col=T,...)
 	}else if(ptype=="violin"){
-		o.width <- 35 
+		o.width <- 30
 		o.height <- 9
 		if(!is.null(pdf.width)){ o.width <- pdf.width }
 		if(!is.null(pdf.height)){ o.height <- pdf.height }
@@ -697,7 +826,7 @@ plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
 				  obj.tmp[[meta.col]] <- meta.info.tb[[meta.col]][match(colnames(obj.tmp),
 																		meta.info.tb$cellID)]
 				  p <- ssc.plot.violin(obj.tmp,"scaled.exprs",gene=rownames(obj.tmp),
-									   group.var=sprintf(meta.col),clamp=c(0,6),p.ncol=p.ncol)
+									   group.var=sprintf(meta.col),clamp=c(0,6),p.ncol=p.ncol,...)
 				  ggsave(sprintf("%s.RF.%s.%s.pdf",out.prefix,dataset.id,xx),p,width=o.width,height=o.height)
 											  },.parallel=T)
 								  })

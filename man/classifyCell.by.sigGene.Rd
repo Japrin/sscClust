@@ -2,7 +2,7 @@
 % Please edit documentation in R/integrate.R
 \name{classifyCell.by.sigGene}
 \alias{classifyCell.by.sigGene}
-\title{plot genes expression in pairs of clusters to examine the correlation}
+\title{classify cells using signature genes}
 \usage{
 classifyCell.by.sigGene(
   obj.list,
@@ -74,12 +74,14 @@ classifyCell.by.sigGene(
 
 \item{RF.selectVar}{logical; (default: FALSE)}
 
+\item{...}{parameters passed to some method}
+
 \item{TH.gene.exp.freq.pos}{double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)}
 
 \item{TH.gene.exp.freq.neg}{double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)}
 }
 \description{
-plot genes expression in pairs of clusters to examine the correlation
+classify cells using signature genes
 }
 \details{
 classify cells using the signature genes

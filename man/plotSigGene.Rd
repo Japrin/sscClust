@@ -18,7 +18,8 @@ plotSigGene(
   pdf.height = NULL,
   verbose = F,
   ptype = "heatmap",
-  ncores = 16
+  ncores = 16,
+  ...
 )
 }
 \arguments{
@@ -49,6 +50,8 @@ plotSigGene(
 \item{ptype}{character; (default: "heatmap")}
 
 \item{ncores}{integer; number of CPU to used (default: 16)}
+
+\item{...}{parameters passed to plotting methods}
 }
 \description{
 plot signature genes
