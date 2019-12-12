@@ -4,12 +4,14 @@
 \alias{rank.de.gene}
 \title{get gene ranking table from obj}
 \usage{
-rank.de.gene(obj, group = "pca.SNN.kauto")
+rank.de.gene(obj, group = "pca.SNN.kauto", sort.by = "median.rank")
 }
 \arguments{
 \item{obj}{object; object of \code{singleCellExperiment} class}
 
 \item{group}{character; columan name in colData(obj)}
+
+\item{sort.by}{character; by which to sort the genes [default: "median.rank"]}
 }
 \value{
 a gene table

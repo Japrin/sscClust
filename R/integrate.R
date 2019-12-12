@@ -6,6 +6,7 @@
 #' @param ncores integer; number of cores to use (default: 6)
 #' @param use.deg logical; whether use only the differentially expressed genes (default: FALSE)
 #' @param gene.de.list list; if not NULL, each element is a data.frame with "geneID" column (default: NULL)
+#' @param sort.by character; by which to sort genes and the top ones will be used for clustering. One of "F.rank.median", and "occurence" (default: "F.rank.median")
 #' @param avg.by character; calculate the average expression of cells group by the specifid column (default: "majorCluster")
 #' @param n.downsample integer; number of cells in each cluster to downsample to (default: NULL)
 #' @param n.pc integer; number of pc ot use (default: 15)
@@ -26,7 +27,7 @@ integrate.by.avg <- function(sce.list,
                              out.prefix,
                              assay.name="exprs",is.avg=FALSE,ncores=6,
                              use.deg=TRUE,
-                             gene.de.list=NULL,
+                             gene.de.list=NULL,sort.by="F.rank.median",
                              avg.by="majorCluster",
 							 n.downsample=NULL,
 							 n.pc=15,
@@ -97,9 +98,9 @@ integrate.by.avg <- function(sce.list,
 
     ##Differential expressed genes
     gene.de.common <- c()
-	use.F.avg.rank <- TRUE
+	#use.F.avg.rank <- TRUE
     if(use.deg && !is.null(gene.de.list)){
-		if(use.F.avg.rank){
+		if(sort.by=="F.rank.median"){
 			gene.rank.tb <- as.data.table(ldply(names(gene.de.list),function(x){
 													ret.tb <- unique(gene.de.list[[x]][,c("geneID","F.rank")])
 													ret.tb$dataset.id <- x
@@ -135,8 +136,8 @@ integrate.by.avg <- function(sce.list,
 				ggsave(sprintf("%s.Frank.rank.png",out.prefix),width=4,height=6)
 
 			}
-		}else{
-			loginfo(sprintf("use deg "))
+		}else if(sort.by=="occurence"){
+			loginfo(sprintf("use deg present multiple times (de.thres: %s) ",de.thres))
 			if(is.null(gene.de.list)){
 				gene.de.list <- list()
 				for(i in seq_along(sce.list)){
@@ -286,11 +287,13 @@ integrate.by.avg <- function(sce.list,
 #' get gene ranking table from obj
 #' @param obj object; object of \code{singleCellExperiment} class
 #' @param group character; columan name in colData(obj)
+#' @param sort.by character; by which to sort the genes [default: "median.rank"]
 #' @import data.table
 #' @importFrom plyr ldply
+#' @importFrom metap sumlog sumz logitp
 #' @details rank genes
 #' @return a gene table
-rank.de.gene <- function(obj,group="pca.SNN.kauto")
+rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank")
 {
 	#### To do: add diff between this - max_other(not this)
 	gene.desc.top <- as.data.table(ldply(unique(sort(obj[[group]])),function(x){
@@ -308,10 +311,18 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto")
 											 }
 											 ret.tb[["median.rank"]] <- rowMedians(apply(assay(obj.x,"t"),2,
 																					 function(x){ rank(-x)/length(x)}))
+											 if("P.Value" %in% assayNames(obj.x)){
+												 ret.tb[["p.comb.Fisher"]] <- apply(assay(obj.x,"P.Value"),1,function(x){if(length(x)==1){return(x)}; x[x==0] <- .Machine$double.xmin; metap::sumlog(x)$p } )
+												 ret.tb[["p.comb.Stouffer"]] <- apply(assay(obj.x,"P.Value"),1,function(x){if(length(x)==1){return(x)};  x[x==0] <- .Machine$double.xmin; metap::sumz(x)$p } )
+												 ret.tb[["p.comb.logits"]] <- apply(assay(obj.x,"P.Value"),1,function(x){if(length(x)==1){return(x)};  x[x==0] <- .Machine$double.xmin; metap::logitp(x)$p } )
+												 ret.tb[["p.comb.Fisher.adj"]] <- p.adjust(ret.tb[["p.comb.Fisher"]],"BH")
+												 ret.tb[["p.comb.Stouffer.adj"]] <- p.adjust(ret.tb[["p.comb.Stouffer"]],"BH")
+												 ret.tb[["p.comb.logits.adj"]] <- p.adjust(ret.tb[["p.comb.logits"]],"BH")
+											 }
 											 return(ret.tb)
 							   }))
-	###gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,-gene.desc.top[[sprintf("mean.%s",de.stat)]]), ]
-	gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,median.rank), ]
+	gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,gene.desc.top[[sort.by]]), ]
+	###gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,median.rank), ]
 	return(gene.desc.top)
 }
 
@@ -322,6 +333,7 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto")
 #' @param gene.pos.tb data.frame; signature genes (positive)
 #' @param gene.neg.tb data.frame; signature genes (negative)
 #' @param meta.info.tb data.frame; cell information table (default: NULL)
+#' @param meta.train.tb data.frame; cell information table (default: NULL)
 #' @param ndownsample integer; number of cells (default: 1500)
 #' @param myseed integer; seed for random number generation.(default: 123456)
 #' @param assay.name character; which assay (default: "exprs")
@@ -350,7 +362,7 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto")
 classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out.prefix=NULL,
                                     adjB=NULL,meta.cluster=NULL,method="posFreq",
 									gene.pos.tb=NULL,gene.neg.tb=NULL,
-									meta.info.tb=NULL,ndownsample=1500,myseed=123456,
+									meta.info.tb=NULL,meta.train.tb=NULL,ndownsample=1500,myseed=123456,
 									verbose=F,
                                     sig.prevelance=0.65,ntop=10,ncores=16,
 									bin.z.pos.th=0.3,bin.z.neg.th=0.3,
@@ -545,28 +557,45 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 				  dataset.id <- names(obj.list)[i]
 				  gene.used <- rownames(obj)[match(gene.core.tb$geneSymbol,rowData(obj)$display.name)]
 				  gene.used <- unique(gene.used[!is.na(gene.used)])
+				  ### scale in the whole range of the dataset
 				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB)
-				  ret.tb <- data.table(cellID=colnames(dat.block))
-				  ret.tb$meta.cluster=meta.info.tb$metaCluster[match(ret.tb$cellID,meta.info.tb$cellID)]
-				  ret.tb$ClusterID=meta.info.tb$ClusterID[match(ret.tb$cellID,meta.info.tb$cellID)]
+				  obj$ClusterID <- meta.info.tb$ClusterID[match(colnames(obj),meta.info.tb$cellID)]
+				  obj$meta.cluster <- meta.info.tb$metaCluster[match(colnames(obj),meta.info.tb$cellID)]
+				  obj <- ssc.downsample(obj,group.var="ClusterID",priority="silhouette",rd="seurat.pca")
+				  ### select cells usd for training
+				  #f.cell <- intersect(colnames(obj),meta.train.tb$cellID)
+				  #obj <- obj[,f.cell]
+				  #dat.block <- dat.block[,f.cell]
+				  print(all(colnames(dat.block)==colnames(obj)))
+				  ret.tb <- data.table(cellID=colnames(dat.block),
+									   dataset.id=dataset.id,
+									   ClusterID=obj$ClusterID,
+									   meta.cluster=obj$meta.cluster,
+									   silhouette=obj$silhouette,
+									   silhouette.rank=obj$silhouette.rank)
 				  ret.tb <- cbind(ret.tb,t(dat.block))
 				  ret.tb$cellID <- sprintf("%s.%s",dataset.id,ret.tb$cellID)
 				  return(ret.tb)
 		}))
 		set.seed(myseed)
 		exp.z.tb <- exp.z.tb[sample(nrow(exp.z.tb),replace=F),]
-		dat.train.tb <- exp.z.tb[meta.cluster %in% unique(sort(gene.core.tb$meta.cluster)),
+		dat.train.tb <- exp.z.tb[meta.cluster %in% unique(sort(gene.core.tb$meta.cluster)) &
+									ClusterID %in% meta.train.tb$ClusterID,
 								 ][,head(.SD,n=ndownsample),by="meta.cluster"]
-		#dat.train.tb[1:4,1:5]
-		res.RF <-	sscClust:::run.RF(as.matrix(dat.train.tb[,-c(1,2,3)]),
-									  factor(dat.train.tb$meta.cluster),
-									  as.matrix(exp.z.tb[,-c(1,2,3)]), do.norm=F,
-									  ntree = 500, ntreeIterat = 500,selectVar=RF.selectVar)
+								 ###][silhouette>0,
+								 ###][,head(.SD,n=ndownsample),by="meta.cluster"]
+		print(dat.train.tb[,.N,by=c("dataset.id","meta.cluster")])
+		##exp.z.tb[1:4,1:7]
+		##dat.train.tb[1:4,1:7]
+		res.RF <-	sscClust:::run.RF(xdata=as.matrix(dat.train.tb[,-c(1:6)]),
+									  xlabel=factor(dat.train.tb$meta.cluster),
+									  ydata=as.matrix(exp.z.tb[,-c(1:6)]), do.norm=F,
+									  selectVar=RF.selectVar,...)
 		if(verbose){
 			saveRDS(res.RF,file=sprintf("%s.res.RF.rds",out.prefix))
 		}
 
-		out.tb <- exp.z.tb[,c(1,2)]
+		out.tb <- exp.z.tb[,c(1,4)]
 		colnames(out.tb)[2] <- "meta.cluster.raw"
 		out.tb$meta.cluster.RF <- res.RF$ylabel
 		cls.set <- colnames(res.RF$yres)

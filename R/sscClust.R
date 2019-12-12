@@ -1749,8 +1749,12 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 		sig.table <- sig.table[order(cluster,adj.P.Val,-t,-logFC),]
 	    if(!is.null(out.prefix))
 		{
-			write.table(all.table,sprintf("%s.limma.all.txt",out.prefix),row.names = F,quote = F,sep = "\t")
-			write.table(sig.table,sprintf("%s.limma.sig.txt",out.prefix),row.names = F,quote = F,sep = "\t")
+			conn <- gzfile(sprintf("%s.limma.all.txt.gz",out.prefix),"w")
+			write.table(all.table,conn,row.names = F,quote = F,sep = "\t")
+			close(conn)
+			conn <- gzfile(sprintf("%s.limma.sig.txt.gz",out.prefix),"w")
+			write.table(sig.table,conn,row.names = F,quote = F,sep = "\t")
+			close(conn)
 		}
 	}
 
@@ -2129,19 +2133,47 @@ ssc.plotGeneDensity <- function(obj,out.prefix,gene.id,gene.symbol,assay.name="n
 #' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param group.var character; column in the colData(obj) used for grouping. (default: "majorCluster")
 #' @param rn.seed integer; random number seed (default: 9999)
+#' @param priority character; priority. (default: "")
+#' @param rd character; data reducedDim(obj, rd) will be used for distance calculation (default: "pca")
 #' @details return a downsampled object of \code{singleCellExperiment} class.
 #' @export
-ssc.downsample <- function(obj, ncell.downsample=NULL, group.var="majorCluster",rn.seed=9999)
+ssc.downsample <- function(obj, ncell.downsample=NULL, group.var="majorCluster",rn.seed=9999,
+						   priority="",rd="pca")
 {
     #### downsample cells
     set.seed(rn.seed)
+    clust <- structure(obj[[group.var]],names=colnames(obj))
+    grp.list <- unique(clust)
+	if(priority=="silhouette"){
+		sil <- ssc.plot.silhouette(obj,group.var,reducedDim.name=rd,do.plot=F)
+		p.tb <- as.data.table(sil[,c(1:3)])
+		p.tb$cellID <- colnames(obj)
+		p.tb$group <- obj[[group.var]]
+		p.tb[,silhouette.rank:=rank(-sil_width),by=c("group")]
+		obj[[priority]] <- p.tb[["sil_width"]]
+		obj[[sprintf("%s.rank",priority)]] <- p.tb[[sprintf("%s.rank",priority)]]
+	}else if(priority=="distCenter"){
+		dat.map <- reducedDim(obj,rd)
+		p.tb <- as.data.table(ldply(grp.list,function(x){
+						   xx <- names(clust[clust==x])
+						   dat.block <- dat.map[xx,]
+						   cc <- colMedians(dat.block)
+						   out.tb <- data.table(cellID=xx, group=x,
+												distCenter=sqrt(rowSums(sweep(dat.block,2,cc,"-")^2)))
+						   out.tb[,distCenter.rank:=rank(distCenter)]
+						   return(out.tb)
+						   }))
+		obj[[priority]] <- p.tb[[priority]][match(colnames(obj),p.tb$cellID)]
+		obj[[sprintf("%s.rank",priority)]] <- p.tb[[sprintf("%s.rank",priority)]][match(colnames(obj),p.tb$cellID)]
+	}
     if(!is.null(ncell.downsample)){
-        clust <- colData(obj)[,group.var]
-        names(clust) <- colnames(obj)
-        grp.list <- unique(clust)
-        f.cell <- unlist(sapply(grp.list,function(x){
-                             x <- names(clust[clust==x])
-                             sample(x,min(length(x),ncell.downsample)) }))
+		if(priority==""){
+			f.cell <- unlist(sapply(grp.list,function(x){
+								 x <- names(clust[clust==x])
+								 sample(x,min(length(x),ncell.downsample)) }))
+		}else{
+			f.cell <- p.tb$cellID[ p.tb[[sprintf("%s.rank",priority)]] <= ncell.downsample ]
+		}
         obj <- obj[,f.cell]
     }
     return(obj)

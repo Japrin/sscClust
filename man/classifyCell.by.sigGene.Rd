@@ -15,6 +15,7 @@ classifyCell.by.sigGene(
   gene.pos.tb = NULL,
   gene.neg.tb = NULL,
   meta.info.tb = NULL,
+  meta.train.tb = NULL,
   ndownsample = 1500,
   myseed = 123456,
   verbose = F,
@@ -51,6 +52,8 @@ classifyCell.by.sigGene(
 \item{gene.neg.tb}{data.frame; signature genes (negative)}
 
 \item{meta.info.tb}{data.frame; cell information table (default: NULL)}
+
+\item{meta.train.tb}{data.frame; cell information table (default: NULL)}
 
 \item{ndownsample}{integer; number of cells (default: 1500)}
 

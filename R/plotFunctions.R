@@ -368,6 +368,8 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 #' @param group.var character; (default: "ClusterID")
 #' @param donor.var character; (default: "donor")
 #' @param verbose logical; (default: FALSE)
+#' @param par.stat parameter passed to stat_compare_means (default: list() )
+#' @param min.NTotal minimum number of cells to calculate frequency (default: 0 )
 #' @param ... parameter passed to ggpubr
 #' @importFrom  ggpubr ggbarplot ggboxplot stat_compare_means
 #' @importFrom ggplot2 facet_wrap coord_cartesian expand_limits geom_text element_text theme ggsave
@@ -377,6 +379,7 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
 plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
                         facet.ncol=3,plot.width=10,plot.height=5,test.method="fisher.test",
 						group.filter=NULL,sort.freq=F,bar.position=position_dodge2(),
+						par.stat=list(),min.NTotal=0,
                         cmp.var="Species",group.var="ClusterID",donor.var="donor",verbose=F,...)
 {
     require("ggpubr")
@@ -412,6 +415,8 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
     dat.spe.group.dist <- dat.spe.group.dist[,.(group.var=group.var,N=N,NTotal=sum(.SD$N)),
                                              by=c("donor.var","cmp.var")]
     dat.spe.group.dist[,freq:=N/NTotal]
+	##### data for plot: dat.spe.group.dist
+	dat.spe.group.dist <- dat.spe.group.dist[NTotal>=min.NTotal,]
 	###dat.spe.group.dist.test <<- dat.spe.group.dist
 	dat.freq.med <- dat.spe.group.dist[,.(freq.med=median(freq)),by=c("group.var","cmp.var")][order(freq.med),]
 	if(!is.null(group.filter)){
@@ -431,7 +436,8 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
                        color = "cmp.var", 
                        add = "jitter",outlier.shape=NA,...)
         if(test.method!=""){
-            p <- p + stat_compare_means(aes_string(group = "cmp.var"), label = "p.signif")
+			p <- p + do.call(stat_compare_means,c(list(mapping=aes_string(group = "cmp.var"),
+													   label="p.signif"),par.stat))
         }
     }else if(plot.type=="boxplot2"){
         p <- ggboxplot(dat.spe.group.dist,x="cmp.var",y="freq",
@@ -440,7 +446,7 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
                 facet_wrap(~group.var,ncol=facet.ncol,scales="free_y")+
                 expand_limits(y=0)
         if(test.method!=""){
-            p <- p + stat_compare_means(label = "p.format")
+			p <- p + do.call(stat_compare_means,c(list(label="p.format"),par.stat))
         }
     }else if(plot.type=="barplot"){
         dat.plot <- dat.spe.group.dist[,.(N=sum(.SD$N),NTotal=sum(.SD$NTotal),

@@ -12,6 +12,7 @@ integrate.by.avg(
   ncores = 6,
   use.deg = TRUE,
   gene.de.list = NULL,
+  sort.by = "F.rank.median",
   avg.by = "majorCluster",
   n.downsample = NULL,
   n.pc = 15,
@@ -43,6 +44,8 @@ integrate.by.avg(
 \item{use.deg}{logical; whether use only the differentially expressed genes (default: FALSE)}
 
 \item{gene.de.list}{list; if not NULL, each element is a data.frame with "geneID" column (default: NULL)}
+
+\item{sort.by}{character; by which to sort genes and the top ones will be used for clustering. One of "F.rank.median", and "occurence" (default: "F.rank.median")}
 
 \item{avg.by}{character; calculate the average expression of cells group by the specifid column (default: "majorCluster")}
 

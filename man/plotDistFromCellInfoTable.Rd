@@ -15,6 +15,8 @@ plotDistFromCellInfoTable(
   group.filter = NULL,
   sort.freq = F,
   bar.position = position_dodge2(),
+  par.stat = list(),
+  min.NTotal = 0,
   cmp.var = "Species",
   group.var = "ClusterID",
   donor.var = "donor",
@@ -42,6 +44,10 @@ plotDistFromCellInfoTable(
 \item{sort.freq}{logical; (default: FALSE)}
 
 \item{bar.position}{; passed to ggbarplot's position (default: position_dodge2())}
+
+\item{par.stat}{parameter passed to stat_compare_means (default: list() )}
+
+\item{min.NTotal}{minimum number of cells to calculate frequency (default: 0 )}
 
 \item{cmp.var}{character; (default: "Species")}
 

@@ -917,8 +917,15 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     sig.table <- all.table[adj.P.Val<T.fdr & abs(logFC)>T.logFC,]
     if(!is.null(out.prefix))
     {
-        write.table(all.table,sprintf("%s.limma.all.txt",out.prefix),row.names = F,quote = F,sep = "\t")
-        write.table(sig.table,sprintf("%s.limma.sig.txt",out.prefix),row.names = F,quote = F,sep = "\t")
+		conn <- gzfile(sprintf("%s.limma.all.txt.gz",out.prefix),"w")
+        write.table(all.table,conn,row.names = F,quote = F,sep = "\t")
+		close(conn)
+		conn <- gzfile(sprintf("%s.limma.sig.txt.gz",out.prefix),"w")
+        write.table(sig.table,conn,row.names = F,quote = F,sep = "\t")
+		close(conn)
+		if(verbose>1){
+			saveRDS(fit,file=sprintf("%s.fit.rds",out.prefix))
+		}
     }
 	ret.dat <- list(all=all.table,sig=sig.table)
     return(ret.dat)

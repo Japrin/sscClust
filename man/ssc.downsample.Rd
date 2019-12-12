@@ -8,7 +8,9 @@ ssc.downsample(
   obj,
   ncell.downsample = NULL,
   group.var = "majorCluster",
-  rn.seed = 9999
+  rn.seed = 9999,
+  priority = "",
+  rd = "pca"
 )
 }
 \arguments{
@@ -19,6 +21,10 @@ ssc.downsample(
 \item{group.var}{character; column in the colData(obj) used for grouping. (default: "majorCluster")}
 
 \item{rn.seed}{integer; random number seed (default: 9999)}
+
+\item{priority}{character; priority. (default: "")}
+
+\item{rd}{character; data reducedDim(obj, rd) will be used for distance calculation (default: "pca")}
 }
 \description{
 downsample
