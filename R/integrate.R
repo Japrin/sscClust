@@ -95,6 +95,16 @@ integrate.by.avg <- function(sce.list,
 		}
 	}
 	assay(sce.pb,"exprs") <- assay(sce.pb,assay.name)
+	##if(is.avg)
+	{
+		cls.info.df <- ldply(names(sce.avg.list),function(x){
+								 o.df <- cbind(data.frame(rid=colnames(sce.avg.list[[x]])),
+											   as.data.frame(colData(sce.avg.list[[x]])))
+								 o.df
+								})
+		rownames(cls.info.df) <- cls.info.df$rid
+		colData(sce.pb) <- DataFrame(cls.info.df[colnames(sce.pb),])
+	}
 
     ##Differential expressed genes
     gene.de.common <- c()
@@ -136,7 +146,8 @@ integrate.by.avg <- function(sce.list,
 				ggsave(sprintf("%s.Frank.rank.png",out.prefix),width=4,height=6)
 
 			}
-		}else if(sort.by=="occurence"){
+		}else if(sort.by=="occurence")
+		{
 			loginfo(sprintf("use deg present multiple times (de.thres: %s) ",de.thres))
 			if(is.null(gene.de.list)){
 				gene.de.list <- list()
@@ -240,7 +251,7 @@ integrate.by.avg <- function(sce.list,
 	if(!is.null(gene.de.list) && "pca.SNN.kauto" %in% colnames(colData(sce.pb))){
 		##### top de genes
 		gene.desc.top <- sscClust:::rank.de.gene(sce.pb)
-		saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
+		#saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
 		##gene.desc.top <- readRDS(sprintf("%s.gene.desc.top.rds",out.prefix))
 
 		RhpcBLASctl::omp_set_num_threads(1)
@@ -293,7 +304,7 @@ integrate.by.avg <- function(sce.list,
 #' @importFrom metap sumlog sumz logitp
 #' @details rank genes
 #' @return a gene table
-rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank")
+rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.adj=NULL)
 {
 	#### To do: add diff between this - max_other(not this)
 	gene.desc.top <- as.data.table(ldply(unique(sort(obj[[group]])),function(x){
@@ -305,19 +316,27 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank")
 														N.sig=rowSums(assay(obj.x,"sig")),
 														meta.cluster.size=ncol(obj.x))
 											 ret.tb[,freq.sig:=N.sig/meta.cluster.size]
-											 anames <- intersect(assayNames(obj.x),c("logFC","t","SNR","meanExp","meanScale"))
+											 ###anames <- intersect(assayNames(obj.x),c("logFC","t","SNR","meanExp","meanScale"))
+											 anames <- intersect(assayNames(obj.x),c("logFC","meanScale"))
 											 for(aa in anames){
 												 ret.tb[[sprintf("median.%s",aa)]] <- rowMedians(assay(obj.x,aa))
 											 }
 											 ret.tb[["median.rank"]] <- rowMedians(apply(assay(obj.x,"t"),2,
 																					 function(x){ rank(-x)/length(x)}))
-											 if("P.Value" %in% assayNames(obj.x)){
-												 ret.tb[["p.comb.Fisher"]] <- apply(assay(obj.x,"P.Value"),1,function(x){if(length(x)==1){return(x)}; x[x==0] <- .Machine$double.xmin; metap::sumlog(x)$p } )
-												 ret.tb[["p.comb.Stouffer"]] <- apply(assay(obj.x,"P.Value"),1,function(x){if(length(x)==1){return(x)};  x[x==0] <- .Machine$double.xmin; metap::sumz(x)$p } )
-												 ret.tb[["p.comb.logits"]] <- apply(assay(obj.x,"P.Value"),1,function(x){if(length(x)==1){return(x)};  x[x==0] <- .Machine$double.xmin; metap::logitp(x)$p } )
-												 ret.tb[["p.comb.Fisher.adj"]] <- p.adjust(ret.tb[["p.comb.Fisher"]],"BH")
+											 if("zp" %in% assayNames(obj.x)){
+												 w <- sqrt(obj.x$nCellsStudy/sum(obj.x$nCellsStudy))
+												 if(!is.null(weight.adj)){
+													w <- w * obj.x[[weight.adj]]
+												 }
+												 zsum <- (assay(obj.x,"zp") %*% w)[,1]
+												 ### two-sided p value
+												 #ret.tb[["p.comb.Stouffer.z"]] <- zsum
+												 ret.tb[["p.comb.Stouffer"]] <- 2*(pnorm(-abs(zsum)))
 												 ret.tb[["p.comb.Stouffer.adj"]] <- p.adjust(ret.tb[["p.comb.Stouffer"]],"BH")
-												 ret.tb[["p.comb.logits.adj"]] <- p.adjust(ret.tb[["p.comb.logits"]],"BH")
+											 }
+											 if("dprime" %in% assayNames(obj.x)){
+												es.combi <- directEScombi(assay(obj.x,"dprime"), assay(obj.x,"vardprime"))
+												ret.tb <- cbind(ret.tb,es.combi)
 											 }
 											 return(ret.tb)
 							   }))

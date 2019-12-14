@@ -4,7 +4,12 @@
 \alias{rank.de.gene}
 \title{get gene ranking table from obj}
 \usage{
-rank.de.gene(obj, group = "pca.SNN.kauto", sort.by = "median.rank")
+rank.de.gene(
+  obj,
+  group = "pca.SNN.kauto",
+  sort.by = "median.rank",
+  weight.adj = NULL
+)
 }
 \arguments{
 \item{obj}{object; object of \code{singleCellExperiment} class}

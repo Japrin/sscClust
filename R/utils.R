@@ -923,11 +923,12 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 		conn <- gzfile(sprintf("%s.limma.sig.txt.gz",out.prefix),"w")
         write.table(sig.table,conn,row.names = F,quote = F,sep = "\t")
 		close(conn)
-		if(verbose>1){
-			saveRDS(fit,file=sprintf("%s.fit.rds",out.prefix))
-		}
+#		if(verbose>1){
+#			saveRDS(fit,file=sprintf("%s.fit.rds",out.prefix))
+#		}
     }
 	ret.dat <- list(all=all.table,sig=sig.table)
+	if(verbose>1){ ret.dat$fit <- fit }
     return(ret.dat)
 }
 

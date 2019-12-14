@@ -1738,6 +1738,10 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 
     all.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$all }))
     sig.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$sig }))
+	if(verbose>1){
+		fit.list <- llply(group.list,function(x){ out[[as.character(x)]]$fit })
+		names(fit.list) <- group.list
+	}
 
 	if(verbose>2){
 		res.aov <- findDEGenesByAOV(assay(obj,assay.name),clust,batch=batchV, out.prefix=NULL,
@@ -1758,7 +1762,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 		}
 	}
 
-    return(list(all=all.table,sig=sig.table))
+    return(list(all=all.table,sig=sig.table,fit=fit.list))
 }
 
 
