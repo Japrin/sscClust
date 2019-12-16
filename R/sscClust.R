@@ -219,42 +219,55 @@ ssc.assay.hclust <- function(obj,assay.name="exprs",
 {
     if(order.col && ncol(obj)>2)
     {
-        branch.col <- FALSE
-        obj.hclust.col <- NULL
-        if(clustering.distance=="spearman" || clustering.distance=="pearson"){
-            tryCatch({
-                dist.out <- cor.BLAS(t(assay(obj,assay.name)),method=clustering.distance,nthreads=1)
-                obj.hclust.col <- hclust(as.dist(1-dist.out), method=clustering.method)
-            },error = function(e){
-                cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
-            })
-        }
-        if(is.logical(branch.col) && !branch.col){
-            obj.hclust.col <- hclust(dist(t(assay(obj,assay.name))),method=clustering.method)
-        }
-        branch.col <- dendextend::color_branches(as.dendrogram(obj.hclust.col),k=k.col)
-        obj <- obj[,obj.hclust.col$order]
-        metadata(obj)$assay.hclust$col <- obj.hclust.col
-        metadata(obj)$assay.hclust$branch.col <- branch.col
+		ret.col <- run.cutree(t(assay(obj,assay.name)),method.hclust=clustering.method,
+							   method.distance=clustering.distance,k=k.col)
+
+        obj <- obj[,ret.col$hclust$order]
+        metadata(obj)$assay.hclust$col <- ret.col$hclust
+        metadata(obj)$assay.hclust$branch.col <- ret.col$branch
+#        branch.col <- FALSE
+#        obj.hclust.col <- NULL
+#        if(clustering.distance=="spearman" || clustering.distance=="pearson"){
+#            tryCatch({
+#                dist.out <- cor.BLAS(t(assay(obj,assay.name)),method=clustering.distance,nthreads=1)
+#                obj.hclust.col <- hclust(as.dist(1-dist.out), method=clustering.method)
+#            },error = function(e){
+#                cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
+#            })
+#        }
+#        if(is.null(obj.hclust.col)){
+#            obj.hclust.col <- hclust(dist(t(assay(obj,assay.name))),method=clustering.method)
+#        }
+#        branch.col <- dendextend::color_branches(as.dendrogram(obj.hclust.col),k=k.col)
+#        obj <- obj[,obj.hclust.col$order]
+#        metadata(obj)$assay.hclust$col <- obj.hclust.col
+#        metadata(obj)$assay.hclust$branch.col <- branch.col
     }
-    if(order.row && nrow(obj)>2){
-        branch.row <- FALSE
-        obj.hclust.row <- NULL
-        if(clustering.distance=="spearman" || clustering.distance=="pearson"){
-            tryCatch({
-                dist.out <- cor.BLAS(assay(obj,assay.name),method=clustering.distance,nthreads=1)
-                obj.hclust.row <- hclust(as.dist(1-dist.out), method=clustering.method)
-            },error = function(e){
-                cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
-            })
-        }
-        if(is.logical(branch.row) && !branch.row){
-            obj.hclust.row <- hclust(dist(assay(obj,assay.name)),method=clustering.method)
-        }
-        branch.row <- dendextend::color_branches(as.dendrogram(obj.hclust.row),k=k.row)
-        obj <- obj[obj.hclust.row$order,]
-        metadata(obj)$assay.hclust$row <- obj.hclust.row
-        metadata(obj)$assay.hclust$branch.row <- branch.row
+    if(order.row && nrow(obj)>2)
+	{
+		ret.row <- run.cutree((assay(obj,assay.name)),method.hclust=clustering.method,
+							   method.distance=clustering.distance,k=k.row)
+
+        obj <- obj[ret.row$hclust$order,]
+        metadata(obj)$assay.hclust$row <- ret.row$hclust
+        metadata(obj)$assay.hclust$branch.row <- ret.row$branch
+#        branch.row <- FALSE
+#        obj.hclust.row <- NULL
+#        if(clustering.distance=="spearman" || clustering.distance=="pearson"){
+#            tryCatch({
+#                dist.out <- cor.BLAS(assay(obj,assay.name),method=clustering.distance,nthreads=1)
+#                obj.hclust.row <- hclust(as.dist(1-dist.out), method=clustering.method)
+#            },error = function(e){
+#                cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
+#            })
+#        }
+#        if(is.null(obj.hclust.row)){
+#            obj.hclust.row <- hclust(dist(assay(obj,assay.name)),method=clustering.method)
+#        }
+#        branch.row <- dendextend::color_branches(as.dendrogram(obj.hclust.row),k=k.row)
+#        obj <- obj[obj.hclust.row$order,]
+#        metadata(obj)$assay.hclust$row <- obj.hclust.row
+#        metadata(obj)$assay.hclust$branch.row <- branch.row
     }
     return(obj)
 }

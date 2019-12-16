@@ -2,7 +2,7 @@
 % Please edit documentation in R/plotFunctions.R
 \name{plot.branch}
 \alias{plot.branch}
-\title{plot matrix (typically genes expression)}
+\title{plot branch}
 \usage{
 \method{plot}{branch}(obj.clust, out.prefix, ncls = 1, cluster = NULL)
 }
@@ -16,7 +16,7 @@
 \item{cluster}{integer vector; (default: NULL)}
 }
 \description{
-plot matrix (typically genes expression)
+plot branch
 }
 \details{
 plot dendrogram

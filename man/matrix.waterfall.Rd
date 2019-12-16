@@ -12,7 +12,8 @@ matrix.waterfall(
   waterfall.column = F,
   waterfall.row = F,
   type.return = "matrix",
-  do.norm = T
+  do.norm = T,
+  ...
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ matrix.waterfall(
 \item{type.return}{character; return type; (default: "matrix")}
 
 \item{do.norm}{logical; normalized the data before calculating scores?; (default: TRUE)}
+
+\item{...}{parameters passed to run.cutreeDynamic}
 }
 \description{
 make the matrix looks like "waterfall" (typically genes expression)

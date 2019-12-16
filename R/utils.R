@@ -934,8 +934,8 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 
 #' run dynamicTreeCut::cutreeDynamic on rows of the given matrix
 #' @param data data frame or matrix;
-#' @param deepSplit integer; passed to dynamicTreeCut::cutreeDynamic
-#' @param minClusterSize integer; passed to dynamicTreeCut::cutreeDynamic
+#' @param method.hclust character; clustering method for hclust [default: "ward.D2"]
+#' @param method.distance character; distance method for hclust [default: "spearman"]
 #' @param ... parameters passed to dynamicTreeCut::cutreeDynamic
 #' @details dynamicTreeCut::cutreeDynamic on rows of the given matrix
 #' @return a matrix with dimention as input ( samples in rows and variables in columns)
@@ -943,28 +943,100 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 #' @importFrom dynamicTreeCut cutreeDynamic
 #' @importFrom dendextend color_branches
 #' @export
-run.cutreeDynamic <- function(dat,method.hclust="ward.D2",deepSplit=4, minClusterSize=2,...){
-    obj.distM <- stats::dist(dat)
-    obj.hclust <- stats::hclust(obj.distM,method.hclust)
+run.cutreeDynamic <- function(dat,method.hclust="ward.D2",method.distance="spearman",
+							  #deepSplit=4, minClusterSize=2,
+							  ...)
+{
+    obj.hclust <- NULL
+    if(method.distance=="spearman" || method.distance=="pearson"){
+		tryCatch({
+			###obj.distM <- as.dist(1-sscClust:::cor.BLAS((dat),method=method.distance,nthreads=1))
+			obj.distM <- as.dist(1-cor.BLAS((dat),method=method.distance,nthreads=1))
+			obj.hclust <- stats::hclust(obj.distM, method=method.hclust)
+		},error = function(e){
+			cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
+		})
+    }
+    if(is.null(obj.hclust)){
+		obj.distM <- stats::dist(dat)
+		obj.hclust <- stats::hclust(obj.distM,method.hclust)
+    }
     ##### if method.hclust=="complete", some clusters from cutreeDynamic are not consistent with the dendrogram
     cluster.label <- dynamicTreeCut::cutreeDynamic(obj.hclust,distM=as.matrix(obj.distM),
-                                                method = "hybrid",
-                                                deepSplit=deepSplit,minClusterSize=minClusterSize,
+                                                #method = "hybrid",
+                                                #deepSplit=deepSplit,minClusterSize=minClusterSize,
                                                 ...)
     obj.dend <- as.dendrogram(obj.hclust)
     ncls <- length(unique(cluster.label))
-    colSet.cls <- auto.colSet(ncls)
+    colSet.cls <- auto.colSet(ncls,"Paired")
+    ###colSet.cls <- sscClust:::auto.colSet(ncls)
     names(colSet.cls) <- unique(cluster.label[order.dendrogram(obj.dend)])
     col.cls <- data.frame("k0"=sapply(cluster.label,function(x){ colSet.cls[as.character(x)] }))
 
-    #print(colSet.cls)
-    #print(table(cluster.label))
+#    print(colSet.cls)
+#    print(table(cluster.label))
+#	pdf("test.pdf")
+#	opar <- par(mar=c(15,4,4,2))
+#	plot(obj.dend)
+#	dev.off()
+#	par(opar)
 
-    obj.branch <- color_branches(obj.dend,
+    obj.branch <- dendextend::color_branches(obj.dend,
                                  clusters=cluster.label[order.dendrogram(obj.dend)],
                                  col=colSet.cls)
 
+#	pdf("test.01.pdf")
+#	opar <- par(mar=c(15,4,4,2))
+#	plot(obj.branch)
+#	dev.off()
+#	par(opar)
     ###aa <- plot.branch(obj.hclust,"test.01",cluster=cluster.label)
 
     return(list("hclust"=obj.hclust,"dist"=obj.distM,"cluster"=cluster.label,"branch"=obj.branch))
 }
+
+#' run cutree on rows of the given matrix
+#' @param data data frame or matrix;
+#' @param method.hclust character; clustering method for hclust [default: "ward.D2"]
+#' @param method.distance character; distance method for hclust [default: "spearman"]
+#' @param ... parameters passed to cutree
+#' @details cutree on rows of the given matrix
+#' @return a matrix with dimention as input ( samples in rows and variables in columns)
+#' @importFrom stats dist hclust
+#' @importFrom dendextend color_branches
+#' @export
+run.cutree <- function(dat,method.hclust="ward.D2",method.distance="spearman",k=1,
+							  ...)
+{
+	ret <- list()
+    {
+		branch <- FALSE
+		obj.hclust <- NULL
+		if(method.distance=="spearman" || method.distance=="pearson"){
+			tryCatch({
+				obj.distM <- as.dist(1-sscClust:::cor.BLAS((dat),method=method.distance,nthreads=1))
+				#obj.distM <- as.dist(1-cor.BLAS((dat),method=method.distance,nthreads=1))
+				obj.hclust <- stats::hclust(obj.distM, method=method.hclust)
+			},error = function(e){
+				cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
+			})
+		}
+		if(is.null(obj.hclust)){
+			obj.distM <- stats::dist(dat)
+			obj.hclust <- stats::hclust(obj.distM,method.hclust)
+		}
+		obj.dend <- as.dendrogram(obj.hclust)
+		cluster <- cutree(obj.hclust,k=k,...)
+        colSet.cls <- sscClust:::auto.colSet(length(unique(cluster)),"Paired")
+		branch <- dendextend::color_branches(obj.dend,clusters=cluster[order.dendrogram(obj.dend)],col=colSet.cls)
+		branch <- dendextend::set(branch,"branches_lwd", 1.5)
+
+		ret[["hclust"]] <- obj.hclust
+		ret[["dist"]] <- obj.distM
+		ret[["cluster"]] <- cluster
+		ret[["branch"]] <- branch
+    }
+    return(ret)
+}
+
+

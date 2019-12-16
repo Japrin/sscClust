@@ -275,8 +275,8 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number
                   row_dend_reorder = FALSE, column_dend_reorder = FALSE,
                   column_names_gp = gpar(fontsize = 12*28*.cex.column/max(m,32)),
                   row_names_gp = gpar(fontsize = 10*28*.cex.row/max(n,32)),
-                  row_dend_width = unit(4, "cm"),
-                  column_dend_height = unit(4, "cm"),
+                  #row_dend_width = unit(4, "cm"),
+                  #column_dend_height = unit(4, "cm"),
                   show_row_dend = show.dendrogram,
                   show_column_dend = show.dendrogram,
                   heatmap_legend_param = par.legend.used,
@@ -306,7 +306,7 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number
     if(returnHT){ return(ht) }
 }
 
-#' plot matrix (typically genes expression)
+#' plot branch
 #' @param obj.clust object;
 #' @param out.prefix character; output prefix.
 #' @param ncls integer; (default: 1)
@@ -319,7 +319,7 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
     obj.dend <- as.dendrogram(obj.clust)
     if(!is.null(cluster)){
         ncls <- length(unique(cluster))
-        colSet.cls <- auto.colSet(ncls)
+        colSet.cls <- auto.colSet(ncls,"Paired")
         names(colSet.cls) <- unique(cluster[order.dendrogram(obj.dend)])
         col.cls <- data.frame("k0"=sapply(cluster,function(x){ colSet.cls[as.character(x)] }),
                                 stringsAsFactors=F)
@@ -328,7 +328,7 @@ plot.branch <- function(obj.clust,out.prefix,ncls=1,cluster=NULL)
                                      col=colSet.cls)
     }else{
         dend.cutree <- cutree(obj.clust, c(ncls,ncls), order_clusters_as_data = T)
-        colSet.cls <- auto.colSet(ncls)
+        colSet.cls <- auto.colSet(ncls,"Paired")
         col.cls <- t(apply(dend.cutree,1,function(x){ colSet.cls[x] }))
         branch.col <- color_branches(obj.dend,k=ncls,col=colSet.cls)
         colnames(col.cls) <- c("k0","k0")
@@ -507,13 +507,14 @@ plotDistFromCellInfoTable <- function(obj,out.prefix,plot.type="barplot",
 #' @param score.alpha double; for row/column score; (default: 1.5)
 #' @param do.norm logical; normalized the data before calculating scores?; (default: TRUE)
 #' @param type.return character; return type; (default: "matrix")
+#' @param ... parameters passed to run.cutreeDynamic
 #' @import data.table
 #' @import ggplot2
 #' @importFrom stats dist
 #' @export
 matrix.waterfall <- function(dat,score.alpha=1.5,clust.row=FALSE,clust.column=FALSE,
 							 waterfall.column=F,waterfall.row=F,
-							 type.return="matrix",do.norm=T)
+							 type.return="matrix",do.norm=T,...)
 {
     scoreVec = function(x) {
         score = 0
@@ -528,15 +529,23 @@ matrix.waterfall <- function(dat,score.alpha=1.5,clust.row=FALSE,clust.column=FA
 	scoresR <- NULL
     dat.ordered <- dat
     if(clust.row=="cutreeDynamic"){
-        res.clust.row <- run.cutreeDynamic(dat,method.hclust="ward.D2",deepSplit=1)
+        res.clust.row <- run.cutreeDynamic(dat,...)
         dat.ordered <- dat[res.clust.row$hclust$order,]
         clust.row <- res.clust.row$branch
-    }
+    }else if(clust.row=="cutree"){
+        res.clust.row <- run.cutree(dat,...)
+        dat.ordered <- dat[res.clust.row$hclust$order,]
+        clust.row <- res.clust.row$branch
+	}
     if(clust.column=="cutreeDynamic"){
-        res.clust.column <- run.cutreeDynamic(t(dat),method.hclust="ward.D2",deepSplit=1)
+        res.clust.column <- run.cutreeDynamic(t(dat),...)
         dat.ordered <- dat[,res.clust.column$hclust$order]
         clust.column <- res.clust.column$branch
-    }
+    }else if(clust.column=="cutree"){
+        res.clust.column <- run.cutree(t(dat),...)
+        dat.ordered <- dat[,res.clust.column$hclust$order]
+        clust.column <- res.clust.column$branch
+	}
     if(waterfall.column){
         scoresC <- apply(dat.ordered, 2, scoreVec)
         dat <- dat[,order(scoresC,decreasing = T)]
