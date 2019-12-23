@@ -11,6 +11,7 @@ classifyCell.by.model(
   out.prefix = NULL,
   adjB = NULL,
   meta.info.tb = NULL,
+  pca.rotation = NULL,
   pad.missing = F,
   allZeroAsLow = F,
   verbose = F,
@@ -30,6 +31,8 @@ classifyCell.by.model(
 \item{adjB}{character; batch column of the colData(obj). (default: NULL)}
 
 \item{meta.info.tb}{data.frame; cell information table (default: NULL)}
+
+\item{pca.rotation}{matrix; rotation matrix (default: NULL)}
 
 \item{pad.missing}{logical; (default: FALSE)}
 

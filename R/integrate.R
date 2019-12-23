@@ -349,6 +349,7 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.
 #' classify cells using signature genes
 #' @param obj.list object; named list of object of \code{singleCellExperiment} class
 #' @param gene.core.tb data.frame; signature genes 
+#' @param pca.rotation matrix; rotation matrix (default: NULL)
 #' @param gene.pos.tb data.frame; signature genes (positive)
 #' @param gene.neg.tb data.frame; signature genes (negative)
 #' @param meta.info.tb data.frame; cell information table (default: NULL)
@@ -370,6 +371,7 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.
 #' @param TH.gene.exp.freq double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)
 #' @param TH.gene.exp.freq.pos double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)
 #' @param TH.gene.exp.freq.neg double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)
+#' @param TH.silhouette double; threshold (default: -Inf)
 #' @param RF.selectVar logical; (default: FALSE)
 #' @param ... parameters passed to some method
 #' @import data.table
@@ -378,7 +380,7 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.
 #' @importFrom  ggpubr ggscatter
 #' @details classify cells using the signature genes
 #' @export
-classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out.prefix=NULL,
+classifyCell.by.sigGene <- function(obj.list,gene.core.tb,pca.rotation=NULL,assay.name="exprs",out.prefix=NULL,
                                     adjB=NULL,meta.cluster=NULL,method="posFreq",
 									gene.pos.tb=NULL,gene.neg.tb=NULL,
 									meta.info.tb=NULL,meta.train.tb=NULL,ndownsample=1500,myseed=123456,
@@ -388,6 +390,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 									prob.th=0.8,
 									TH.gene.exp.freq=0.65,
 									TH.gene.exp.freq.train.pos=0.8,TH.gene.exp.freq.train.neg=0.2,
+									TH.silhouette=-Inf,
 									RF.selectVar=F,...)
 {
 	if(is.null(meta.cluster)){
@@ -574,7 +577,11 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 		exp.z.tb <- as.data.table(ldply(seq_along(obj.list),function(i){
 				  obj <- obj.list[[i]]
 				  dataset.id <- names(obj.list)[i]
-				  gene.used <- rownames(obj)[match(gene.core.tb$geneSymbol,rowData(obj)$display.name)]
+				  if(is.null(pca.rotation)){
+					  gene.used <- rownames(obj)[match(gene.core.tb$geneSymbol,rowData(obj)$display.name)]
+				  }else{
+					  gene.used <- rownames(obj)[match(rownames(pca.rotation),rowData(obj)$display.name)]
+				  }
 				  gene.used <- unique(gene.used[!is.na(gene.used)])
 				  ### scale in the whole range of the dataset
 				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB)
@@ -592,7 +599,12 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 									   meta.cluster=obj$meta.cluster,
 									   silhouette=obj$silhouette,
 									   silhouette.rank=obj$silhouette.rank)
-				  ret.tb <- cbind(ret.tb,t(dat.block))
+				  if(is.null(pca.rotation)){
+					  ret.tb <- cbind(ret.tb,t(dat.block))
+				  }else{
+					  dat.pc <- t(dat.block) %*% pca.rotation
+					  ret.tb <- cbind(ret.tb,dat.pc)
+				  }
 				  ret.tb$cellID <- sprintf("%s.%s",dataset.id,ret.tb$cellID)
 				  return(ret.tb)
 		}))
@@ -600,16 +612,23 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 		exp.z.tb <- exp.z.tb[sample(nrow(exp.z.tb),replace=F),]
 		dat.train.tb <- exp.z.tb[meta.cluster %in% unique(sort(gene.core.tb$meta.cluster)) &
 									ClusterID %in% meta.train.tb$ClusterID,
+								 ][silhouette>TH.silhouette,
 								 ][,head(.SD,n=ndownsample),by="meta.cluster"]
-								 ###][silhouette>0,
-								 ###][,head(.SD,n=ndownsample),by="meta.cluster"]
+		dat.test.tb <- exp.z.tb[meta.cluster %in% unique(sort(gene.core.tb$meta.cluster)) &
+									ClusterID %in% meta.train.tb$ClusterID,
+								 ][silhouette>TH.silhouette,
+								 ][!(cellID %in% dat.train.tb$cellID),
+								 ][,head(.SD,n=ndownsample/2),by="meta.cluster"]
 		print(dat.train.tb[,.N,by=c("dataset.id","meta.cluster")])
 		##exp.z.tb[1:4,1:7]
 		##dat.train.tb[1:4,1:7]
 		res.RF <-	sscClust:::run.RF(xdata=as.matrix(dat.train.tb[,-c(1:6)]),
 									  xlabel=factor(dat.train.tb$meta.cluster),
-									  ydata=as.matrix(exp.z.tb[,-c(1:6)]), do.norm=F,
-									  selectVar=RF.selectVar,...)
+									  ydata=as.matrix(exp.z.tb[,-c(1:6)]),
+									  xdata.test=as.matrix(dat.test.tb[,-c(1:6)]),
+									  xlable.test=factor(dat.test.tb$meta.cluster),
+									  do.norm=F,
+									  selectVar=RF.selectVar,ncores=ncores,...)
 		if(verbose){
 			saveRDS(res.RF,file=sprintf("%s.res.RF.rds",out.prefix))
 		}
@@ -641,6 +660,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 #' classify cells using pre-trained model
 #' @param obj.list object; named list of object of \code{singleCellExperiment} class
 #' @param mod.rf object; pre-trained model used for prediction
+#' @param pca.rotation matrix; rotation matrix (default: NULL)
 #' @param assay.name character; which assay (default: "exprs")
 #' @param out.prefix character; output prefix (default: NULL).
 #' @param adjB character; batch column of the colData(obj). (default: NULL)
@@ -657,7 +677,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,assay.name="exprs",out
 #' @details classify cells using pre-trained model, which can be obtained by run classifyCell.by.sigGene()
 #' @export
 classifyCell.by.model <- function(obj.list,mod.rf,assay.name="exprs",out.prefix=NULL,
-                                    adjB=NULL, meta.info.tb=NULL,
+                                    adjB=NULL, meta.info.tb=NULL,pca.rotation=NULL,
 									pad.missing=F,allZeroAsLow=F,
 									verbose=F,ncores=16, ...)
 {
@@ -702,17 +722,23 @@ classifyCell.by.model <- function(obj.list,mod.rf,assay.name="exprs",out.prefix=
 		exp.z.tb <- as.data.table(ldply(seq_along(obj.list),function(i){
 				  obj <- obj.list[[i]]
 				  dataset.id <- names(obj.list)[i]
-				  gene.used <- rownames(obj)[match(rownames(mod.rf$importance),rowData(obj)$display.name)]
 				  gene.pad <- NULL
-				  if(any(is.na(gene.used))){
-					  if(!pad.missing){
-						  cat(sprintf("Not all gene(s) found in dataset %s \n",dataset.id))
-						  return(NULL)
-					  }else{
-						  idx.na <- which(is.na(gene.used))
-						  gene.pad <- rownames(mod.rf$importance)[idx.na]
+				  if(is.null(pca.rotation)){
+					  ###gene.used <- rownames(obj)[match(gene.core.tb$geneSymbol,rowData(obj)$display.name)]
+					  gene.used <- rownames(obj)[match(rownames(mod.rf$importance),rowData(obj)$display.name)]
+					  if(any(is.na(gene.used))){
+						  if(!pad.missing){
+							  cat(sprintf("Not all gene(s) found in dataset %s \n",dataset.id))
+							  return(NULL)
+						  }else{
+							  idx.na <- which(is.na(gene.used))
+							  gene.pad <- rownames(mod.rf$importance)[idx.na]
+						  }
 					  }
+				  }else{
+					  gene.used <- rownames(obj)[match(rownames(pca.rotation),rowData(obj)$display.name)]
 				  }
+				  
 				  ###cat(sprintf("dataset: %s\n",dataset.id))
 				  dat.block <- getExpDataFromGeneSymbol(obj,assay.name,gene.used,adjB=adjB,
 														gene.pad=gene.pad,allZeroAsLow=allZeroAsLow)
@@ -725,7 +751,12 @@ classifyCell.by.model <- function(obj.list,mod.rf,assay.name="exprs",out.prefix=
 				  ret.tb <- data.table(cellID=colnames(dat.block))
 				  #ret.tb$meta.cluster=meta.info.tb$metaCluster[match(ret.tb$cellID,meta.info.tb$cellID)]
 				  #ret.tb$ClusterID=meta.info.tb$ClusterID[match(ret.tb$cellID,meta.info.tb$cellID)]
-				  ret.tb <- cbind(ret.tb,t(dat.block))
+				  if(is.null(pca.rotation)){
+					  ret.tb <- cbind(ret.tb,t(dat.block))
+				  }else{
+					  dat.pc <- t(dat.block) %*% pca.rotation
+					  ret.tb <- cbind(ret.tb,dat.pc)
+				  }
 				  ret.tb$cellID <- sprintf("%s.%s",dataset.id,ret.tb$cellID)
 				  return(ret.tb)
 		}))
@@ -733,7 +764,12 @@ classifyCell.by.model <- function(obj.list,mod.rf,assay.name="exprs",out.prefix=
 		##### predict
 		ydata <- as.matrix(exp.z.tb[,-c(1)])
 		rownames(ydata) <- exp.z.tb$cellID
-		yres <- predict(mod.rf,ydata,type="prob")
+		#### ranger:::predict.ranger
+		if("ranger" %in% class(mod.rf)){
+			yres <- predict(mod.rf,ydata,num.threads=ncores)$predictions
+		}else{
+			yres <- predict(mod.rf,ydata,type="prob")
+		}
 		cls.set <- colnames(yres)
 		ylabel <- apply(yres,1,function(x){ cls.set[which.max(x)] })
 		names(ylabel) <- rownames(ydata)

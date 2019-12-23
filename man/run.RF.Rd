@@ -11,7 +11,11 @@ run.RF(
   do.norm = F,
   ntree = 500,
   ntreeIterat = 200,
-  selectVar = T
+  selectVar = T,
+  ncores = NULL,
+  use.ranger = T,
+  xdata.test = NULL,
+  xlable.test = NULL
 )
 }
 \arguments{
@@ -28,6 +32,8 @@ run.RF(
 \item{ntreeIterat}{integer; parameter of varSelRF::varSelRF}
 
 \item{selectVar}{logical; wheter select variables (default: TRUE)}
+
+\item{use.ranger}{logical; wheter use ranger (default: TRUE)}
 }
 \value{
 List with the following elements:

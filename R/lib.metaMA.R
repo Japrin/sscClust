@@ -57,8 +57,8 @@ directEScombi <- function(ES,varES,useREM=TRUE)
 	rpvalESc <- 2*(pnorm(-abs(zSco)))
 	rpadjEsc <- p.adjust(rpvalESc,method="BH")
 	###res=which(p.adjust(rpvalESc,method="BH")<=BHth)
-	result=cbind(MUvals,zSco,rpvalESc,rpadjEsc)
-	colnames(result)=c("comb.ES","comb.Z","comb.p","comb.padj")
+	result=cbind(MUvals,MUsES,zSco,rpvalESc,rpadjEsc)
+	colnames(result)=c("comb.ES","comb.ES.sd","comb.Z","comb.p","comb.padj")
 	result
 }
 

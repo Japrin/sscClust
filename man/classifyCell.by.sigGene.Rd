@@ -7,6 +7,7 @@
 classifyCell.by.sigGene(
   obj.list,
   gene.core.tb,
+  pca.rotation = NULL,
   assay.name = "exprs",
   out.prefix = NULL,
   adjB = NULL,
@@ -28,6 +29,7 @@ classifyCell.by.sigGene(
   TH.gene.exp.freq = 0.65,
   TH.gene.exp.freq.train.pos = 0.8,
   TH.gene.exp.freq.train.neg = 0.2,
+  TH.silhouette = -Inf,
   RF.selectVar = F,
   ...
 )
@@ -36,6 +38,8 @@ classifyCell.by.sigGene(
 \item{obj.list}{object; named list of object of \code{singleCellExperiment} class}
 
 \item{gene.core.tb}{data.frame; signature genes}
+
+\item{pca.rotation}{matrix; rotation matrix (default: NULL)}
 
 \item{assay.name}{character; which assay (default: "exprs")}
 
@@ -74,6 +78,8 @@ classifyCell.by.sigGene(
 \item{prob.th}{numeric; probability threshold (default: 0.8)}
 
 \item{TH.gene.exp.freq}{double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)}
+
+\item{TH.silhouette}{double; threshold (default: -Inf)}
 
 \item{RF.selectVar}{logical; (default: FALSE)}
 

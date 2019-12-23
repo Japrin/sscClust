@@ -323,6 +323,31 @@ expressedFraction.HiExpressorMean <- function(exp.bin,exp.norm,group,n.cores=NUL
     return(out.res)
 }
 
+#' @importFrom randomForest randomForest
+#' @importFrom parallel mclapply
+#' @param ntree integer; Number of trees to grow.
+#' @param ncore integer; Number of cores to use.
+#' @param ... passed to randomForest::randomForest
+mcrf <- function(ntree, ncore, ...) {
+	ntrees <- rep(ntree%/%ncore, ncore) + c(rep(0, ncore-ntree%%ncore), rep(1, ntree%%ncore))
+	rfs <- mclapply(ntrees, function(nn) {
+#						a.mod <- randomForest::randomForest(ntree = nn, keep.inbag=T, ...)
+#						pred <- predict(a.mod,x, predict.all=TRUE)
+#						oob.data <- as.data.table(ldply(seq_len(nn),function(i){
+#							tree_pred_i <- pred$individual[ , i]
+#							oob_idx <- a.mod$inbag[ , i] == 0
+#							data.frame(oob.pred=tree_pred_i[oob_idx],
+#									   oob.actual=a.mod$y[oob_idx])
+#						}))
+#						conf_mtx <- oob.data[,table(oob.pred,oob.actual)]
+#						error_rates <- 1 - diag(conf_mtx) / colSums(conf_mtx)
+#						error_rate <- 1 - sum(diag(conf_mtx)) / sum(conf_mtx)
+						a.mod <- randomForest::randomForest(ntree = nn, ...)
+						return(a.mod)
+	}, mc.cores = ncore)
+	do.call(randomForest::combine, rfs)
+}
+
 ####### classification functions
 
 #' Wraper for running random forest classifier
@@ -330,6 +355,7 @@ expressedFraction.HiExpressorMean <- function(exp.bin,exp.norm,group,n.cores=NUL
 #' @importFrom varSelRF varSelRF
 #' @importFrom randomForest randomForest
 #' @importFrom stats predict
+#' @importFrom ranger ranger
 #' @param xdata data frame or matrix; data used for training, with sample id in rows and variables in columns
 #' @param xlabel factor; classification label of the samples, with length equal to the number of rows in xdata
 #' @param ydata data frame or matrix; data to be predicted the label, same format as xdata
@@ -337,10 +363,14 @@ expressedFraction.HiExpressorMean <- function(exp.bin,exp.norm,group,n.cores=NUL
 #' @param ntree integer; parameter of varSelRF::varSelRF
 #' @param ntreeIterat integer; parameter of varSelRF::varSelRF
 #' @param selectVar logical; wheter select variables (default: TRUE)
+#' @param use.ranger logical; wheter use ranger (default: TRUE)
 #' @return List with the following elements:
 #' \item{ylabel}{ppredicted labels of the samples in ydata}
 #' \item{rfsel}{trained model; output of varSelRF()}
-run.RF <- function(xdata, xlabel, ydata, do.norm=F, ntree = 500, ntreeIterat = 200, selectVar=T)
+run.RF <- function(xdata, xlabel, ydata, do.norm=F,
+				   ntree = 500, ntreeIterat = 200, selectVar=T,
+				   ncores=NULL,use.ranger=T,
+				   xdata.test=NULL,xlable.test=NULL)
 {
   #require("varSelRF")
   #require("randomForest")
@@ -352,6 +382,7 @@ run.RF <- function(xdata, xlabel, ydata, do.norm=F, ntree = 500, ntreeIterat = 2
     xdata <- scale(xdata,center = T,scale = T)
     ydata <- scale(ydata,center = T,scale = T)
   }
+  pred.test <- NULL
   ### random forest
   if(selectVar){
 	  rf.model <- varSelRF::varSelRF(xdata, xlabel,
@@ -362,13 +393,44 @@ run.RF <- function(xdata, xlabel, ydata, do.norm=F, ntree = 500, ntreeIterat = 2
 	  #rfsel$rf.model$confusion %>% print
 	  yres <- predict(rf.model$rf.model, newdata = ydata[,rf.model$selected.vars],type = "prob")
   }else{
-	rf.model <- randomForest::randomForest(xdata, xlabel,importance=T,proximity=T,ntree=ntree)
-	yres <- predict(rf.model,ydata,type="prob")
+	  if(!is.null(ncores) && ncores > 1){
+		  if(use.ranger){
+			  rf.model <- ranger::ranger(x=xdata,y=xlabel,probability=T,num.trees=ntree,
+										 importance="impurity",num.threads=ncores,classification=T)
+			  yres <- predict(rf.model,ydata,num.threads=ncores)$predictions
+			  rf.model$importance <- data.frame(x=rf.model$variable.importance)
+			  colnames(rf.model$importance) <- rf.model$importance.mode
+			  if(!is.null(xdata.test)){
+				  pred.test <- predict(rf.model,xdata.test,num.threads=ncores)$predictions
+			  }
+		  }else{
+			  rf.model <- mcrf(ntree, ncores, x=xdata,y=xlabel,importance=T,proximity=T)
+			  yres <- predict(rf.model,ydata,type="prob")
+			  if(!is.null(xdata.test)){
+				  pred.test <- predict(rf.model,xdata.test,type="prob")
+			  }
+		  }
+	  }else{
+		  rf.model <- randomForest::randomForest(xdata, xlabel,importance=T,proximity=T,ntree=ntree)
+		  yres <- predict(rf.model,ydata,type="prob")
+	  }
   }
   cls.set <- colnames(yres)
   ylabel <- apply(yres,1,function(x){ cls.set[which.max(x)] })
   names(ylabel) <- rownames(ydata)
-  return(list("ylabel"=ylabel,"rfsel"=rf.model,"yres"=yres))
+  ret.list <- list("ylabel"=ylabel,"rfsel"=rf.model,"yres"=yres)
+  if(!is.null(pred.test)){
+	  pred.test.res <- data.table(pred=apply(pred.test,1,function(x){ as.character(cls.set[which.max(x)]) }),
+								  actual=as.character(xlable.test),
+								  group=as.character(xlable.test))
+	  conf.mtx.test <- pred.test.res[,table(pred,actual)]
+	  error.rate.perCls <- pred.test.res[,.(N=.N, error.rate=sum(.SD$pred!=.SD$actual)/.N),by="group"]
+	  error.rate.overall <- sum(pred.test.res[,pred!=actual])/nrow(pred.test.res)
+	  ret.list[["conf.mtx"]] <- conf.mtx.test
+	  ret.list[["error.rate.perCls"]] <- error.rate.perCls
+	  ret.list[["error.rate.overall"]] <- error.rate.overall
+  }
+  return(ret.list)
 }
 
 #' Wraper for running svm
@@ -984,6 +1046,7 @@ run.cutreeDynamic <- function(dat,method.hclust="ward.D2",method.distance="spear
     obj.branch <- dendextend::color_branches(obj.dend,
                                  clusters=cluster.label[order.dendrogram(obj.dend)],
                                  col=colSet.cls)
+	obj.branch <- dendextend::set(obj.branch,"branches_lwd", 1.5)
 
 #	pdf("test.01.pdf")
 #	opar <- par(mar=c(15,4,4,2))
