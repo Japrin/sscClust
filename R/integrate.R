@@ -10,6 +10,7 @@
 #' @param avg.by character; calculate the average expression of cells group by the specifid column (default: "majorCluster")
 #' @param n.downsample integer; number of cells in each cluster to downsample to (default: NULL)
 #' @param n.pc integer; number of pc ot use (default: 15)
+#' @param do.clustering logical; wheter perform PCA/clustering (default: TRUE)
 #' @param de.stat character; column in gene.de.file (default: "t")
 #' @param de.thres double; used for selecting genes. can be larger than 1(top number of genes) or less than 1 (F.rank threshold) (default: 2000)
 #' @param do.scale logical; scale the summarized vectors (default: false)
@@ -30,7 +31,7 @@ integrate.by.avg <- function(sce.list,
                              gene.de.list=NULL,sort.by="F.rank.median",
                              avg.by="majorCluster",
 							 n.downsample=NULL,
-							 n.pc=15,
+							 n.pc=15,do.clustering=T,
 							 de.stat="t",de.thres=1,do.scale=F,
 							 ###par.clust=list(deepSplit=4, minClusterSize=2,method="dynamicTreeCut"),
 							 par.clust=list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2),
@@ -48,12 +49,13 @@ integrate.by.avg <- function(sce.list,
     #### get common genes
     loginfo(sprintf("get common genes ... "))
     gene.common <- c()
-    for(i in seq_along(sce.list)){
-      if(length(gene.common)==0)
-            gene.common <- rownames(sce.list[[i]])
-        else
-            gene.common <- intersect(gene.common,rownames(sce.list[[i]]))
-    }
+	for(i in seq_along(sce.list)){
+	  if(length(gene.common)==0)
+			gene.common <- rownames(sce.list[[i]])
+		else
+			gene.common <- intersect(gene.common,rownames(sce.list[[i]]))
+	}
+	
     loginfo(sprintf("total %d common genes obtain ",length(gene.common)))
 
     ### cal the average
@@ -117,7 +119,7 @@ integrate.by.avg <- function(sce.list,
 													return(ret.tb)
 															 }))
 			gene.rank.tb <- dcast(gene.rank.tb,geneID~dataset.id,value.var="F.rank",fill=1)
-			gene.rank.tb$median.F.rank <- rowMedians(as.matrix(gene.rank.tb[,-c("geneID"),with=F]))
+			gene.rank.tb$median.F.rank <- rowMedians(as.matrix(gene.rank.tb[,-c("geneID"),with=F]),na.rm=T)
 			gene.rank.tb <- gene.rank.tb[order(median.F.rank),]
 			gene.rank.tb <- gene.rank.tb[geneID %in% gene.common,]
 			rowData(sce.pb)$median.F.rank <- gene.rank.tb[["median.F.rank"]][match(rownames(sce.pb),gene.rank.tb$geneID)]
@@ -184,6 +186,19 @@ integrate.by.avg <- function(sce.list,
 	loginfo(sprintf("total number %d genes will be used ",length(gene.de.common)))
 
 	rowData(sce.pb)$gene.de.common <- rownames(sce.pb) %in% gene.de.common
+
+    m <- regexec("^(.+?)\\.",colnames(sce.pb),perl=T)
+    mm <- regmatches(colnames(sce.pb),m)
+    colData(sce.pb)[,avg.by] <- colnames(sce.pb)
+    colData(sce.pb)[,"dataset.id"] <- sapply(mm,"[",2)
+    colData(sce.pb)
+    metadata(sce.pb)$ssc$gene.de.list <- gene.de.list
+
+	if(!do.clustering){
+		loginfo(sprintf("integrate.by.avg run successfully"))
+		return(sce.pb)
+	}
+
     ###  clustering the pseudo bulk data
     #all(rownames(dat.avg.mtx)==rownames(sce.avg.list[[1]]))
 	loginfo(sprintf("cluster the pseudo-bulk samples..."))
@@ -198,12 +213,6 @@ integrate.by.avg <- function(sce.list,
 	}
 
     #ssc.plot.pca(sce.pb)
-    m <- regexec("^(.+?)\\.",colnames(sce.pb),perl=T)
-    mm <- regmatches(colnames(sce.pb),m)
-    colData(sce.pb)[,avg.by] <- colnames(sce.pb)
-    colData(sce.pb)[,"dataset.id"] <- sapply(mm,"[",2)
-    colData(sce.pb)
-
     #### clustering the clusters
 	sce.pb <- do.call(ssc.clust,c(list(obj=sce.pb,method.reduction="pca", seed=myseed),
 								 par.clust))
@@ -251,6 +260,7 @@ integrate.by.avg <- function(sce.list,
 	if(!is.null(gene.de.list) && "pca.SNN.kauto" %in% colnames(colData(sce.pb))){
 		##### top de genes
 		gene.desc.top <- sscClust:::rank.de.gene(sce.pb)
+		metadata(sce.pb)$ssc$gene.desc.top <- gene.desc.top
 		#saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
 		##gene.desc.top <- readRDS(sprintf("%s.gene.desc.top.rds",out.prefix))
 
@@ -287,10 +297,6 @@ integrate.by.avg <- function(sce.list,
 							   )
 	}
 
-	#### heatmap show average expression of specified genes
-    ###return(list("sce.pb"=sce.pb,"branch.out"=branch.out))
-    metadata(sce.pb)$ssc$gene.de.list <- gene.de.list
-    metadata(sce.pb)$ssc$gene.desc.top <- gene.desc.top
 	loginfo(sprintf("integrate.by.avg run successfully"))
     return(sce.pb)
 }

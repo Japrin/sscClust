@@ -16,6 +16,7 @@ integrate.by.avg(
   avg.by = "majorCluster",
   n.downsample = NULL,
   n.pc = 15,
+  do.clustering = T,
   de.stat = "t",
   de.thres = 1,
   do.scale = F,
@@ -52,6 +53,8 @@ integrate.by.avg(
 \item{n.downsample}{integer; number of cells in each cluster to downsample to (default: NULL)}
 
 \item{n.pc}{integer; number of pc ot use (default: 15)}
+
+\item{do.clustering}{logical; wheter perform PCA/clustering (default: TRUE)}
 
 \item{de.stat}{character; column in gene.de.file (default: "t")}
 

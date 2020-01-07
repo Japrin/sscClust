@@ -111,7 +111,7 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
                             ggplot2::ggplot(.dd,aes(Dim1,Dim2))+
                                 geom_point(aes(colour=value),
                                            size=if(is.null(size)) auto.point.size(npts)*1.1 else size,
-                                           alpha=pt.alpha) +
+                                           alpha=pt.alpha,stroke=0,shape=16) +
                                 labs(title=x, x ="", y = "") +
                                 scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
                                 theme_bw() +

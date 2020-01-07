@@ -14,7 +14,7 @@ directEScombi(ES, varES, useREM = TRUE)
 \item{useREM}{logical; . [default TRUE]}
 }
 \value{
-a matrix
+a data.frame
 }
 \description{
 directional Effect Size combination

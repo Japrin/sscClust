@@ -723,7 +723,7 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     }else if(SNN.method=="betweenness"){
       clust.res <- igraph::cluster_edge_betweenness(snn.gr)
     }else if(SNN.method=="leiden"){
-      clust.res <- leiden::leiden(igraph::as_adjacency_matrix(snn.gr),seed=myseed,...)
+      clust.res <- leiden::leiden((snn.gr),seed=myseed,...)
 	  clust.res <- list(membership=clust.res)
 	}
     metadata(obj)$ssc$clust.res[["snn.gr"]] <- snn.gr
@@ -1438,7 +1438,7 @@ ssc.plot.violin <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,
 	  dat.plot.df <- cbind(dat.plot.df,dat.plot)
 	  dat.plot.df <- data.table::melt(dat.plot.df,id.vars=c("sample",group.var),
 									  variable.name="gene",value.name=assay.name)
-	  dat.plot.df.grpMean <- dat.plot.df[,lapply(.SD,mean),by=c("gene",group.var),.SDcols=assay.name]
+	  dat.plot.df.grpMean <- dat.plot.df[,lapply(.SD,mean,na.rm=T),by=c("gene",group.var),.SDcols=assay.name]
 	  colnames(dat.plot.df.grpMean) <- c("gene",group.var,"meanExp")
 	  dat.plot.df <- dat.plot.df.grpMean[dat.plot.df,,on=c("gene",group.var)]
       dat.plot.df[,gene:=factor(gene,levels=colnames(dat.plot),ordered=T)]
@@ -1736,8 +1736,10 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
         xlabel <- clust
 		xgroup <- x
 		if(group.mode=="multiAsTwo"){
+			xlabel <- as.character(xlabel)
 			xlabel[xlabel!=x] <- "_control"
 			xlabel[xlabel==x] <- "_case"
+			xlabel <- factor(xlabel,levels=c("_control","_case"))
 			xgroup <- sprintf("_case:%s",x)
 		}
         out.limma <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
@@ -2159,6 +2161,9 @@ ssc.downsample <- function(obj, ncell.downsample=NULL, group.var="majorCluster",
 {
     #### downsample cells
     set.seed(rn.seed)
+	if(is.null(colnames(obj))){
+		stop(sprintf("no colnames for obj\n"))
+	}
     clust <- structure(obj[[group.var]],names=colnames(obj))
     grp.list <- unique(clust)
 	if(priority=="silhouette"){
@@ -2291,7 +2296,11 @@ ssc.scale <- function(obj,gene.id,gene.symbol,assay.name="norm_exprs",adjB=NULL,
 		warning("No gene.id or gene.symbol provided!")
 		return(NULL)
 	}
+	if(is.null(names(rowData(obj)[,"display.name"]))){
+		names(rowData(obj)[,"display.name"]) <- rownames(obj)
+	}
 	if(missing(gene.id) && !is.null(gene.symbol)){
+		
 		gene.list <- rowData(obj)[,"display.name"][which(rowData(obj)[,"display.name"] %in% gene.symbol)]
 	}else{
 		gene.id <- intersect(gene.id,rownames(obj))

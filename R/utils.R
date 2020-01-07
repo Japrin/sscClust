@@ -849,7 +849,7 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
         xdata <- xdata[,f.cell]
     }
     xdata <- as.matrix(xdata)
-    f.gene <- rowVars(xdata)>0
+    f.gene <- rowVars(xdata)>0 & apply(xdata,1,function(x){ !any(is.na(x)) })
     xdata <- xdata[f.gene,]
     ####
 	if("_control" %in% xlabel){
