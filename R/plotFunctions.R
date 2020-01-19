@@ -40,6 +40,7 @@ auto.point.size <- function(n){
 #' @param gene.to.show character; gene id to be showd on the tSNE map
 #' @param out.prefix character; output prefix (default: NULL)
 #' @param p.ncol integer; number of columns in the plot's layout (default: 3)
+#' @param theme.use function; which theme to use (default: theme_bw)
 #' @param xlim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @param ylim integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)
 #' @param size double; points' size. If NULL, infer from number of points (default NULL)
@@ -49,13 +50,14 @@ auto.point.size <- function(n){
 #' @param pt.order character; (default: "value")
 #' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )
 #' @param scales character; whether use the same scale across genes. one of "fixed" or "free" (default: "fixed")
+#' @param vector.friendly logical; output vector friendly figure (default: FALSE)
 #' @details For genes contained in both `Y` and `gene.to.show`, show their expression on the tSNE
 #' map provided as `dat.map`. One point in the map represent a cell; cells with higher expression
 #' also have darker color.
 #' @return a ggplot object
-ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
+ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,theme.use=theme_bw,
                          xlim=NULL,ylim=NULL,size=NULL,pt.alpha=0.5,pt.order="value",clamp=NULL,
-                         width=9,height=8,scales="fixed"){
+                         width=9,height=8,scales="fixed",vector.friendly=F){
   #suppressPackageStartupMessages(require("data.table"))
   #requireNamespace("ggplot2",quietly = T)
   #requireNamespace("RColorBrewer",quietly = T)
@@ -73,6 +75,7 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
   dat.plot <- cbind(dat.plot,dat.map,t(as.matrix(Y[gene.to.show,dat.plot$sample,drop=F])))
   colnames(dat.plot) <- c("sample","Dim1","Dim2",names(gene.to.show))
   dat.plot.melt <- data.table::melt(dat.plot,id.vars = c("sample","Dim1","Dim2"))
+  dat.plot.melt <- dat.plot.melt[!is.na(value),]
   if(pt.order=="value"){
 	  dat.plot.melt <- dat.plot.melt[order(dat.plot.melt$value,decreasing = F),]
   }else if(pt.order=="random"){
@@ -80,6 +83,74 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
   }
   npts <- nrow(dat.plot)
   dat.plot.melt[,variable:=factor(variable,levels=names(gene.to.show),ordered=T)]
+  
+  make.plot <- function(gene.to.show,dat.plot.melt,show.legend=T,clamp="none",value.range=NULL,size=NULL,vector.friendly=F,out.prefix=NULL)
+  {
+	  lapply(names(gene.to.show),function(x){
+						.dd <- dat.plot.melt[variable==x,]
+						if(!is.null(clamp) && clamp=="none"){
+						}else{
+							if(is.null(clamp)){
+								clamp <- quantile(.dd$value,c(0.05,0.95))
+							}
+							.dd[value < clamp[1],value:=clamp[1]]
+							.dd[value > clamp[2],value:=clamp[2]]
+						}
+						if(is.null(value.range)){
+							value.range <- pretty(.dd$value)
+						}
+						p <- ggplot2::ggplot(.dd,aes(Dim1,Dim2))+
+							geom_point(aes(colour=value),
+									   size=if(is.null(size)) sscClust:::auto.point.size(npts)*1.1 else size,
+									   alpha=pt.alpha,stroke=0,shape=16) +
+							labs(title=x, x ="", y = "") +
+							scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd"), limits=c(value.range[1],value.range[length(value.range)]))
+						p <- p + theme.use()
+					    p <- p + theme(plot.title = element_text(hjust = 0.5))+
+							coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+						legend.p <- NULL
+						if(vector.friendly){
+							####p <- Seurat::AugmentPlot(p,width=width,height=height)
+							tmpfilename <- sprintf("%s.tmp.%s.png",if(!is.null(out.prefix)) out.prefix else "",x)
+							ggsave(filename=tmpfilename, plot = p + theme_void() + theme(legend.position = "none",
+												  axis.line.x = element_blank(), axis.line.y = element_blank(),
+												  axis.title.x = element_blank(), axis.title.y = element_blank(),
+												  axis.ticks.x = element_blank(),axis.ticks.y = element_blank(),
+												  plot.title = element_blank()),
+								 width=7,height=6)
+							pbuild.params <- ggplot_build(plot = p)$layout$panel_params[[1]]
+							range.values <- c( pbuild.params$x.range, pbuild.params$y.range)
+							img <- png::readPNG(source = tmpfilename)
+							##print(str(p$data))
+							##p.test <<- p
+							blank <- ggplot(data = as.data.table(p$data)[1,,drop=F],aes(Dim1,Dim2)) +
+									  ###geom_point(aes(color=value)) +
+									  geom_blank()+
+									  labs(title=x, x ="", y = "") +
+									  ###scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd"),limits=c(value.range[1],value.range[length(value.range)])) +
+									  theme(plot.title = element_text(hjust = 0.5))
+							blank <- blank + p$theme + coord_cartesian(xlim = range.values[1:2], ylim = range.values[3:4], expand = F)
+							blank <- blank + annotation_raster(raster = img,
+															 xmin = range.values[1], xmax = range.values[2],
+															 ymin = range.values[3], ymax = range.values[4])
+						    legend.blank <- cowplot::get_legend(p)
+							if(show.legend){
+								p <- cowplot::plot_grid(blank, legend.blank, rel_widths = c(3, 1))
+							}else{
+								p <- blank
+							}
+							legend.p <- legend.blank
+							file.remove(tmpfilename)
+						}else{
+							legend.p <- cowplot::get_legend(p)
+							if(!show.legend){
+								p <- p + theme(legend.position = "none")
+							}
+						}
+						return(list("plot"=p,"legend"=legend.p))
+					 })
+  }
+
   if(scales=="fixed"){
       if(!is.null(clamp) && clamp=="none"){
       }else{
@@ -89,36 +160,15 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,
           dat.plot.melt[value < clamp[1],value:=clamp[1]]
           dat.plot.melt[value > clamp[2],value:=clamp[2]]
       }
-      p <- ggplot2::ggplot(dat.plot.melt,aes(Dim1,Dim2)) +
-        geom_point(aes(colour=value),
-                   size=if(is.null(size)) auto.point.size(npts)*1.1 else size,
-                   alpha=pt.alpha) +
-        scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
-        facet_wrap(~variable, ncol = p.ncol) +
-        theme_bw() +
-        coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
+	  value.range <- pretty(dat.plot.melt$value)
+      multi.p <- make.plot(gene.to.show,dat.plot.melt,show.legend=F,clamp="none",value.range=value.range,size=size,vector.friendly=vector.friendly,out.prefix=out.prefix)
+	  legend.p <- multi.p[[1]][["legend"]]
+	  ####+ theme(legend.box.margin = margin(0, 0, 0, 12)))
+      p <- cowplot::plot_grid(plotlist=llply(multi.p,function(x){ x[["plot"]] }),ncol = p.ncol,align = "hv")
+	  p <- cowplot::plot_grid(p, legend.p, rel_widths = c(3, .4))
   }else{
-      multi.p <- lapply(names(gene.to.show),function(x){
-                            .dd <- dat.plot.melt[variable==x,]
-                            if(!is.null(clamp) && clamp=="none"){
-                            }else{
-                                if(is.null(clamp)){
-                                    clamp <- quantile(.dd$value,c(0.05,0.95))
-                                }
-                                .dd[value < clamp[1],value:=clamp[1]]
-                                .dd[value > clamp[2],value:=clamp[2]]
-                            }
-                            ggplot2::ggplot(.dd,aes(Dim1,Dim2))+
-                                geom_point(aes(colour=value),
-                                           size=if(is.null(size)) auto.point.size(npts)*1.1 else size,
-                                           alpha=pt.alpha,stroke=0,shape=16) +
-                                labs(title=x, x ="", y = "") +
-                                scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd")) +
-                                theme_bw() +
-                                theme(plot.title = element_text(hjust = 0.5))+
-                                coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
-                         })
-      p <- cowplot::plot_grid(plotlist=multi.p,ncol = p.ncol,align = "hv")
+      multi.p <- make.plot(gene.to.show,dat.plot.melt,show.legend=T,clamp=clamp,value.range=NULL,size=size,vector.friendly=vector.friendly,out.prefix=out.prefix)
+      p <- cowplot::plot_grid(plotlist=llply(multi.p,function(x){ x[["plot"]] }),ncol = p.ncol,align = "hv")
   }
   if(!is.null(out.prefix)){
     ggplot2::ggsave(sprintf("%s.geneOntSNE.pdf",out.prefix),plot=p,width = width,height = height)
@@ -160,7 +210,7 @@ plot.density2D <- function(x,peaks=NULL)
 #' @param dat matrix; matrix
 #' @param out.prefix character; output prefix.
 #' @param mytitle character; (default: "Heatmap")
-#' @param show.number logical; (default: TRUE)
+#' @param show.number logical; (default: NULL)
 #' @param do.clust logical, character or dendrogram; passed to both cluster_columns and cluster_rows of Heatmap. Higher priority than clust.row and clust.column (default: NULL)
 #' @param clust.row logical, character or dendrogram; passed to cluster_rows of Heatmap (default: FALSE)
 #' @param clust.column logical, character or dendrogram; passed to cluster_columns of Heatmap (default: FALSE)
@@ -169,6 +219,8 @@ plot.density2D <- function(x,peaks=NULL)
 #' @param show.dendrogram logical, whetehr show the dendrogram (default: FALSE)
 #' @param z.lo double; (default: NULL)
 #' @param z.hi double; (default: NULL)
+#' @param z.len integer; (default: 100)
+#' @param col.ht vector; (default: NULL)
 #' @param palatte character; (default: NULL)
 #' @param row.ann.dat data.frame; data for row annotation; (default: NULL)
 #' @param row.split vector; used for row; (default: NULL)
@@ -187,12 +239,12 @@ plot.density2D <- function(x,peaks=NULL)
 #' @importFrom dynamicTreeCut cutreeDynamic
 #' @details plot matrix
 #' @export
-plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number=TRUE,
-                               do.clust=NULL,z.lo=NULL,z.hi=NULL,palatte=NULL,
+plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number=NULL,
+                               do.clust=NULL,z.lo=NULL,z.hi=NULL,z.len=100,palatte=NULL,
                                clust.row=FALSE,clust.column=FALSE,show.dendrogram=FALSE,
                                waterfall.row=FALSE,waterfall.column=FALSE,
                                row.ann.dat=NULL,row.split=NULL,returnHT=FALSE,
-                               par.legend=list(),par.heatmap=list(),
+                               par.legend=list(),par.heatmap=list(),col.ht=NULL,
 							   par.warterfall=list(score.alpha=1.5,do.norm=T),
                                pdf.width=8,pdf.height=8,exp.name="Count",...)
 {
@@ -233,11 +285,15 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number
     tmp.var <- pretty((dat),n=8)
     if(is.null(z.lo)){ z.lo <- tmp.var[1] }
     if(is.null(z.hi)){ z.hi <- tmp.var[length(tmp.var)] }
-    if(show.number){
-        my.cell_fun <- function(j, i, x, y, w, h, col) { grid.text(dat[i, j], x, y) }
-    }else{
-        my.cell_fun <- NULL
-    }
+
+    my.cell_fun <- NULL
+	if(!is.null(show.number)){
+		if(is.logical(show.number) && show.number==T){
+			my.cell_fun <- function(j, i, x, y, w, h, col) { grid.text(dat[i, j], x, y) }
+		}else if(is.matrix(show.number)){
+			my.cell_fun <- function(j, i, x, y, w, h, col) { grid.text(show.number[i, j], x, y) }
+		}
+	}
     m <- ncol(dat)
     n <- nrow(dat)
     if(is.null(palatte)){
@@ -270,7 +326,7 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number
     }
 
     ht <- ComplexHeatmap::Heatmap(dat, name = mytitle,
-                  col = colorRamp2(seq(z.lo,z.hi,length=100), colorRampPalette(palatte)(100)),
+                  col = if(is.null(col.ht)) colorRamp2(seq(z.lo,z.hi,length=z.len), colorRampPalette(palatte)(z.len)) else col.ht,
                   cluster_columns=clust.column,cluster_rows=clust.row,
                   row_dend_reorder = FALSE, column_dend_reorder = FALSE,
                   column_names_gp = gpar(fontsize = 12*28*.cex.column/max(m,32)),

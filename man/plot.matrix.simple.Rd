@@ -8,10 +8,11 @@
   dat,
   out.prefix = NULL,
   mytitle = "Heatmap",
-  show.number = TRUE,
+  show.number = NULL,
   do.clust = NULL,
   z.lo = NULL,
   z.hi = NULL,
+  z.len = 100,
   palatte = NULL,
   clust.row = FALSE,
   clust.column = FALSE,
@@ -23,6 +24,7 @@
   returnHT = FALSE,
   par.legend = list(),
   par.heatmap = list(),
+  col.ht = NULL,
   par.warterfall = list(score.alpha = 1.5, do.norm = T),
   pdf.width = 8,
   pdf.height = 8,
@@ -37,13 +39,15 @@
 
 \item{mytitle}{character; (default: "Heatmap")}
 
-\item{show.number}{logical; (default: TRUE)}
+\item{show.number}{logical; (default: NULL)}
 
 \item{do.clust}{logical, character or dendrogram; passed to both cluster_columns and cluster_rows of Heatmap. Higher priority than clust.row and clust.column (default: NULL)}
 
 \item{z.lo}{double; (default: NULL)}
 
 \item{z.hi}{double; (default: NULL)}
+
+\item{z.len}{integer; (default: 100)}
 
 \item{palatte}{character; (default: NULL)}
 
@@ -66,6 +70,8 @@
 \item{par.legend}{list; lengend parameters, used to overwrite the default setting; (default: list())}
 
 \item{par.heatmap}{list; other heatmap parameters, (default: list())}
+
+\item{col.ht}{vector; (default: NULL)}
 
 \item{par.warterfall}{list; parameters for warterfall, sucah as score.alpha}
 

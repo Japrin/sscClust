@@ -23,6 +23,9 @@ ssc.plot.tsne(
   do.scale = FALSE,
   label = NULL,
   par.repel = list(force = 1),
+  vector.friendly = F,
+  theme.use = theme_bw,
+  legend.w = 1,
   par.geneOnTSNE = list(scales = "free", pt.order = "value", pt.alpha = 0.1),
   out.prefix = NULL,
   p.ncol = 3,
@@ -68,6 +71,12 @@ ssc.plot.tsne(
 \item{label}{double; label size. if NULL, no label showed. (default: NULL )}
 
 \item{par.repel}{list; passed to geom_text_repel}
+
+\item{vector.friendly}{logical; output vector friendly figure (default: FALSE)}
+
+\item{theme.use}{function; which theme to use (default: theme_bw)}
+
+\item{legend.w}{numeric; adjust legend width (default: 1)}
 
 \item{par.geneOnTSNE}{character; other parameters of geneOnTSNE}
 

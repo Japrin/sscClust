@@ -10,6 +10,7 @@ ggGeneOnTSNE(
   gene.to.show,
   out.prefix = NULL,
   p.ncol = 3,
+  theme.use = theme_bw,
   xlim = NULL,
   ylim = NULL,
   size = NULL,
@@ -18,7 +19,8 @@ ggGeneOnTSNE(
   clamp = NULL,
   width = 9,
   height = 8,
-  scales = "fixed"
+  scales = "fixed",
+  vector.friendly = F
 )
 }
 \arguments{
@@ -32,6 +34,8 @@ should be sample id}
 \item{out.prefix}{character; output prefix (default: NULL)}
 
 \item{p.ncol}{integer; number of columns in the plot's layout (default: 3)}
+
+\item{theme.use}{function; which theme to use (default: theme_bw)}
 
 \item{xlim}{integer or NULL; only draw points lie in the ragne specified by xlim and ylim (default NULL)}
 
@@ -50,6 +54,8 @@ should be sample id}
 \item{height}{numeric; height of the plot (default: 8)}
 
 \item{scales}{character; whether use the same scale across genes. one of "fixed" or "free" (default: "fixed")}
+
+\item{vector.friendly}{logical; output vector friendly figure (default: FALSE)}
 }
 \value{
 a ggplot object

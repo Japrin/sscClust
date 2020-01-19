@@ -1244,6 +1244,9 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param label double; label size. if NULL, no label showed. (default: NULL )
 #' @param par.repel list; passed to geom_text_repel
 #' @param par.geneOnTSNE character; other parameters of geneOnTSNE
+#' @param vector.friendly logical; output vector friendly figure (default: FALSE)
+#' @param theme.use function; which theme to use (default: theme_bw)
+#' @param legend.w numeric; adjust legend width (default: 1)
 #' @importFrom SingleCellExperiment colData
 #' @importFrom ggplot2 ggplot aes geom_point scale_colour_manual theme_bw aes_string guides guide_legend coord_cartesian
 #' @importFrom ggrepel geom_text_repel
@@ -1260,7 +1263,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
                              plotDensity=F, colSet=list(),
                              reduced.name="iCor.tsne",reduced.dim=c(1,2),xlim=NULL,ylim=NULL,size=NULL,
                              brewer.palette="YlOrRd",adjB=NULL,clamp="none",do.scale=FALSE,
-                             label=NULL,par.repel=list(force=1),
+                             label=NULL,par.repel=list(force=1),vector.friendly=F,theme.use=theme_bw,legend.w=1,
                              par.geneOnTSNE=list(scales="free",pt.order="value",pt.alpha=0.1),
                              out.prefix=NULL,p.ncol=3,width=NA,height=NA,base_aspect_ratio=1.1,peaks=NULL)
 {
@@ -1330,10 +1333,42 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
           }else{
             p <- p + scale_colour_manual(values = colSet[[cc]])
           }
-          p <- p + theme_bw() + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE) +
+		  p <- p + theme.use()
+		  legend.ncol <- if(nvalues>10 && !is.infinite(nvalues)) ceiling(nvalues/10) else NULL
+          p <- p + coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE) +
             ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size=if(nvalues<=26) 4 else 2.0),
-														   ncol=if(nvalues>10 && !is.infinite(nvalues)) ceiling(nvalues/10) else NULL,
+														   ncol=legend.ncol,
                                                            label.theme = element_text(size=8)))
+
+		  if(vector.friendly){
+		  	  ####p <- Seurat::AugmentPlot(p,width=width,height=height)
+			  tmpfilename <- sprintf("%s.tmp.%s.png",if(!is.null(out.prefix)) out.prefix else "",cc)
+			  #print(tmpfilename)
+			  ggsave(filename=tmpfilename,
+					 plot = p + theme_void() + theme(legend.position = "none",
+									  axis.line.x = element_blank(), axis.line.y = element_blank(),
+									  axis.title.x = element_blank(), axis.title.y = element_blank(),
+									  axis.ticks.x = element_blank(),axis.ticks.y = element_blank(),
+									  plot.title = element_blank()),
+					 width=7,height=6)
+			  pbuild.params <- ggplot_build(plot = p)$layout$panel_params[[1]]
+			  range.values <- c( pbuild.params$x.range, pbuild.params$y.range)
+			  img <- png::readPNG(source = tmpfilename)
+			  blank <- ggplot(data = p$data,mapping = aes(Dim1,Dim2)) +
+						  geom_blank()
+			  ####if(!is.null(splitBy)){
+			  ####	  blank <- blank + ggplot2::facet_wrap(~splitBy)
+			  ####}
+			  blank <- blank + p$theme + coord_cartesian(xlim = range.values[1:2], ylim = range.values[3:4], expand = F)
+			  blank <- blank + annotation_raster(raster = img,
+												 xmin = range.values[1], xmax = range.values[2],
+												 ymin = range.values[3], ymax = range.values[4])
+			  #p <- blank + geom_hline(yintercept=seq(-8,8,2),linetype=2,alpha=0.2) + geom_vline(xintercept=seq(-8,8,2),linetype=2,alpha=0.2)
+			  legend.blank <- cowplot::get_legend(p)
+			  p <- cowplot::plot_grid(blank, legend.blank, rel_widths = c(4, if(is.null(legend.ncol)) 1*legend.w else legend.ncol*legend.w))
+			  #p <- blank
+			  file.remove(tmpfilename)
+		  }
 
           return(p)
         })
@@ -1341,7 +1376,8 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
         if(!is.null(out.prefix)){
           cowplot::save_plot(sprintf("%s.columnsOntSNE.pdf",out.prefix),pp,
                              ncol = if(length(columns)>1) 2 else 1,
-                             base_aspect_ratio=base_aspect_ratio)
+                             base_aspect_ratio=base_aspect_ratio,
+							 base_height=if(!is.na(height)) height else 3.71)
         }else{
           #print(pp)
           return(pp)
@@ -1373,7 +1409,7 @@ ssc.plot.tsne <- function(obj, assay.name="exprs", gene=NULL, columns=NULL,split
     p <- do.call(ggGeneOnTSNE,c(list(Y=dat.onTSNE, dat.map=dat.map, gene.to.show=gene,
                                      p.ncol=p.ncol,xlim=xlim,ylim=ylim,
                                      size=size,width=width,height=height,
-                                     clamp=clamp,
+                                     clamp=clamp,vector.friendly=vector.friendly,theme.use=theme.use,
                                      out.prefix=out.prefix),
                                 par.geneOnTSNE))
     if(is.null(out.prefix)){
@@ -1706,7 +1742,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     requireNamespace("plyr")
     requireNamespace("dplyr")
 
-    if(!is.null(ncell.downsample)){
+    if(!is.null(ncell.downsample) && group.mode=="multi"){
         obj <- ssc.downsample(obj, ncell.downsample=ncell.downsample, group.var=group.var,rn.seed=9999)
     }
 
@@ -1745,6 +1781,8 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
         out.limma <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
                                       out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
                                       group=xgroup,
+									  rn.seed=9999,
+									  ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
                                       T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
                                       gid.mapping=gid.mapping, do.voom=F)
 
