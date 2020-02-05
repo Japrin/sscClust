@@ -24,8 +24,10 @@ ssc.plot.tsne(
   label = NULL,
   par.repel = list(force = 1),
   vector.friendly = F,
+  par.legend = list(),
   theme.use = theme_bw,
   legend.w = 1,
+  verbose = F,
   par.geneOnTSNE = list(scales = "free", pt.order = "value", pt.alpha = 0.1),
   out.prefix = NULL,
   p.ncol = 3,
@@ -74,9 +76,13 @@ ssc.plot.tsne(
 
 \item{vector.friendly}{logical; output vector friendly figure (default: FALSE)}
 
+\item{par.legend}{list; lengend parameters, used to overwrite the default setting; (default: list())}
+
 \item{theme.use}{function; which theme to use (default: theme_bw)}
 
 \item{legend.w}{numeric; adjust legend width (default: 1)}
+
+\item{verbose}{logical;  (default: FALSE)}
 
 \item{par.geneOnTSNE}{character; other parameters of geneOnTSNE}
 

@@ -9,7 +9,9 @@ ssc.plot.violin(
   assay.name = "exprs",
   gene = NULL,
   columns = NULL,
+  par.legend = list(),
   group.var = "majorCluster",
+  group.in = NULL,
   clamp = c(0, 12),
   adjB = NULL,
   do.scale = F,
@@ -28,7 +30,11 @@ ssc.plot.violin(
 
 \item{columns}{character; columns in colData(obj) to be showd. (default: NULL)}
 
+\item{par.legend}{list; lengend parameters, used to overwrite the default setting; (default: list())}
+
 \item{group.var}{character; column in the colData(obj) used for grouping. (default: "majorCluster")}
+
+\item{group.in}{character; only thoes groups to be shown. NULL for all groups. (default: NULL)}
 
 \item{clamp}{integer vector; expression values will be clamped to the range defined by this parameter. (default: c(0,12))}
 

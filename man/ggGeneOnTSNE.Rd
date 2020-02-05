@@ -20,7 +20,8 @@ ggGeneOnTSNE(
   width = 9,
   height = 8,
   scales = "fixed",
-  vector.friendly = F
+  vector.friendly = F,
+  par.legend = list()
 )
 }
 \arguments{
@@ -56,6 +57,8 @@ should be sample id}
 \item{scales}{character; whether use the same scale across genes. one of "fixed" or "free" (default: "fixed")}
 
 \item{vector.friendly}{logical; output vector friendly figure (default: FALSE)}
+
+\item{par.legend}{list; lengend parameters, used to overwrite the default setting; (default: list())}
 }
 \value{
 a ggplot object

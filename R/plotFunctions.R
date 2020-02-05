@@ -51,13 +51,14 @@ auto.point.size <- function(n){
 #' @param clamp integer vector; expression values will be clamped to the range defined by this parameter, such as c(0,15). (default: NULL )
 #' @param scales character; whether use the same scale across genes. one of "fixed" or "free" (default: "fixed")
 #' @param vector.friendly logical; output vector friendly figure (default: FALSE)
+#' @param par.legend list; lengend parameters, used to overwrite the default setting; (default: list())
 #' @details For genes contained in both `Y` and `gene.to.show`, show their expression on the tSNE
 #' map provided as `dat.map`. One point in the map represent a cell; cells with higher expression
 #' also have darker color.
 #' @return a ggplot object
 ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,theme.use=theme_bw,
                          xlim=NULL,ylim=NULL,size=NULL,pt.alpha=0.5,pt.order="value",clamp=NULL,
-                         width=9,height=8,scales="fixed",vector.friendly=F){
+                         width=9,height=8,scales="fixed",vector.friendly=F,par.legend=list()){
   #suppressPackageStartupMessages(require("data.table"))
   #requireNamespace("ggplot2",quietly = T)
   #requireNamespace("RColorBrewer",quietly = T)
@@ -103,8 +104,11 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,theme.u
 							geom_point(aes(colour=value),
 									   size=if(is.null(size)) sscClust:::auto.point.size(npts)*1.1 else size,
 									   alpha=pt.alpha,stroke=0,shape=16) +
-							labs(title=x, x ="", y = "") +
-							scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd"), limits=c(value.range[1],value.range[length(value.range)]))
+							labs(title=x, x ="", y = "")
+						p <- p + do.call(scale_colour_gradientn,c(list(colours=RColorBrewer::brewer.pal(9,"YlOrRd"),
+																	 limits=c(value.range[1],
+																			  value.range[length(value.range)])),
+																  par.legend))
 						p <- p + theme.use()
 					    p <- p + theme(plot.title = element_text(hjust = 0.5))+
 							coord_cartesian(xlim = xlim, ylim = ylim, expand = TRUE)
@@ -124,10 +128,8 @@ ggGeneOnTSNE <- function(Y,dat.map,gene.to.show,out.prefix=NULL,p.ncol=3,theme.u
 							##print(str(p$data))
 							##p.test <<- p
 							blank <- ggplot(data = as.data.table(p$data)[1,,drop=F],aes(Dim1,Dim2)) +
-									  ###geom_point(aes(color=value)) +
 									  geom_blank()+
 									  labs(title=x, x ="", y = "") +
-									  ###scale_colour_gradientn(colours = RColorBrewer::brewer.pal(9,"YlOrRd"),limits=c(value.range[1],value.range[length(value.range)])) +
 									  theme(plot.title = element_text(hjust = 0.5))
 							blank <- blank + p$theme + coord_cartesian(xlim = range.values[1:2], ylim = range.values[3:4], expand = F)
 							blank <- blank + annotation_raster(raster = img,
