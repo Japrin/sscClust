@@ -301,34 +301,141 @@ integrate.by.avg <- function(sce.list,
     return(sce.pb)
 }
 
+
+#' collapse effect size, give input table and group variate
+#' @param dat.long data.table; these columns are required: "geneID","aid","P.Value","adj.P.Val","sig","dprime","vardprime","group.2nd"
+#' @param group.2nd character; column of obj, used for collapse [default: NULL]
+#' @param mode.collapse character; collapse method. one of "min", "comb" [default: "comb"]
+#' @param th.adj.P double; threshold [default: 0.01]
+#' @param th.dprime double; threshold [default: 0.15]
+#' @import data.table
+#' @importFrom plyr ldply
+#' @details collapse effect size
+#' @return a gene table
+collapseEffectSizeLong <- function(dat.long,mode.collapse="comb",group.2nd="group.2nd",
+								   th.adj.P=0.01,th.dprime=0.15)
+{
+	#dat.long[["group.2nd"]] <- dat.long[[group.2nd]]
+	dat.collapse <- NULL
+	if(mode.collapse=="min"){
+		dat.collapse <- dat.long[,.(dprime=dprime[which.min(abs(dprime))],
+									vardprime=vardprime[which.min(abs(dprime))],
+									P.Value=P.Value[which.min(abs(dprime))],
+									adj.P.Val=adj.P.Val[which.min(abs(dprime))],
+									sig=all(adj.P.Val<th.adj.P) & all(dprime>th.dprime) ),
+								by=c("geneID",group.2nd)]
+	}else if(mode.collapse=="comb"){
+		aid.mapping.tb <- unique(dat.long[,c("aid",group.2nd),with=F])
+		n.group.2nd <- aid.mapping.tb[,.N,by=group.2nd]
+		dat.collapse.nOne <- dat.long[dat.long[[group.2nd]] %in% n.group.2nd[N==1,][[group.2nd]],
+									  c("geneID",group.2nd,"dprime","vardprime","P.Value","adj.P.Val","sig"),with=F]
+		dat.collapse.nMul <- as.data.table(ldply(n.group.2nd[N>1,][[group.2nd]],
+												 function(x){
+													 dat.x.es.combi.tb <- directEScombiFromLongTable(dat.long[dat.long[[group.2nd]]==x,])
+													 ret.tb <-data.table(geneID=dat.x.es.combi.tb$geneID,
+															   group.2nd=x,
+															   dprime=dat.x.es.combi.tb[["comb.ES"]],
+															   vardprime=dat.x.es.combi.tb[["comb.ES.sd"]]^2,
+															   P.Value=dat.x.es.combi.tb[["comb.p"]],
+															   adj.P.Val=dat.x.es.combi.tb[["comb.padj"]],
+															   sig=(dat.x.es.combi.tb[["comb.ES"]]>th.dprime &
+																	dat.x.es.combi.tb[["comb.padj"]]<th.adj.P))
+													 colnames(ret.tb)[2] <- group.2nd
+													 return(ret.tb)
+												 }))
+		dat.collapse <- rbind(dat.collapse.nOne,dat.collapse.nMul)
+		setorderv(dat.collapse,c("geneID",group.2nd))
+	}
+	return(dat.collapse)
+}
+
+
 #' get gene ranking table from obj
 #' @param obj object; object of \code{singleCellExperiment} class
 #' @param group character; columan name in colData(obj)
 #' @param sort.by character; by which to sort the genes [default: "median.rank"]
+#' @param weight.adj character; column of obj, used to adjust weight [default: NULL]
+#' @param group.2nd character; column of obj, used for collapse [default: NULL]
+#' @param mode.collapse character; collapse method. one of "min", "comb" [default: "comb"]
+#' @param th.adj.P double; threshold [default: 0.01]
+#' @param th.dprime double; threshold [default: 0.15]
 #' @import data.table
 #' @importFrom plyr ldply
 #' @importFrom metap sumlog sumz logitp
 #' @details rank genes
 #' @return a gene table
-rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.adj=NULL)
+rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.adj=NULL,
+						 group.2nd=NULL,mode.collapse="comb",th.adj.P=0.01,th.dprime=0.15)
 {
 	#### To do: add diff between this - max_other(not this)
 	gene.desc.top <- as.data.table(ldply(unique(sort(obj[[group]])),function(x){
 											 obj.x <- obj[,obj[[group]]==x]
+
+											 dat.long <- ssc.toLongTable(obj.x,gene.id=NULL,
+																		 assay.name=c("dprime","vardprime",
+																					  "P.Value","adj.P.Val","sig"),
+																		 col.idx=group.2nd)
+
+#											 if(!is.null(group.2nd)){
+#												 dat.long$group.2nd <- dat.long[[group.2nd]]
+#											 }else{
+#												 dat.long[,group.2nd:="GRP"]
+#											 }
+
+											 dat.collapse <- NULL
+
 											 ret.tb <- data.table(geneID=rownames(obj.x),
 														geneSymbol=rowData(obj.x)$display.name,
 														meta.cluster=x,
-														Group=x,
-														N.sig=rowSums(assay(obj.x,"sig")),
-														meta.cluster.size=ncol(obj.x))
-											 ret.tb[,freq.sig:=N.sig/meta.cluster.size]
+														Group=x)
+
+											 ret.tb.ext <- dat.long[,.(N.sig=sum(.SD$sig),
+																	   freq.sig=sum(.SD$sig)/nrow(.SD),
+																	   N.total=.N),
+																	by="geneID"]
+
+											 if("dprime" %in% assayNames(obj.x))
+											 {
+												 ret.tb.ext.a <- dat.long[,.(dprime.max=max(dprime),
+																	  dprime.max.P.Value=P.Value[which.max(dprime)],
+																	  dprime.max.adj.P.Val=adj.P.Val[which.max(dprime)]),
+																	by="geneID"]
+												
+												 if(!is.null(group.2nd)){
+													 dat.collapse <- collapseEffectSizeLong(dat.long,mode.collapse=mode.collapse,
+																			group.2nd=group.2nd,
+																			th.adj.P=th.adj.P,th.dprime=th.dprime)
+												 }
+
+												 if(!is.null(dat.collapse)){
+													ret.tb.ext.b <- dat.collapse[,.(N.sig.group.2nd=sum(.SD$sig),
+																			   freq.sig.group.2nd=sum(.SD$sig)/nrow(.SD),
+																			   N.total.group.2nd=.N,
+																			   dprime.max.group.2nd=max(dprime),
+																			   dprime.max.P.Value.group.2nd=P.Value[which.max(dprime)],
+																			   dprime.max.adj.P.group.2nd=adj.P.Val[which.max(dprime)]),
+																			by="geneID"]
+													ret.tb.ext.a <- merge(ret.tb.ext.a,ret.tb.ext.b,by="geneID")
+												 }
+												 ret.tb.ext <- merge(ret.tb.ext,ret.tb.ext.a,by="geneID")
+											 }
+
+											 ret.tb <- merge(ret.tb,ret.tb.ext,by="geneID")
+
 											 ###anames <- intersect(assayNames(obj.x),c("logFC","t","SNR","meanExp","meanScale"))
 											 anames <- intersect(assayNames(obj.x),c("logFC","meanScale"))
-											 for(aa in anames){
-												 ret.tb[[sprintf("median.%s",aa)]] <- rowMedians(assay(obj.x,aa))
-											 }
-											 ret.tb[["median.rank"]] <- rowMedians(apply(assay(obj.x,"t"),2,
+											 ret.m <- cbind(data.table(geneID=rownames(obj.x)),
+															as.data.table(llply(anames,
+																				function(aa){ rowMedians(assay(obj.x,aa)) }))
+															)
+											 colnames(ret.m)[-1] <- sprintf("median.%s",anames)
+											 ret.m[["median.rank"]] <- rowMedians(apply(assay(obj.x,"t"),2,
 																					 function(x){ rank(-x)/length(x)}))
+											 ret.tb <- merge(ret.tb,ret.m,by="geneID")
+											 setkey(ret.tb,"geneID")
+											 ret.tb <- ret.tb[rownames(obj.x),]
+											 all(ret.tb$geneID==rownames(obj.x))
+
 											 if("zp" %in% assayNames(obj.x)){
 												 w <- sqrt(obj.x$nCellsStudy/sum(obj.x$nCellsStudy))
 												 if(!is.null(weight.adj)){
@@ -340,10 +447,17 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.
 												 ret.tb[["p.comb.Stouffer"]] <- 2*(pnorm(-abs(zsum)))
 												 ret.tb[["p.comb.Stouffer.adj"]] <- p.adjust(ret.tb[["p.comb.Stouffer"]],"BH")
 											 }
+
 											 if("dprime" %in% assayNames(obj.x)){
 												es.combi <- directEScombi(assay(obj.x,"dprime"), assay(obj.x,"vardprime"))
+												es.combi <- es.combi[ret.tb$geneID, ]
+												if(!all(ret.tb$geneID==rownames(es.combi))){
+													stop(sprintf("strange thing: !all(ret.tb$geneID==rownames(es.combi)) (%s)\n",
+																 x))
+												}
 												ret.tb <- cbind(ret.tb,es.combi)
 											 }
+
 											 return(ret.tb)
 							   }))
 	gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,gene.desc.top[[sort.by]]), ]

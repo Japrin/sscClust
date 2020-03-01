@@ -1580,6 +1580,76 @@ ssc.plot.pca <- function(obj, out.prefix=NULL,p.ncol=2)
   print(p)
 }
 
+#' Plot correlation.
+#' @param obj object of \code{singleCellExperiment} class
+#' @param feat1 character; feature on x axis
+#' @param feat2 character; feature on y axis
+#' @param type1 character; feature type on x axis. (default: "gene")
+#' @param type2 character; feature type on y axis. (default: "gene")
+#' @param assay.name character; which assay (default: "exprs")
+#' @param legend.w numeric; adjust legend width (default: 1)
+#' @param legend.ncol integer;  (default: NULL)
+#' @param add.legend logical;  (default: F)
+#' @param out.prefix character; output prefix. (default: NULL)
+#' @param vector.friendly logical; output vector friendly figure (default: FALSE)
+#' @param ... parameter passed to ggscatter
+#' @importFrom ggplot2 ggplot aes geom_point xlab ylab
+#' @export
+ssc.plot.cor <- function(obj,feat1,feat2,type1="gene",type2="gene", assay.name="exprs",
+						 legend.w=1,legend.ncol=NULL,add.legend=F, out.prefix=NULL,
+						 vector.friendly=F,...)
+{
+  requireNamespace("ggplot2")
+  dat.plot <- data.table(cellID=colnames(obj),
+						  feat1=if(type1=="gene") assay(obj,assay.name)[feat1,] else obj[[feat1]],
+						  feat2=if(type2=="gene") assay(obj,assay.name)[feat2,] else obj[[feat2]])
+  dat.ext <- colData(obj)
+  dat.ext <- dat.ext[,setdiff(colnames(dat.ext),c(feat1,feat2)),drop=F]
+  dat.plot <- cbind(dat.plot,as.data.frame(dat.ext))
+  dat.plot <- dat.plot[!is.na(feat1) & !is.na(feat2),]
+
+  p <- ggscatter(dat.plot,x="feat1",y="feat2",...) +
+    ylab(feat1) + xlab(feat2)
+  if(add.legend==T){
+	  p <- p + ggplot2::guides(colour = ggplot2::guide_legend(override.aes = list(size=4.0),
+														   ncol=legend.ncol,
+                                                           label.theme = element_text(size=8)))
+  }
+  if(!vector.friendly){
+	p <- p + geom_smooth(method='lm') + stat_cor()
+  }else{
+	  tmpfilename <- sprintf("%s.tmp.cor.%s.%s.png",if(!is.null(out.prefix)) out.prefix else "",feat1,feat2)
+	  ggsave(filename=tmpfilename,
+			 plot = p + theme_void() + theme(legend.position = "none",
+											 axis.line.x = element_blank(), axis.line.y = element_blank(),
+											 axis.title.x = element_blank(), axis.title.y = element_blank(),
+											 axis.ticks.x = element_blank(),axis.ticks.y = element_blank(),
+											 plot.title = element_blank()),
+			 width=8,height=6)
+	  pbuild.params <- ggplot_build(plot = p)$layout$panel_params[[1]]
+	  range.values <- c( pbuild.params$x.range, pbuild.params$y.range)
+	  img <- png::readPNG(source = tmpfilename)
+	  blank <- ggplot(data = p$data,mapping = aes(feat1,feat2)) + geom_blank()
+	  blank <- blank + p$theme +
+		  ylab(feat1) + xlab(feat2) +
+		  coord_cartesian(xlim = range.values[1:2], ylim = range.values[3:4], expand = F)
+	  blank <- blank + annotation_raster(raster = img,
+										 xmin = range.values[1], xmax = range.values[2],
+										 ymin = range.values[3], ymax = range.values[4])
+	  blank <- blank + geom_smooth(method='lm') + stat_cor()
+	  legend.blank <- cowplot::get_legend(p)
+	  if(legend.w==0){
+		  p <- blank + theme(legend.position="none")
+	  }else{
+		  #p <- cowplot::plot_grid(blank, legend.blank, rel_widths = c(4, 1*legend.w))
+		  p <- cowplot::plot_grid(blank, legend.blank, rel_widths = c(4, if(is.null(legend.ncol)) 1*legend.w else legend.ncol*legend.w))
+	  }
+#	  p <- blank
+	  file.remove(tmpfilename)
+  }
+  return(p)
+}
+
 
 #' identify marker genes of each cluster
 #' @param obj object of \code{singleCellExperiment} class
@@ -2381,5 +2451,68 @@ ssc.scale <- function(obj,gene.id,gene.symbol,assay.name="norm_exprs",adjB=NULL,
 	}
 	assay(obj,sprintf("%s.scale",assay.name)) <- dat.block
 	return(obj)
+}
+
+#' convert assay data to long format
+#' @param obj object of \code{singleCellExperiment} class
+#' @param gene.id should be in rownames(obj); genes to plot
+#' @param gene.symbol should be in rowData(obj)[,"display.name"]; genes to plot
+#' @param assay.name character; which assay. NULL for all assays. (default: NULL)
+#' @param col.idx character; output extra columns of the colData(obj). NULL for donnot output extra columns. (default: NULL)
+#' @importFrom reshape2 melt
+#' @import data.table
+#' @return Returns a data.table
+#' @details convert assay data to table of long format. It can be specified which genes and assays will be contained in the long table.
+#' @export
+ssc.toLongTable <- function(obj,gene.id,gene.symbol,assay.name=NULL,col.idx=NULL)
+{
+
+	if(missing(gene.id) && missing(gene.symbol)){
+		warning("No gene.id or gene.symbol provided!")
+		return(NULL)
+	}
+	if(is.null(names(rowData(obj)[,"display.name"]))){
+		names(rowData(obj)[,"display.name"]) <- rownames(obj)
+	}
+	if(missing(gene.id) && !is.null(gene.symbol)){
+		
+		gene.list <- rowData(obj)[,"display.name"][which(rowData(obj)[,"display.name"] %in% gene.symbol)]
+	}else{
+		if(is.null(gene.id)){
+			gene.id <- rownames(obj)
+		}else{
+			gene.id <- intersect(gene.id,rownames(obj))
+		}
+		gene.list <- rowData(obj)[,"display.name"][gene.id]
+	}
+	if(length(gene.list)==0){ 
+		warning("No data found for the provided genes!")
+		return(NULL)
+	}
+	obj <- obj[names(gene.list),]
+	if(is.null(assay.name)){
+		assay.name <- assayNames(obj)
+	}
+
+	dat.long <- NULL
+	for(aname in intersect(assayNames(obj),assay.name)){
+		dat.i <- as.data.table(reshape2::melt(assay(obj,aname)))
+		colnames(dat.i) <- c("geneID","aid",aname)
+		dat.i[,geneID:=as.character(geneID)]
+		dat.i[,aid:=as.character(aid)]
+		if(is.null(dat.long)){
+			dat.long <- dat.i
+		}else{
+			dat.long <- merge(dat.long,dat.i,by=c("geneID","aid"))
+		}
+	}
+
+	if(!is.null(dat.long) && !is.null(col.idx)){
+		dat.extra.tb <- cbind(data.table(aid=colnames(obj)),
+							  as.data.frame(colData(obj)[,col.idx,drop=F]))
+		dat.long <- merge(dat.long,dat.extra.tb,by="aid")
+	}
+
+	return(dat.long)
 }
 

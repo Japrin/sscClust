@@ -6,9 +6,10 @@
 #' @param y matrix; input data, rows for variable (genes), columns for observations (cells) (default: NULL)
 #' @param method character; method used. (default: "pearson")
 #' @param nthreads integer; number of threads to use. if NULL, automatically detect the number. (default: NULL)
+#' @param na.rm logical; remove missing values. (default: T)
 #' @details calcualte the correlation among variables(rows)
 #' @return correlation coefficient matrix among rows
-cor.BLAS <- function(x,y=NULL,method="pearson",nthreads=NULL)
+cor.BLAS <- function(x,y=NULL,method="pearson",nthreads=NULL,na.rm=T)
 {
   if(is.null(nthreads))
   {
@@ -20,18 +21,22 @@ cor.BLAS <- function(x,y=NULL,method="pearson",nthreads=NULL)
   cor.pearson <- function(x,y=NULL)
   {
     if(is.null(y)){
-      x = x - rowMeans(x)
-      x = x / sqrt(rowSums(x^2))
+	  ### x = x - rowMeans(t(na.omit(t(x))))
+      x = x - rowMeans(x,na.rm=na.rm)
+      x = x / sqrt(rowSums(x^2,na.rm=na.rm))
       ### cause 'memory not mapped' :( ; and slower in my evaluation: 38 sec .vs. 12 sec.
       #x.cor = tcrossprod(x)
+	  if(na.rm){ x[is.na(x)] <- 0 }
       x.cor = x %*% t(x)
       return(x.cor)
     }else{
-      x = x - rowMeans(x)
-      x = x / sqrt(rowSums(x^2))
-      y = y - rowMeans(y)
-      y = y / sqrt(rowSums(y^2))
+      x = x - rowMeans(x,na.rm=na.rm)
+      x = x / sqrt(rowSums(x^2,na.rm=na.rm))
+      y = y - rowMeans(y,na.rm=na.rm)
+      y = y / sqrt(rowSums(y^2,na.rm=na.rm))
       #xy.cor <- tcrossprod(x,y)
+	  if(na.rm){ x[is.na(x)] <- 0 }
+	  if(na.rm){ y[is.na(y)] <- 0 }
       xy.cor <- x %*% t(y)
       return(xy.cor)
     }

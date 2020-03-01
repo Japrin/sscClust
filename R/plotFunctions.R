@@ -232,6 +232,7 @@ plot.density2D <- function(x,peaks=NULL)
 #' @param par.warterfall list; parameters for warterfall, sucah as score.alpha
 #' @param pdf.width double; width of the output plot (default: 22)
 #' @param pdf.height double; height of the output plot (default: 22)
+#' @param fig.type character; type of output file (default: "pdf")
 #' @param exp.name character; showd in the legend (default: "Count")
 #' @param ... parameters passed to ComplexHeatmap::draw
 #' @import data.table
@@ -248,7 +249,7 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number
                                row.ann.dat=NULL,row.split=NULL,returnHT=FALSE,
                                par.legend=list(),par.heatmap=list(),col.ht=NULL,
 							   par.warterfall=list(score.alpha=1.5,do.norm=T),
-                               pdf.width=8,pdf.height=8,exp.name="Count",...)
+                               pdf.width=8,pdf.height=8,fig.type="pdf",exp.name="Count",...)
 {
     require("gplots")
     require("ComplexHeatmap")
@@ -275,7 +276,11 @@ plot.matrix.simple <- function(dat,out.prefix=NULL,mytitle="Heatmap",show.number
     if(!is.null(row.ann.dat)){ row.ann.dat <- row.ann.dat[order(scoresR,decreasing = T),] }
 
 	if(!is.null(out.prefix)){
-        pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height)
+		if(fig.type=="pdf"){
+			pdf(sprintf("%s.pdf",out.prefix),width=pdf.width,height=pdf.height)
+		}else{
+			png(sprintf("%s.png",out.prefix),width=pdf.width*100,height=pdf.height*100)
+		}
         opar <- par(mar=c(4,2,4,4))
         plot.new()
         title(main = mytitle,cex.main=2)

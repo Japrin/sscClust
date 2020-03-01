@@ -28,6 +28,7 @@
   par.warterfall = list(score.alpha = 1.5, do.norm = T),
   pdf.width = 8,
   pdf.height = 8,
+  fig.type = "pdf",
   exp.name = "Count",
   ...
 )
@@ -78,6 +79,8 @@
 \item{pdf.width}{double; width of the output plot (default: 22)}
 
 \item{pdf.height}{double; height of the output plot (default: 22)}
+
+\item{fig.type}{character; type of output file (default: "pdf")}
 
 \item{exp.name}{character; showd in the legend (default: "Count")}
 

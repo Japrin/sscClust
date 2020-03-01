@@ -79,8 +79,11 @@ directEScombi <- function(ES,varES,useREM=TRUE)
 	result <- ldply(seq_len(nrow(varES)),function(i){
 						ES.i <- ES[i,]
 						varES.i <- varES[i,]
+						if(all(varES.i==0) && all(ES.i==0)){
+							return(cbind(MUvals=0,MUsES=0,zSco=0,rpvalESc=1))
+						}
 						f.use <- varES.i!=0
-						if(useREM){
+						if(useREM && sum(f.use)>1){
 							varES.i <- varES.i + tau2.NA.oneRow(Qvals[i],sum(f.use),1/varES.i[f.use])
 						}
 						wt.i <- 1/varES.i[f.use]
@@ -88,7 +91,7 @@ directEScombi <- function(ES,varES,useREM=TRUE)
 						MUsES <- sqrt(1/sum(wt.i,na.rm=TRUE))
 						zSco <- MUvals/MUsES
 						rpvalESc <- 2*(pnorm(-abs(zSco)))
-						cbind(MUvals,MUsES,zSco,rpvalESc)
+						return(cbind(MUvals,MUsES,zSco,rpvalESc))
 					})
 	colnames(result) <- c("comb.ES","comb.ES.sd","comb.Z","comb.p")
 	rownames(result) <- rownames(varES)
@@ -97,5 +100,35 @@ directEScombi <- function(ES,varES,useREM=TRUE)
 	result
 }
 
+#' directional Effect Size combination
+#' @param dat.long data.table; input data
+#' @param idx.geneID character; column for geneID (default: "geneID")
+#' @param idx.aid character; column for aid (default: "aid")
+#' @param idx.ES character; column for ES (default: "dprime")
+#' @param idx.varES character; column for varES (default: "vardprime")
+#' @param ... parameters passed to directEScombi()
+#' @importFrom data.table dcast
+#' @details wrapper function to run directEScombi()
+#' @return a data.table
+#' @export
+directEScombiFromLongTable <- function(dat.long,idx.geneID="geneID",idx.aid="aid",
+									   idx.ES="dprime",idx.varES="vardprime",...)
+{
+	### ES
+	dat.x.dprime.tb <- dcast(dat.long, sprintf("%s ~ %s",idx.geneID,idx.aid),value.var=idx.ES)
+	dat.x.dprime.mtx <- as.matrix(dat.x.dprime.tb[,-c("geneID"),with=F])
+	rownames(dat.x.dprime.mtx) <- dat.x.dprime.tb[["geneID"]]
+	### varES
+	dat.x.vardprime.tb <- dcast(dat.long, sprintf("%s ~ %s",idx.geneID,idx.aid),value.var=idx.varES)
+	dat.x.vardprime.mtx <- as.matrix(dat.x.vardprime.tb[,-c("geneID"),with=F])
+	rownames(dat.x.vardprime.mtx) <- dat.x.vardprime.tb[["geneID"]]
 
+	if(!all(rownames(dat.x.dprime.mtx)==rownames(dat.x.vardprime.mtx))){
+		stop(sprintf("strange thing: !all(rownames(dat.x.dprime.mtx)==rownames(dat.x.vardprime.mtx)) (%s)\n",x))
+	}
+	dat.x.es.combi <- directEScombi(dat.x.dprime.mtx, dat.x.vardprime.mtx,...)
+	dat.x.es.combi.tb <- cbind(data.table(geneID=rownames(dat.x.es.combi)),
+							   dat.x.es.combi)
+	return(dat.x.es.combi.tb)
+}
 

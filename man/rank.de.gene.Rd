@@ -8,7 +8,11 @@ rank.de.gene(
   obj,
   group = "pca.SNN.kauto",
   sort.by = "median.rank",
-  weight.adj = NULL
+  weight.adj = NULL,
+  group.2nd = NULL,
+  mode.collapse = "comb",
+  th.adj.P = 0.01,
+  th.dprime = 0.15
 )
 }
 \arguments{
@@ -17,6 +21,16 @@ rank.de.gene(
 \item{group}{character; columan name in colData(obj)}
 
 \item{sort.by}{character; by which to sort the genes [default: "median.rank"]}
+
+\item{weight.adj}{character; column of obj, used to adjust weight [default: NULL]}
+
+\item{group.2nd}{character; column of obj, used for collapse [default: NULL]}
+
+\item{mode.collapse}{character; collapse method. one of "min", "comb" [default: "comb"]}
+
+\item{th.adj.P}{double; threshold [default: 0.01]}
+
+\item{th.dprime}{double; threshold [default: 0.15]}
 }
 \value{
 a gene table

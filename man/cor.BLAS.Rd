@@ -4,7 +4,7 @@
 \alias{cor.BLAS}
 \title{Correlation calculation. use BLAS and data.table to speed up.}
 \usage{
-cor.BLAS(x, y = NULL, method = "pearson", nthreads = NULL)
+cor.BLAS(x, y = NULL, method = "pearson", nthreads = NULL, na.rm = T)
 }
 \arguments{
 \item{x}{matrix; input data, rows for variable (genes), columns for observations (cells).}
@@ -14,6 +14,8 @@ cor.BLAS(x, y = NULL, method = "pearson", nthreads = NULL)
 \item{method}{character; method used. (default: "pearson")}
 
 \item{nthreads}{integer; number of threads to use. if NULL, automatically detect the number. (default: NULL)}
+
+\item{na.rm}{logical; remove missing values. (default: T)}
 }
 \value{
 correlation coefficient matrix among rows
