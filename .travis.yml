@@ -6,7 +6,6 @@ bioc_packages:
   - BiocGenerics
   - BiocParallel
   - ComplexHeatmap
-  - SC3
   - scran
   - uwot
 r_github_packages: Japrin/sscVis
