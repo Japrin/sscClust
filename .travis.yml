@@ -9,6 +9,7 @@ bioc_packages:
   - SC3
   - scran
   - uwot
+r_github_packages: Japrin/sscVis
 r_github_packages: Japrin/SC3
 
 addons:
