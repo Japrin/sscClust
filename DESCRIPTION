@@ -20,4 +20,4 @@ Imports: sscVis, RColorBrewer, Rtsne, class, factoextra, data.table, ggplot2,
     plyr, dplyr, varSelRF, ADPclust, doParallel, matrixStats,
     igraph, densityClust, RhpcBLASctl, e1071, uwot, leiden,
     dynamicTreeCut, limma, mclust, randomForest,
-	S4Vectors, ranger, extremevalues
+	S4Vectors, ranger

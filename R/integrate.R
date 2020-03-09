@@ -1235,7 +1235,6 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 #' @param out.prefix character; output prefix [default: NULL]
 #' @param e.name character; name of the expression metric [default: "Exp"]
 #' @param th.score numeric; numeic vector to show the threshold specified manually [default: NULL]
-#' @importFrom extremevalues outlierPlot getOutliers
 #' @importFrom data.table as.data.table
 #' @importFrom grDevices png pdf dev.off
 #' @importFrom graphics par
