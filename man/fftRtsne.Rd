@@ -92,6 +92,10 @@ fftRtsne(
 
 \item{initialization}{matrix}
 
+\item{data_path}{character;}
+
+\item{result_path}{character;}
+
 \item{out_prefix}{character; temporary files prefix for fast_tsne (default: NULL)}
 
 \item{load_affinities}{character;}
@@ -103,6 +107,8 @@ fftRtsne(
 \item{perplexity_list}{list;}
 
 \item{get_costs}{logical;}
+
+\item{df}{numeric;}
 }
 \value{
 a matrix with samples in rows and tSNE coordinate in columns

@@ -14,6 +14,7 @@
 #' @param de.stat character; column in gene.de.file (default: "t")
 #' @param de.thres double; used for selecting genes. can be larger than 1(top number of genes) or less than 1 (F.rank threshold) (default: 2000)
 #' @param do.scale logical; scale the summarized vectors (default: false)
+#' @param par.clust list; parameters for clustering method (default: list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2))
 #' @param method.avg character; method of calculate the average expression. Passed to `avg` of `ssc.average.cell`.(default: "zscore")
 #' @param topGene.lo double; for top gene heatmap.(default: -1.5)
 #' @param topGene.hi double; for top gene heatmap.(default: 1.5)
@@ -22,6 +23,11 @@
 #' @param verbose logical; verbose level.(default: FALSE)
 #' @param ... parameters passed to ssc.clusterMarkerGene
 #' @importFrom plyr llply
+#' @importFrom SummarizedExperiment colData rowData `colData<-` `rowData<-` assay
+#' @importFrom S4Vectors `metadata<-`
+#' @importFrom matrixStats rowMedians
+#' @importFrom RColorBrewer brewer.pal
+#' @importFrom utils head
 #' @details method to calculate the average expression can be one of "mean", "zscore"
 #' @export
 integrate.by.avg <- function(sce.list,
@@ -38,7 +44,7 @@ integrate.by.avg <- function(sce.list,
                              topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,myseed=9997,verbose=F,
                              method.avg="zscore",...)
   {
-    require("plyr")
+    #require("plyr")
     if(use.deg && is.null(gene.de.list) && is.avg){
         cat(sprintf("sce.list contain average expression, gene.de.list must be not NULL!\n"))
     }
@@ -123,8 +129,8 @@ integrate.by.avg <- function(sce.list,
 			gene.rank.tb <- gene.rank.tb[order(median.F.rank),]
 			gene.rank.tb <- gene.rank.tb[geneID %in% gene.common,]
 			rowData(sce.pb)$median.F.rank <- gene.rank.tb[["median.F.rank"]][match(rownames(sce.pb),gene.rank.tb$geneID)]
-			gene.rank.tb.debug <<- gene.rank.tb
-			sce.pb.debug <<- sce.pb
+			#gene.rank.tb.debug <<- gene.rank.tb
+			#sce.pb.debug <<- sce.pb
 			if(de.thres>=1){
 				gene.de.common <- head(gene.rank.tb$geneID,n=de.thres)
 			}else{
@@ -132,20 +138,20 @@ integrate.by.avg <- function(sce.list,
 			}
 			if(verbose){
 
-				.dat.plot <- gene.rank.tb
-				.dat.plot$rank <- order(gene.rank.tb$median.F.rank)
-				.dat.plot$used <- FALSE
-				.dat.plot[rank<=de.thres,used:=TRUE]
-				p <- ggplot(.dat.plot,aes(x=rank,y=median.F.rank)) +
-						geom_point(aes(color=used),shape=20) +
-						xlab("Genes") + ylab("Median of\nPercentage Rank") +
-						theme_bw() + 
-						coord_flip() + scale_x_reverse() +
-						theme(axis.title=element_text(size=18)) + 
-						theme(axis.text=element_text(size=15))
-				if(de.thres>=1){ p <- p + geom_vline(xintercept=de.thres,linetype=2,color="black") }
-				#ggsave(sprintf("%s.Frank.rank.png",out.prefix),width=6,height=2.5)
-				ggsave(sprintf("%s.Frank.rank.png",out.prefix),width=4,height=6)
+#				.dat.plot <- gene.rank.tb
+#				.dat.plot$rank <- order(gene.rank.tb$median.F.rank)
+#				.dat.plot$used <- FALSE
+#				.dat.plot[rank<=de.thres,used:=TRUE]
+#				p <- ggplot(.dat.plot,aes(x=rank,y=median.F.rank)) +
+#						geom_point(aes(color=used),shape=20) +
+#						xlab("Genes") + ylab("Median of\nPercentage Rank") +
+#						theme_bw() + 
+#						coord_flip() + scale_x_reverse() +
+#						theme(axis.title=element_text(size=18)) + 
+#						theme(axis.text=element_text(size=15))
+#				if(de.thres>=1){ p <- p + geom_vline(xintercept=de.thres,linetype=2,color="black") }
+#				#ggsave(sprintf("%s.Frank.rank.png",out.prefix),width=6,height=2.5)
+#				ggsave(sprintf("%s.Frank.rank.png",out.prefix),width=4,height=6)
 
 			}
 		}else if(sort.by=="occurence")
@@ -235,7 +241,7 @@ integrate.by.avg <- function(sce.list,
 		ggsave(sprintf("%s.pca.tsne.dynamicTreeCut.kauto.pdf",out.prefix),
 				   width=6.0,height=4)
 
-		branch.out <- sscClust:::plot.branch(metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$hclust,
+		branch.out <- sscVis:::plotBranch(metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$hclust,
 					cluster=sce.pb$pca.dynamicTreeCut.kauto,
 					out.prefix=sprintf("%s.dynamicTreeCut",out.prefix))
 		metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$branch <- branch.out$branch
@@ -243,14 +249,14 @@ integrate.by.avg <- function(sce.list,
 		#### correlation between clusters
 		dat.cor.mtx <- cor(assay(sce.pb),method="pearson")
 		for(z.lo in c(0,0.5,-0.5,-1)){
-			sscClust:::plot.matrix.simple(dat.cor.mtx,
+			sscVis::plotMatrix.simple(dat.cor.mtx,
 							   out.prefix=sprintf("%s.avg.%s.cor.zlo.%s",out.prefix,"pearson",z.lo),
 							   do.clust=metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$branch,
 							   show.number = F,
 							   z.lo = z.lo, z.hi = 1,exp.name="Cor")
 		}
 
-		sscClust:::plot.matrix.simple(as.matrix(metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$dist),
+		sscVis::plotMatrix.simple(as.matrix(metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$dist),
 						   out.prefix=sprintf("%s.avg.pca.dist",out.prefix),
 						   do.clust=metadata(sce.pb)$ssc$clust.res$dynamicTreeCut$auto$branch,show.number = F,
 						   palatte=(brewer.pal(n = 7,name = "RdYlBu")),
@@ -259,7 +265,7 @@ integrate.by.avg <- function(sce.list,
 
 	if(!is.null(gene.de.list) && "pca.SNN.kauto" %in% colnames(colData(sce.pb))){
 		##### top de genes
-		gene.desc.top <- sscClust:::rank.de.gene(sce.pb)
+		gene.desc.top <- rank.de.gene(sce.pb)
 		metadata(sce.pb)$ssc$gene.desc.top <- gene.desc.top
 		#saveRDS(gene.desc.top,sprintf("%s.gene.desc.top.rds",out.prefix))
 		##gene.desc.top <- readRDS(sprintf("%s.gene.desc.top.rds",out.prefix))
@@ -308,7 +314,7 @@ integrate.by.avg <- function(sce.list,
 #' @param mode.collapse character; collapse method. one of "min", "comb" [default: "comb"]
 #' @param th.adj.P double; threshold [default: 0.01]
 #' @param th.dprime double; threshold [default: 0.15]
-#' @import data.table
+#' @importFrom data.table as.data.table data.table setorderv
 #' @importFrom plyr ldply
 #' @details collapse effect size
 #' @return a gene table
@@ -359,9 +365,11 @@ collapseEffectSizeLong <- function(dat.long,mode.collapse="comb",group.2nd="grou
 #' @param mode.collapse character; collapse method. one of "min", "comb" [default: "comb"]
 #' @param th.adj.P double; threshold [default: 0.01]
 #' @param th.dprime double; threshold [default: 0.15]
-#' @import data.table
+#' @importFrom data.table as.data.table data.table setkey
 #' @importFrom plyr ldply
-#' @importFrom metap sumlog sumz logitp
+#' @importFrom SummarizedExperiment assayNames
+#' @importFrom stats pnorm p.adjust
+#' @importFrom matrixStats rowMedians
 #' @details rank genes
 #' @return a gene table
 rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.adj=NULL,
@@ -488,16 +496,21 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.
 #' @param bin.z.pos.th numeric; z score of 'epressed' genes must be larger than this value  (default: 0.3)
 #' @param bin.z.neg.th numeric; z score of 'not epressed' genes must be less than this value  (default: 0.3)
 #' @param prob.th numeric; probability threshold (default: 0.8)
-#' @param TH.gene.exp.freq double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)
-#' @param TH.gene.exp.freq.pos double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)
-#' @param TH.gene.exp.freq.neg double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)
+#' @param TH.gene.exp.freq double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.65)
+#' @param TH.gene.exp.freq.train.pos double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)
+#' @param TH.gene.exp.freq.train.neg double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)
 #' @param TH.silhouette double; threshold (default: -Inf)
 #' @param RF.selectVar logical; (default: FALSE)
 #' @param ... parameters passed to some method
-#' @import data.table
-#' @import ggplot2
-#' @import ggridges
-#' @importFrom  ggpubr ggscatter
+#' @importFrom data.table as.data.table data.table `:=` melt dcast
+#' @importFrom SummarizedExperiment assay rowData `colData<-`
+#' @importFrom ggpubr ggscatter
+#' @importFrom ggplot2 ggsave
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom doParallel registerDoParallel
+#' @importFrom plyr l_ply ldply
+#' @importFrom S4Vectors DataFrame
+#' @importFrom utils head
 #' @details classify cells using the signature genes
 #' @export
 classifyCell.by.sigGene <- function(obj.list,gene.core.tb,pca.rotation=NULL,assay.name="exprs",out.prefix=NULL,
@@ -616,7 +629,7 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,pca.rotation=NULL,assa
 					  dat.train.label <- factor(c(rep("pos",length(cell.pos)),rep("neg",length(cell.neg))))
 					  dat.pred <- t(dat.block[gene.train,,drop=F])
 					  if(nrow(dat.train)>=20){
-						  res.RF <-	sscClust:::run.RF(dat.train, dat.train.label, dat.pred, do.norm=F,
+						  res.RF <-	run.RF(dat.train, dat.train.label, dat.pred, do.norm=F,
 														 ntree = 500, ntreeIterat = 500,selectVar=RF.selectVar)
 						  out.tb <- data.table(cellID=rownames(res.RF$yres),
 											   meta.cluster=xx,
@@ -742,11 +755,11 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,pca.rotation=NULL,assa
 		print(dat.train.tb[,.N,by=c("dataset.id","meta.cluster")])
 		##exp.z.tb[1:4,1:7]
 		##dat.train.tb[1:4,1:7]
-		res.RF <-	sscClust:::run.RF(xdata=as.matrix(dat.train.tb[,-c(1:6)]),
+		res.RF <-	run.RF(xdata=as.matrix(dat.train.tb[,-c(1:6)]),
 									  xlabel=factor(dat.train.tb$meta.cluster),
 									  ydata=as.matrix(exp.z.tb[,-c(1:6)]),
 									  xdata.test=as.matrix(dat.test.tb[,-c(1:6)]),
-									  xlable.test=factor(dat.test.tb$meta.cluster),
+									  xlabel.test=factor(dat.test.tb$meta.cluster),
 									  do.norm=F,
 									  selectVar=RF.selectVar,ncores=ncores,...)
 		if(verbose){
@@ -790,10 +803,9 @@ classifyCell.by.sigGene <- function(obj.list,gene.core.tb,pca.rotation=NULL,assa
 #' @param verbose logical; (default: FALSE)
 #' @param ncores integer; number of CPU to used (default: 16)
 #' @param ... parameters passed to some method
-#' @import data.table
-#' @import ggplot2
-#' @import ggridges
+#' @importFrom data.table data.table `:=`
 #' @importFrom  ggpubr ggscatter
+#' @importFrom  SummarizedExperiment assay
 #' @details classify cells using pre-trained model, which can be obtained by run classifyCell.by.sigGene()
 #' @export
 classifyCell.by.model <- function(obj.list,mod.rf,assay.name="exprs",out.prefix=NULL,
@@ -935,10 +947,13 @@ classifyCell.by.model <- function(obj.list,mod.rf,assay.name="exprs",out.prefix=
 #' @param p.ncol integer; number of columns in the violin plot (default: 2)
 #' @param pdf.width double; width of the output plot (default: NULL)
 #' @param pdf.height double; height of the output plot (default: NULL)
-#' @import data.table
-#' @import ggplot2
-#' @import ggridges
-#' @importFrom  ggpubr ggscatter
+#' @importFrom data.table data.table melt dcast
+#' @importFrom ggplot2 ggsave
+#' @importFrom ggpubr ggscatter
+#' @importFrom grid unit gpar
+#' @importFrom SummarizedExperiment assay
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom doParallel registerDoParallel
 #' @details make some plot(s) of signature genes
 #' @export
 plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
@@ -981,7 +996,7 @@ plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
 				  ret.tb$cellID <- sprintf("%s.%s",dataset.id,ret.tb$cellID)
 				  return(ret.tb)
 		}))
-		exp.z.tb.debug <<- exp.z.tb
+		###exp.z.tb.debug <<- exp.z.tb
 		exp.z.ave.tb <- melt(exp.z.tb[,-c("cellID")],
 				   id.vars=c("meta.cluster","ClusterID"))[,.(value=mean(value)),by=c("meta.cluster","ClusterID","variable")]
 		exp.z.ave.tb <- dcast(exp.z.ave.tb,meta.cluster+ClusterID~variable)
@@ -1051,9 +1066,11 @@ plotSigGene <- function(obj.list,gene.core.tb,out.prefix,assay.name="exprs",
 #' @param zero.notUsed logical; [default: F]
 #' @param my.seed integer; [default: 9997]
 #' @param ... parameters passed to plot.densityMclust
-#' @import data.table
-#' @import ggplot2
-#' @import mclust
+#' @importFrom data.table data.table
+#' @importFrom mclust densityMclust
+#' @importFrom graphics abline layout plot lines rect
+#' @importFrom grDevices pdf png dev.off
+#' @importFrom stats ppoints lm qnorm dnorm
 #' @details use mixture model to classify each data point. If G is null, the largest component is corresponding to binarized expression 1, and other components are corresponding to binarized expressed 0.
 #' @export
 binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Exp",verbose=F,
@@ -1218,8 +1235,12 @@ binarizeExp <- function(x,out.prefix=NULL,G=NULL,topNAsHi=1,e.TH=NULL,e.name="Ex
 #' @param out.prefix character; output prefix [default: NULL]
 #' @param e.name character; name of the expression metric [default: "Exp"]
 #' @param th.score numeric; numeic vector to show the threshold specified manually [default: NULL]
-#' @import data.table
-#' @import ggplot2
+#' @importFrom extremevalues outlierPlot getOutliers
+#' @importFrom data.table as.data.table
+#' @importFrom grDevices png pdf dev.off
+#' @importFrom graphics par
+#' @importFrom ggplot2 ggplot geom_line geom_vline ggsave aes aes_string geom_density theme_bw
+#' @importFrom stats dnorm
 #' @details outlier detection using extremevalues
 #' @export
 classify.outlier <- function(x,out.prefix=NULL,e.name="Exp",th.score=NULL)
@@ -1239,7 +1260,7 @@ classify.outlier <- function(x,out.prefix=NULL,e.name="Exp",th.score=NULL)
     ret.1$classification <- ret.1$bin.Exp
     colnames(ret.1)[2] <- e.name
 
-    ret.2 <- data.table(score=ii,density=x.fit)
+    ret.2 <- as.data.table(list("score"=ii,"density"=x.fit))
 
 	##### plot #####
     if(!is.null(out.prefix)){
@@ -1252,7 +1273,7 @@ classify.outlier <- function(x,out.prefix=NULL,e.name="Exp",th.score=NULL)
         par(opar)
 
 	    p <- ggplot(ret.1, aes(o.Exp)) + geom_density(colour="black") + theme_bw() +
-		        geom_line(data=ret.2,aes(x=score,y=density),colour="red") +
+		        geom_line(data=ret.2,aes_string(x="score",y="density"),colour="red") +
 		        geom_vline(xintercept = K$limit,linetype=2,colour="orange")
 	    if(!is.null(th.score)){
 			p <- p + geom_vline(xintercept = th.score,linetype=2,colour="black")
@@ -1264,7 +1285,7 @@ classify.outlier <- function(x,out.prefix=NULL,e.name="Exp",th.score=NULL)
 
 
 #' plot genes expression in pairs of clusters to examine the correlation
-#' @param sce.pb object; object of \code{singleCellExperiment} class
+#' @param obj object; object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param x.cluster character; cluster to be showed in x axis
 #' @param out.prefix character; output prefix.
@@ -1273,19 +1294,20 @@ classify.outlier <- function(x,out.prefix=NULL,e.name="Exp",th.score=NULL)
 #' @param plot.ncol integer; number of columns in facet_wrap() (default: 7)
 #' @param plot.width double; width of the output plot (default: 22)
 #' @param plot.height double; height of the output plot (default: 22)
-#' @import data.table
-#' @import ggplot2
-#' @importFrom  ggpubr ggscatter
+#' @importFrom data.table setDT melt dcast
+#' @importFrom SummarizedExperiment assay
+#' @importFrom ggplot2 geom_hline geom_vline facet_wrap ggsave
+#' @importFrom ggpubr ggscatter
 #' @details used to examine the correlation between pairs of clusters
 #' @export
-plot.pairs.cor <- function(sce.pb,assay.name,x.cluster,out.prefix,
+plotPairsCor <- function(obj,assay.name,x.cluster,out.prefix,
                            genes=NULL,gene.highlight=NULL,
                            plot.ncol=7,plot.width=22,plot.height=22)
 {
-    require("data.table")
-    require("ggplot2")
-    require("ggpubr")
-    dat.assay <- assay(sce.pb,assay.name)
+    #require("data.table")
+    #require("ggplot2")
+    #require("ggpubr")
+    dat.assay <- assay(obj,assay.name)
     colnames(dat.assay) <- make.names(colnames(dat.assay))
     if(!is.null(genes)){
         f.gene <- intersect(rownames(dat.assay),genes)

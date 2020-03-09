@@ -62,6 +62,8 @@ integrate.by.avg(
 
 \item{do.scale}{logical; scale the summarized vectors (default: false)}
 
+\item{par.clust}{list; parameters for clustering method (default: list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2))}
+
 \item{topGene.lo}{double; for top gene heatmap.(default: -1.5)}
 
 \item{topGene.hi}{double; for top gene heatmap.(default: 1.5)}

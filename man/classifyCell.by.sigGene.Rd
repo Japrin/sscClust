@@ -77,17 +77,17 @@ classifyCell.by.sigGene(
 
 \item{prob.th}{numeric; probability threshold (default: 0.8)}
 
-\item{TH.gene.exp.freq}{double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.5)}
+\item{TH.gene.exp.freq}{double; for a panel of signature genes, it will be classified as expressed if more than this value of genes are expressed (default: 0.65)}
+
+\item{TH.gene.exp.freq.train.pos}{double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)}
+
+\item{TH.gene.exp.freq.train.neg}{double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)}
 
 \item{TH.silhouette}{double; threshold (default: -Inf)}
 
 \item{RF.selectVar}{logical; (default: FALSE)}
 
 \item{...}{parameters passed to some method}
-
-\item{TH.gene.exp.freq.pos}{double; for a panel of signature genes, it will be classified as positive instance if more than this value of genes are expressed (default: 0.8)}
-
-\item{TH.gene.exp.freq.neg}{double; for a panel of signature genes, it will be classified as negative instance if less than this value of genes are expressed (default: 0.2)}
 }
 \description{
 classify cells using signature genes

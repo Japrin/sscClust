@@ -1,82 +1,23 @@
-#' Correlation calculation. use BLAS and data.table to speed up.
-#'
-#' @importFrom data.table frank
-#' @importFrom RhpcBLASctl omp_get_num_procs omp_set_num_threads
-#' @param x matrix; input data, rows for variable (genes), columns for observations (cells).
-#' @param y matrix; input data, rows for variable (genes), columns for observations (cells) (default: NULL)
-#' @param method character; method used. (default: "pearson")
-#' @param nthreads integer; number of threads to use. if NULL, automatically detect the number. (default: NULL)
-#' @param na.rm logical; remove missing values. (default: T)
-#' @details calcualte the correlation among variables(rows)
-#' @return correlation coefficient matrix among rows
-cor.BLAS <- function(x,y=NULL,method="pearson",nthreads=NULL,na.rm=T)
-{
-  if(is.null(nthreads))
-  {
-    nprocs <- RhpcBLASctl::omp_get_num_procs()
-    RhpcBLASctl::omp_set_num_threads(max(nprocs-1,1))
-  }else{
-    RhpcBLASctl::omp_set_num_threads(nthreads)
-  }
-  cor.pearson <- function(x,y=NULL)
-  {
-    if(is.null(y)){
-	  ### x = x - rowMeans(t(na.omit(t(x))))
-      x = x - rowMeans(x,na.rm=na.rm)
-      x = x / sqrt(rowSums(x^2,na.rm=na.rm))
-      ### cause 'memory not mapped' :( ; and slower in my evaluation: 38 sec .vs. 12 sec.
-      #x.cor = tcrossprod(x)
-	  if(na.rm){ x[is.na(x)] <- 0 }
-      x.cor = x %*% t(x)
-      return(x.cor)
-    }else{
-      x = x - rowMeans(x,na.rm=na.rm)
-      x = x / sqrt(rowSums(x^2,na.rm=na.rm))
-      y = y - rowMeans(y,na.rm=na.rm)
-      y = y / sqrt(rowSums(y^2,na.rm=na.rm))
-      #xy.cor <- tcrossprod(x,y)
-	  if(na.rm){ x[is.na(x)] <- 0 }
-	  if(na.rm){ y[is.na(y)] <- 0 }
-      xy.cor <- x %*% t(y)
-      return(xy.cor)
-    }
-  }
-  x <- as.matrix(x)
-  if(!is.matrix(x)){
-    warning("x is not like a matrix")
-    return(NULL)
-  }
-  if(!is.null(y)){
-    y <- as.matrix(y)
-    if(!is.matrix(y)){
-      warning("y is not like a matrix")
-      return(NULL)
-    }
-  }
-  if(method=="pearson"){
-    return(cor.pearson(x,y))
-  }else if(method=="spearman"){
-    if(is.null(y)){
-      return(cor.pearson(t(apply(x, 1, data.table::frank, na.last="keep"))))
-    }else{
-      return(cor.pearson(t(apply(x, 1, data.table::frank, na.last="keep")),
-                         t(apply(y, 1, data.table::frank, na.last="keep"))))
-    }
-  }else{
-    warning("method must be pearson or spearman")
-    return(NULL)
-  }
-}
-
-
-#' dispaly message with time stamp
-#' @param msg characters; message to display
+#' @importFrom sscVis simple.removeBatchEffect
 #' @export
-loginfo <- function(msg) {
-  timestamp <- sprintf("%s", Sys.time())
-  msg <- paste0("[",timestamp, "] ", msg,"\n")
-  cat(msg)
-}
+sscVis::simple.removeBatchEffect
+
+#' @importFrom sscVis run.cutree
+#' @export
+sscVis::run.cutree
+
+#' @importFrom sscVis run.cutreeDynamic
+#' @export
+sscVis::run.cutreeDynamic
+
+#' @importFrom sscVis loginfo
+#' @export
+sscVis::loginfo
+
+#' @importFrom sscVis cor.BLAS
+#' @export
+sscVis::cor.BLAS
+
 
 
 #' Find the knee point of the scree plot
@@ -112,6 +53,7 @@ findKneePoint <- function(pcs)
 #' @importFrom stats aov TukeyHSD
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom doParallel registerDoParallel
+#' @importFrom utils write.table
 #' @param xdata data frame or matrix; rows for genes and columns for samples
 #' @param xlabel factor; cluster label of the samples, with length equal to the number of columns in xdata
 #' @param batch factor; covariate. (default: NULL)
@@ -328,6 +270,8 @@ expressedFraction.HiExpressorMean <- function(exp.bin,exp.norm,group,n.cores=NUL
     return(out.res)
 }
 
+#' Wraper for running random forest classifier (multiple core version)
+#'
 #' @importFrom randomForest randomForest
 #' @importFrom parallel mclapply
 #' @param ntree integer; Number of trees to grow.
@@ -369,13 +313,16 @@ mcrf <- function(ntree, ncore, ...) {
 #' @param ntreeIterat integer; parameter of varSelRF::varSelRF
 #' @param selectVar logical; wheter select variables (default: TRUE)
 #' @param use.ranger logical; wheter use ranger (default: TRUE)
+#' @param ncores intersect; numer of cores to use (default: NULL)
+#' @param xdata.test data frame or matrix; data used for test, with sample id in rows and variables in columns
+#' @param xlabel.test factor; classification label of the test samples, with length equal to the number of rows in xdata.test
 #' @return List with the following elements:
 #' \item{ylabel}{ppredicted labels of the samples in ydata}
 #' \item{rfsel}{trained model; output of varSelRF()}
 run.RF <- function(xdata, xlabel, ydata, do.norm=F,
 				   ntree = 500, ntreeIterat = 200, selectVar=T,
 				   ncores=NULL,use.ranger=T,
-				   xdata.test=NULL,xlable.test=NULL)
+				   xdata.test=NULL,xlabel.test=NULL)
 {
   #require("varSelRF")
   #require("randomForest")
@@ -426,8 +373,8 @@ run.RF <- function(xdata, xlabel, ydata, do.norm=F,
   ret.list <- list("ylabel"=ylabel,"rfsel"=rf.model,"yres"=yres)
   if(!is.null(pred.test)){
 	  pred.test.res <- data.table(pred=apply(pred.test,1,function(x){ as.character(cls.set[which.max(x)]) }),
-								  actual=as.character(xlable.test),
-								  group=as.character(xlable.test))
+								  actual=as.character(xlabel.test),
+								  group=as.character(xlabel.test))
 	  conf.mtx.test <- pred.test.res[,table(pred,actual)]
 	  error.rate.perCls <- pred.test.res[,.(N=.N, error.rate=sum(.SD$pred!=.SD$actual)/.N),by="group"]
 	  error.rate.overall <- sum(pred.test.res[,pred!=actual])/nrow(pred.test.res)
@@ -532,6 +479,7 @@ run.tSNE <- function(idata,tSNE.usePCA=T,tSNE.perplexity=30,method="Rtsne",n.cor
 #' @importFrom plyr llply
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom doParallel registerDoParallel
+#' @importFrom SummarizedExperiment `rowData<-` `assay<-`
 #' @param obj object of \code{singleCellExperiment} class
 #' @param assay.name character; which assay (default: "exprs")
 #' @param out.prefix character, output prefix
@@ -580,9 +528,9 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
         p <- sc3_plot_cluster_stability(obj, k = k)
         ggsave(sprintf("%s.stability.k%d.pdf",out.prefix,k),width = 4,height = 3)
         if(SC3.biology){
-          sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k),
-                                                                        width=SC3.markerplot.width),
-                           show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
+#          sc3_plot_markers(obj, k = k,auroc = 0.7,plot.extra.par = list(filename=sprintf("%s.markers.k%d.pdf",out.prefix,k),
+#                                                                        width=SC3.markerplot.width),
+#                           show_pdata = c( "sampleType",sprintf("sc3_%d_clusters",k), sprintf("sc3_%s_log2_outlier_score",k)))
         }
       },.progress = "none",.parallel=T)
     },error=function(e){
@@ -632,6 +580,10 @@ run.SC3 <- function(obj,assay.name="exprs",out.prefix=NULL,n.cores=8,ks=2:10,SC3
 #' @param nthreads integer; number of threads (default: 0)
 #' @param perplexity_list list;
 #' @param get_costs logical;
+#' @param data_path character;
+#' @param result_path character;
+#' @param df numeric;
+#' @importFrom utils file_test
 #' @details Run FIt-SNE
 #' @return a matrix with samples in rows and tSNE coordinate in columns
 #' @export
@@ -778,35 +730,11 @@ fftRtsne <- function(X,
   Yout
 }
 
-#' Modified from limma::removeBatchEffect, a little different design matrix
-#' @param x matrix; samples in columns and variables in rows
-#' @param batch character; batch vector (default: NULL)
-#' @param covariates double; other covariates to adjust (default: NULL)
-#' @param ... parameters passed to lmFit
-#' @details Modified from limma::removeBatchEffect, a little different design matrix
-#' @return a matrix with dimention as input ( samples in rows and variables in columns)
-#' @importFrom limma lmFit
+#' @importFrom sscVis simple.removeBatchEffect
 #' @export
-simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
-{
-    if (is.null(batch) && is.null(covariates))
-        return(as.matrix(x))
-	if(!is.null(batch) && length(unique(batch))==1){
-		return(t(scale(t(as.matrix(x)),scale=F)))
-	}
-    if (!is.null(batch)) {
-        batch <- as.factor(batch)
-        batch <- model.matrix(~batch)
-    }
-    if (!is.null(covariates))
-        covariates <- as.matrix(covariates)
-    X.batch <- cbind(batch, covariates)
-    fit <- limma::lmFit(x, X.batch, ...)
-    beta <- fit$coefficients
-    beta[is.na(beta)] <- 0
-    ret.V <- as.matrix(x) - beta %*% t(X.batch)
-    return(ret.V)
-}
+sscVis::simple.removeBatchEffect
+
+
 
 #' run limma, given an expression matrix
 #' @param xdata data frame or matrix; rows for genes and columns for samples
@@ -824,16 +752,22 @@ simple.removeBatchEffect <- function (x, batch = NULL, covariates = NULL, ...)
 #' @param rn.seed integer; random number seed (default: 9999)
 #' @details diffeerentially expressed genes dectection using limma
 #' @return a matrix with dimention as input ( samples in rows and variables in columns)
-#' @importFrom limma lmFit eBayes topTable
+#' @importFrom data.table data.table as.data.table
+#' @importFrom grDevices pdf dev.off
+#' @importFrom limma lmFit eBayes topTable voom makeContrasts contrasts.fit
+#' @importFrom stats model.matrix
+#' @importFrom utils write.table
+#' @importFrom matrixStats rowVars
 #' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom BiocParallel MulticoreParam register multicoreWorkers
 #' @export
 run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsample=NULL,
                              T.fdr=0.05,T.logFC=1,verbose=0,n.cores=NULL,group=NULL,
                              gid.mapping=NULL, do.voom=F,rn.seed=9999)
 {
-	suppressPackageStartupMessages(require("limma"))
-	suppressPackageStartupMessages(require("dplyr"))
-	suppressPackageStartupMessages(require("BiocParallel"))
+	#suppressPackageStartupMessages(require("limma"))
+	#suppressPackageStartupMessages(require("dplyr"))
+	#suppressPackageStartupMessages(require("BiocParallel"))
 
     if(ncol(xdata)!=length(xlabel)){
         warning(sprintf("xdata and xlabel is not consistent!\n"))
@@ -915,10 +849,10 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
         contrasts.matrix <- makeContrasts(contrasts=contrast.str,levels=design)
         fit <- contrasts.fit(fit,contrasts=contrasts.matrix)
         fit <- eBayes(fit)
-	    all.table  <- topTable(fit, n = Inf, sort = "p", p = 1)
+	    all.table  <- topTable(fit, number = Inf, sort.by = "p", p.value = 1)
     }else{
 	    fit <- eBayes(fit)
-	    all.table  <- topTable(fit, coef = "II", n = Inf, sort = "p", p = 1)
+	    all.table  <- topTable(fit, coef = "II", number = Inf, sort.by = "p", p.value = 1)
     }
 	all.table <- cbind(data.table(geneID=rownames(all.table),
                                   geneSymbol=if(is.null(gid.mapping)) rownames(all.table) else gid.mapping[rownames(all.table)],
@@ -999,112 +933,5 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     return(ret.dat)
 }
 
-#' run dynamicTreeCut::cutreeDynamic on rows of the given matrix
-#' @param data data frame or matrix;
-#' @param method.hclust character; clustering method for hclust [default: "ward.D2"]
-#' @param method.distance character; distance method for hclust [default: "spearman"]
-#' @param ... parameters passed to dynamicTreeCut::cutreeDynamic
-#' @details dynamicTreeCut::cutreeDynamic on rows of the given matrix
-#' @return a matrix with dimention as input ( samples in rows and variables in columns)
-#' @importFrom stats dist hclust
-#' @importFrom dynamicTreeCut cutreeDynamic
-#' @importFrom dendextend color_branches
-#' @export
-run.cutreeDynamic <- function(dat,method.hclust="ward.D2",method.distance="spearman",
-							  #deepSplit=4, minClusterSize=2,
-							  ...)
-{
-    obj.hclust <- NULL
-    if(method.distance=="spearman" || method.distance=="pearson"){
-		tryCatch({
-			###obj.distM <- as.dist(1-sscClust:::cor.BLAS((dat),method=method.distance,nthreads=1))
-			obj.distM <- as.dist(1-cor.BLAS((dat),method=method.distance,nthreads=1))
-			obj.hclust <- stats::hclust(obj.distM, method=method.hclust)
-		},error = function(e){
-			cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
-		})
-    }
-    if(is.null(obj.hclust)){
-		obj.distM <- stats::dist(dat)
-		obj.hclust <- stats::hclust(obj.distM,method.hclust)
-    }
-    ##### if method.hclust=="complete", some clusters from cutreeDynamic are not consistent with the dendrogram
-    cluster.label <- dynamicTreeCut::cutreeDynamic(obj.hclust,distM=as.matrix(obj.distM),
-                                                #method = "hybrid",
-                                                #deepSplit=deepSplit,minClusterSize=minClusterSize,
-                                                ...)
-    obj.dend <- as.dendrogram(obj.hclust)
-    ncls <- length(unique(cluster.label))
-    colSet.cls <- auto.colSet(ncls,"Paired")
-    ###colSet.cls <- sscClust:::auto.colSet(ncls)
-    names(colSet.cls) <- unique(cluster.label[order.dendrogram(obj.dend)])
-    col.cls <- data.frame("k0"=sapply(cluster.label,function(x){ colSet.cls[as.character(x)] }))
-
-#    print(colSet.cls)
-#    print(table(cluster.label))
-#	pdf("test.pdf")
-#	opar <- par(mar=c(15,4,4,2))
-#	plot(obj.dend)
-#	dev.off()
-#	par(opar)
-
-    obj.branch <- dendextend::color_branches(obj.dend,
-                                 clusters=cluster.label[order.dendrogram(obj.dend)],
-                                 col=colSet.cls)
-	obj.branch <- dendextend::set(obj.branch,"branches_lwd", 1.5)
-
-#	pdf("test.01.pdf")
-#	opar <- par(mar=c(15,4,4,2))
-#	plot(obj.branch)
-#	dev.off()
-#	par(opar)
-    ###aa <- plot.branch(obj.hclust,"test.01",cluster=cluster.label)
-
-    return(list("hclust"=obj.hclust,"dist"=obj.distM,"cluster"=cluster.label,"branch"=obj.branch))
-}
-
-#' run cutree on rows of the given matrix
-#' @param data data frame or matrix;
-#' @param method.hclust character; clustering method for hclust [default: "ward.D2"]
-#' @param method.distance character; distance method for hclust [default: "spearman"]
-#' @param ... parameters passed to cutree
-#' @details cutree on rows of the given matrix
-#' @return a matrix with dimention as input ( samples in rows and variables in columns)
-#' @importFrom stats dist hclust
-#' @importFrom dendextend color_branches
-#' @export
-run.cutree <- function(dat,method.hclust="ward.D2",method.distance="spearman",k=1,
-							  ...)
-{
-	ret <- list()
-    {
-		branch <- FALSE
-		obj.hclust <- NULL
-		if(method.distance=="spearman" || method.distance=="pearson"){
-			tryCatch({
-				obj.distM <- as.dist(1-sscClust:::cor.BLAS((dat),method=method.distance,nthreads=1))
-				#obj.distM <- as.dist(1-cor.BLAS((dat),method=method.distance,nthreads=1))
-				obj.hclust <- stats::hclust(obj.distM, method=method.hclust)
-			},error = function(e){
-				cat("using spearman/pearson as distance failed;try to fall back to use euler distance ... \n");
-			})
-		}
-		if(is.null(obj.hclust)){
-			obj.distM <- stats::dist(dat)
-			obj.hclust <- stats::hclust(obj.distM,method.hclust)
-		}
-		obj.dend <- as.dendrogram(obj.hclust)
-		cluster <- cutree(obj.hclust,k=k,...)
-        colSet.cls <- sscClust:::auto.colSet(length(unique(cluster)),"Paired")
-		branch <- dendextend::color_branches(obj.dend,clusters=cluster[order.dendrogram(obj.dend)],col=colSet.cls)
-		branch <- dendextend::set(branch,"branches_lwd", 1.5)
-
-		ret[["hclust"]] <- obj.hclust
-		ret[["dist"]] <- obj.distM
-		ret[["cluster"]] <- cluster
-		ret[["branch"]] <- branch
-    }
-    return(ret)
-}
 
 

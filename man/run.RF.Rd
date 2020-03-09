@@ -15,7 +15,7 @@ run.RF(
   ncores = NULL,
   use.ranger = T,
   xdata.test = NULL,
-  xlable.test = NULL
+  xlabel.test = NULL
 )
 }
 \arguments{
@@ -33,7 +33,13 @@ run.RF(
 
 \item{selectVar}{logical; wheter select variables (default: TRUE)}
 
+\item{ncores}{intersect; numer of cores to use (default: NULL)}
+
 \item{use.ranger}{logical; wheter use ranger (default: TRUE)}
+
+\item{xdata.test}{data frame or matrix; data used for test, with sample id in rows and variables in columns}
+
+\item{xlabel.test}{factor; classification label of the test samples, with length equal to the number of rows in xdata.test}
 }
 \value{
 List with the following elements:
