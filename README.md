@@ -7,9 +7,12 @@ simpler single cell RNAseq data clustering (sscClust), is a package implement mu
 # Installation
 Calculation will become expensive when the dataset become large, so we stongly recommand use R which linked to optimized BLAS library, such as ATLAS, MKL etc. For windows users, Microsoft R open is recommanded, and for Unix-alike users, please refer [this](https://cran.r-project.org/doc/manuals/r-release/R-admin.html#BLAS) for how to compile R using external BLAS library.
 
+Package sscVis is required.
+
 To install this package, simply:
 ```
 install.packages("devtools")
+devtools::install_github("Japrin/sscVis")
 devtools::install_github("Japrin/sscClust")
 ```
 
