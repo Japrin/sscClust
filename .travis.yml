@@ -1,6 +1,10 @@
 language: r
 sudo: required
 cache: packages
+r_github_packages:
+  - VPetukhov/ggrastr
+  - Japrin/sscVis
+  - Japrin/SC3
 bioc_packages:
   - SingleCellExperiment
   - BiocGenerics
@@ -8,8 +12,6 @@ bioc_packages:
   - ComplexHeatmap
   - scran
   - uwot
-r_github_packages: Japrin/sscVis
-r_github_packages: Japrin/SC3
 
 addons:
   apt:

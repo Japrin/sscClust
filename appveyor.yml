@@ -22,9 +22,8 @@ environment:
 
 build_script:
   - travis-tool.sh r_binary_install BiocManager lifecycle
-  - travis-tool.sh install_bioc SingleCellExperiment scran BiocGenerics BiocParallel ComplexHeatmap
-  - travis-tool.sh install_github Japrin/SC3
-  - travis-tool.sh install_github Japrin/sscVis
+  - travis-tool.sh install_bioc SingleCellExperiment scran BiocGenerics BiocParallel ComplexHeatmap impute
+  - travis-tool.sh install_github VPetukhov/ggrastr Japrin/SC3 Japrin/sscVis
   - travis-tool.sh install_deps
   - travis-tool.sh install_bioc_deps
 #  - travis-tool.sh r_binary_install curl pkgmaker
