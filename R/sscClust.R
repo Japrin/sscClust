@@ -70,7 +70,21 @@ sscVis::ssc.scale
 #' @export
 sscVis::ssc.build
 
+#' @importFrom sscVis effectsize
+#' @export
+sscVis::effectsize
 
+#' @importFrom sscVis directEScombi
+#' @export
+sscVis::directEScombi
+
+#' @importFrom sscVis directEScombiFromLongTable
+#' @export
+sscVis::directEScombiFromLongTable
+
+#' @importFrom sscVis collapseEffectSizeLong
+#' @export
+sscVis::collapseEffectSizeLong
 
 #### ===================================
 

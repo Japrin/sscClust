@@ -13,7 +13,7 @@ Description: A package implement mutilple functionalities which are commonly use
 License: GPL-3 + file LICENSE
 Encoding: UTF-8
 LazyData: true
-RoxygenNote: 7.0.0
+RoxygenNote: 7.1.0
 Depends: R (>= 3.4), SingleCellExperiment, SummarizedExperiment
 Imports: sscVis, RColorBrewer, Rtsne, class, factoextra, data.table, ggplot2,
     ggpubr, MASS, ROCR, BiocGenerics, scran, SC3, BiocParallel,

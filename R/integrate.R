@@ -308,54 +308,6 @@ integrate.by.avg <- function(sce.list,
 }
 
 
-#' collapse effect size, give input table and group variate
-#' @param dat.long data.table; these columns are required: "geneID","aid","P.Value","adj.P.Val","sig","dprime","vardprime","group.2nd"
-#' @param group.2nd character; column of obj, used for collapse [default: NULL]
-#' @param mode.collapse character; collapse method. one of "min", "comb" [default: "comb"]
-#' @param th.adj.P double; threshold [default: 0.01]
-#' @param th.dprime double; threshold [default: 0.15]
-#' @importFrom data.table as.data.table data.table setorderv
-#' @importFrom plyr ldply
-#' @details collapse effect size
-#' @return a gene table
-collapseEffectSizeLong <- function(dat.long,mode.collapse="comb",group.2nd="group.2nd",
-								   th.adj.P=0.01,th.dprime=0.15)
-{
-	#dat.long[["group.2nd"]] <- dat.long[[group.2nd]]
-	dat.collapse <- NULL
-	if(mode.collapse=="min"){
-		dat.collapse <- dat.long[,.(dprime=dprime[which.min(abs(dprime))],
-									vardprime=vardprime[which.min(abs(dprime))],
-									P.Value=P.Value[which.min(abs(dprime))],
-									adj.P.Val=adj.P.Val[which.min(abs(dprime))],
-									sig=all(adj.P.Val<th.adj.P) & all(dprime>th.dprime) ),
-								by=c("geneID",group.2nd)]
-	}else if(mode.collapse=="comb"){
-		aid.mapping.tb <- unique(dat.long[,c("aid",group.2nd),with=F])
-		n.group.2nd <- aid.mapping.tb[,.N,by=group.2nd]
-		dat.collapse.nOne <- dat.long[dat.long[[group.2nd]] %in% n.group.2nd[N==1,][[group.2nd]],
-									  c("geneID",group.2nd,"dprime","vardprime","P.Value","adj.P.Val","sig"),with=F]
-		dat.collapse.nMul <- as.data.table(ldply(n.group.2nd[N>1,][[group.2nd]],
-												 function(x){
-													 dat.x.es.combi.tb <- directEScombiFromLongTable(dat.long[dat.long[[group.2nd]]==x,])
-													 ret.tb <-data.table(geneID=dat.x.es.combi.tb$geneID,
-															   group.2nd=x,
-															   dprime=dat.x.es.combi.tb[["comb.ES"]],
-															   vardprime=dat.x.es.combi.tb[["comb.ES.sd"]]^2,
-															   P.Value=dat.x.es.combi.tb[["comb.p"]],
-															   adj.P.Val=dat.x.es.combi.tb[["comb.padj"]],
-															   sig=(dat.x.es.combi.tb[["comb.ES"]]>th.dprime &
-																	dat.x.es.combi.tb[["comb.padj"]]<th.adj.P))
-													 colnames(ret.tb)[2] <- group.2nd
-													 return(ret.tb)
-												 }))
-		dat.collapse <- rbind(dat.collapse.nOne,dat.collapse.nMul)
-		setorderv(dat.collapse,c("geneID",group.2nd))
-	}
-	return(dat.collapse)
-}
-
-
 #' get gene ranking table from obj
 #' @param obj object; object of \code{singleCellExperiment} class
 #' @param group character; columan name in colData(obj)

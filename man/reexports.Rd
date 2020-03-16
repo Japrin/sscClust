@@ -21,6 +21,10 @@
 \alias{ssc.moduleScore}
 \alias{ssc.scale}
 \alias{ssc.build}
+\alias{effectsize}
+\alias{directEScombi}
+\alias{directEScombiFromLongTable}
+\alias{collapseEffectSizeLong}
 \alias{simple.removeBatchEffect}
 \alias{run.cutree}
 \alias{run.cutreeDynamic}
@@ -33,6 +37,6 @@ These objects are imported from other packages. Follow the links
 below to see their documentation.
 
 \describe{
-  \item{sscVis}{\code{\link[sscVis]{cor.BLAS}}, \code{\link[sscVis]{loginfo}}, \code{\link[sscVis]{run.cutree}}, \code{\link[sscVis]{run.cutreeDynamic}}, \code{\link[sscVis]{simple.removeBatchEffect}}, \code{\link[sscVis]{simple.removeBatchEffect}}, \code{\link[sscVis]{ssc.assay.hclust}}, \code{\link[sscVis]{ssc.assay.zscore}}, \code{\link[sscVis]{ssc.average.cell}}, \code{\link[sscVis]{ssc.build}}, \code{\link[sscVis]{ssc.displayName2id}}, \code{\link[sscVis]{ssc.downsample}}, \code{\link[sscVis]{ssc.id2displayName}}, \code{\link[sscVis]{ssc.moduleScore}}, \code{\link[sscVis]{ssc.order}}, \code{\link[sscVis]{ssc.plot.cor}}, \code{\link[sscVis]{ssc.plot.GeneDensity}}, \code{\link[sscVis]{ssc.plot.heatmap}}, \code{\link[sscVis]{ssc.plot.pca}}, \code{\link[sscVis]{ssc.plot.silhouette}}, \code{\link[sscVis]{ssc.plot.tsne}}, \code{\link[sscVis]{ssc.plot.violin}}, \code{\link[sscVis]{ssc.scale}}, \code{\link[sscVis]{ssc.toLongTable}}}
+  \item{sscVis}{\code{\link[sscVis]{collapseEffectSizeLong}}, \code{\link[sscVis]{cor.BLAS}}, \code{\link[sscVis]{directEScombi}}, \code{\link[sscVis]{directEScombiFromLongTable}}, \code{\link[sscVis]{effectsize}}, \code{\link[sscVis]{loginfo}}, \code{\link[sscVis]{run.cutree}}, \code{\link[sscVis]{run.cutreeDynamic}}, \code{\link[sscVis]{simple.removeBatchEffect}}, \code{\link[sscVis]{simple.removeBatchEffect}}, \code{\link[sscVis]{ssc.assay.hclust}}, \code{\link[sscVis]{ssc.assay.zscore}}, \code{\link[sscVis]{ssc.average.cell}}, \code{\link[sscVis]{ssc.build}}, \code{\link[sscVis]{ssc.displayName2id}}, \code{\link[sscVis]{ssc.downsample}}, \code{\link[sscVis]{ssc.id2displayName}}, \code{\link[sscVis]{ssc.moduleScore}}, \code{\link[sscVis]{ssc.order}}, \code{\link[sscVis]{ssc.plot.GeneDensity}}, \code{\link[sscVis]{ssc.plot.cor}}, \code{\link[sscVis]{ssc.plot.heatmap}}, \code{\link[sscVis]{ssc.plot.pca}}, \code{\link[sscVis]{ssc.plot.silhouette}}, \code{\link[sscVis]{ssc.plot.tsne}}, \code{\link[sscVis]{ssc.plot.violin}}, \code{\link[sscVis]{ssc.scale}}, \code{\link[sscVis]{ssc.toLongTable}}}
 }}
 
