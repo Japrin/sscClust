@@ -58,23 +58,30 @@ findKneePoint <- function(pcs)
 #' @param xlabel factor; cluster label of the samples, with length equal to the number of columns in xdata
 #' @param batch factor; covariate. (default: NULL)
 #' @param out.prefix character; if not NULL, write the result to the file(s). (default: NULL)
-#' @param mod character;
+#' @param pmod character;
 #' @param F.FDR.THRESHOLD numeric; threshold of the adjusted p value of F-test. (default: 0.01)
 #' @param HSD.FDR.THRESHOLD numeric; threshold of the adjusted p value of HSD-test (default: 0.01)
 #' @param HSD.FC.THRESHOLD numeric; threshold of the absoute diff of HSD-test (default: 1)
+#' @param use.Kruskal logical; whether use Kruskal test for ranking genes (default: FALSE)
 #' @param verbose logical; whether output all genes' result. (default: F)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 #' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
 #' @return List with the following elements:
 #' \item{aov.out}{data.frame, test result of all genes (rownames of xdata)}
 #' \item{aov.out.sig}{format as aov.out, but only significant genes. }
-findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
+findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
                              F.FDR.THRESHOLD=0.01,
                              HSD.FDR.THRESHOLD=0.01,
                              HSD.FC.THRESHOLD=1,
+			     use.Kruskal=F,
                              verbose=F,n.cores=NULL,
                              gid.mapping=NULL)
 {
+  ####
+  f.rm <- rowSds(xdata)==0
+  xdata <- xdata[!f.rm,,drop=F]
+
+  ####  
   clustNames <- unique(as.character(xlabel))
   xdata <- as.matrix(xdata)
   ### check rownames and colnames
@@ -91,25 +98,67 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
   RhpcBLASctl::omp_set_num_threads(1)
   registerDoParallel(cores = n.cores)
   ret <- ldply(rownames(xdata),function(v){
+
+    xdata.v <- data.table(y=xdata[v,],g=xlabel,b=batch)
+    t.res.kruskal <- kruskal.test(y ~ g,data=xdata.v)
+    t.res.kruskal.p <- t.res.kruskal$p.value
     if(is.null(batch)){
-        aov.out <- aov(y ~ g,data=data.frame(y=xdata[v,],g=xlabel))
+        aov.out <- aov(y ~ g,data=xdata.v)
     }else{
-        aov.out <- aov(y ~ g+b,data=data.frame(y=xdata[v,],g=xlabel,b=batch))
+        aov.out <- aov(y ~ g+b,data=xdata.v)
     }
     aov.out.s <- summary(aov.out)
     t.res.f <- unlist(aov.out.s[[1]]["g",c("F value","Pr(>F)")])
-    aov.out.hsd <- TukeyHSD(aov.out)
-    hsd.name <- rownames(aov.out.hsd$g)
-    t.res.hsd <- c(aov.out.hsd$g[,"diff"],aov.out.hsd$g[,"p adj"])
-    t.res.hsd.minP <- min(aov.out.hsd$g[,"p adj"])
-    j <- which.min(aov.out.hsd$g[,"p adj"])
-    t.res.hsd.minPDiff <- if(is.na(t.res.hsd.minP)) NaN else aov.out.hsd$g[j,"diff"]
-    t.res.hsd.minPCmp <- if(is.na(t.res.hsd.minP)) NaN else rownames(aov.out.hsd$g)[j]
-    ## whether cluster specific ?
-    t.res.spe  <-  sapply(clustNames,function(v){ all( aov.out.hsd$g[grepl(v,hsd.name,perl=T),"p adj"] < HSD.FDR.THRESHOLD )  })
-    ## wheter up across all comparison ?
-    is.up <- sapply(clustNames,function(v){  all( aov.out.hsd$g[grepl(paste0(v,"-"),hsd.name),"diff"]>0 ) & all( aov.out.hsd$g[grepl(paste0("-",v),hsd.name),"diff"]<0 ) })
-    is.down <- sapply(clustNames,function(v){  all( aov.out.hsd$g[grepl(paste0(v,"-"),hsd.name),"diff"]<0 ) & all( aov.out.hsd$g[grepl(paste0("-",v),hsd.name),"diff"]>0 ) })
+
+    pairwise.cmp.tb <- NULL
+    posthoc.pc.name <- NULL
+    if(use.Kruskal){
+	###t.res.kruskalmc <- pgirmess::kruskalmc(y~g, data=data.frame(y=xdata[v,],g=xlabel),
+	###				       probs = 0.05, cont=NULL)
+	#t.res.kruskal <- with(xdata.v,agricolae::kruskal(y,g,alpha=0.01,p.adj="BH",group=F))
+	#t.res.kruskal.p <- t.res.kruskal$statistics$p.chisq
+	t.res.posthoc.raw <- with(xdata.v,agricolae::kruskal(y,g,alpha=HSD.FDR.THRESHOLD,p.adj="BH",group=F))
+	posthoc.pc.name <- gsub(" ","",rownames(t.res.posthoc.raw$comparison))
+	cmp.tb <- as.data.table(t.res.posthoc.raw$comparison)
+	cmp.tb$cmp <- posthoc.pc.name
+	cmp.tb <- cmp.tb[order(pvalue,-abs(Difference)),]
+	pairwise.cmp.tb <- cmp.tb
+	pairwise.cmp.tb$diff <- pairwise.cmp.tb$Difference
+	pairwise.cmp.tb$p.adj <- pairwise.cmp.tb$pvalue
+	### pvalue actually is adjusted p value
+	t.res.posthoc <- c(t.res.posthoc.raw$comparison[,"Difference"],t.res.posthoc.raw$comparison[,"pvalue"])
+	t.res.posthoc.minP <- cmp.tb$pvalue[1]
+	t.res.posthoc.minPDiff <- cmp.tb$Difference[1]
+	t.res.posthoc.minPCmp <- cmp.tb$cmp[1]
+    }else{
+	aov.out.hsd <- TukeyHSD(aov.out)
+	posthoc.pc.name <- rownames(aov.out.hsd$g)
+	cmp.tb <- as.data.table(aov.out.hsd$g)
+	cmp.tb$cmp <- posthoc.pc.name
+	colnames(cmp.tb) <- make.names(colnames(cmp.tb))
+	cmp.tb <- cmp.tb[order(p.adj,-abs(diff)),]
+	pairwise.cmp.tb <- cmp.tb
+	t.res.posthoc <- c(aov.out.hsd$g[,"diff"],aov.out.hsd$g[,"p adj"])
+	t.res.posthoc.minP <- cmp.tb$p.adj[1]
+	t.res.posthoc.minPDiff <- cmp.tb$diff[1]
+	t.res.posthoc.minPCmp <- cmp.tb$cmp[1]
+    }
+    {
+	## whether cluster specific ?
+	t.res.spe  <-  sapply(clustNames,function(v){
+				  all(pairwise.cmp.tb[grepl(v,cmp,perl=T),][["p.adj"]] < HSD.FDR.THRESHOLD) })
+				  ##all( aov.out.hsd$g[grepl(v,hsd.name,perl=T),"p adj"] < HSD.FDR.THRESHOLD )
+	## wheter up across all comparison ?
+	is.up <- sapply(clustNames,function(v){
+			    all(pairwise.cmp.tb[grepl(paste0(v,"-"),posthoc.pc.name),][["diff"]] > 0) &
+			    all(pairwise.cmp.tb[grepl(paste0("-",v),posthoc.pc.name),][["diff"]] < 0) })
+
+	is.down <- sapply(clustNames,function(v){
+			    all(pairwise.cmp.tb[grepl(paste0(v,"-"),posthoc.pc.name),][["diff"]] < 0) &
+			    all(pairwise.cmp.tb[grepl(paste0("-",v),posthoc.pc.name),][["diff"]] > 0) })
+			    
+    }
+
     is.clusterSpecific <- (sum(t.res.spe,na.rm = T) == 1)
     if(is.clusterSpecific){
       t.res.spe.lable <- names(which(t.res.spe))
@@ -125,16 +174,21 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
       t.res.spe.direction <- "NA"
     }
     dat.ret <- NULL
-    if(!is.null(mod) && mod=="cluster.specific") {
-      dat.ret <- structure(c(v,t.res.f,t.res.hsd,t.res.hsd.minP,t.res.hsd.minPDiff,t.res.hsd.minPCmp,
+    if(!is.null(pmod) && pmod=="cluster.specific") {
+      dat.ret <- structure(c(v,t.res.f,t.res.kruskal.p,
+			     t.res.posthoc,t.res.posthoc.minP,t.res.posthoc.minPDiff,t.res.posthoc.minPCmp,
                              t.res.spe,is.clusterSpecific,t.res.spe.lable,t.res.spe.direction),
-                           names=c("geneID","F","F.pvalue",paste0("HSD.diff.",hsd.name),paste0("HSD.padj.",hsd.name),
-                                   "HSD.padj.min","HSD.padj.min.diff","HSD.padj.min.cmp",
-                                   paste0("cluster.specific.",clustNames),"is.clusterSpecific","cluster.lable","cluster.direction"))
+                           names=c("geneID","F","F.pvalue","Kruskal.pvalue",
+				   paste0("PostHoc.diff.",posthoc.pc.name),paste0("PostHoc.padj.",posthoc.pc.name),
+                                   "PostHoc.padj.min","PostHoc.padj.min.diff","PostHoc.padj.min.cmp",
+                                   paste0("cluster.specific.",clustNames),
+				   "is.clusterSpecific","cluster.lable","cluster.direction"))
     }else{
-      dat.ret <- structure(c(v,t.res.f,t.res.hsd,t.res.hsd.minP,t.res.hsd.minPDiff,t.res.hsd.minPCmp),
-                           names=c("geneID","F","F.pvalue",paste0("HSD.diff.",hsd.name),paste0("HSD.padj.",hsd.name),
-                                   "HSD.padj.min","HSD.padj.min.diff","HSD.padj.min.cmp"))
+      dat.ret <- structure(c(v,t.res.f,t.res.kruskal.p,
+			     t.res.posthoc,t.res.posthoc.minP,t.res.posthoc.minPDiff,t.res.posthoc.minPCmp),
+                           names=c("geneID","F","F.pvalue","Kruskal.pvalue",
+				   paste0("PostHoc.diff.",posthoc.pc.name),paste0("PostHoc.padj.",posthoc.pc.name),
+                                   "PostHoc.padj.min","PostHoc.padj.min.diff","PostHoc.padj.min.cmp"))
     }
     return(dat.ret)
   },.progress = "none",.parallel=T)
@@ -154,7 +208,7 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
   #rownames(ret.df) <- rownames(xdata)
   #print(str(ret.df))
   ## type conversion
-  if(is.null(mod)){
+  if(is.null(pmod)){
     i <- 3:(ncol(ret.df)-1)
     ret.df[i]<-lapply(ret.df[i],as.numeric)
   }else{
@@ -165,13 +219,29 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
   }
   ## adjust F test's p value
   ret.df$F.adjp <- 1
+  ret.df$Kruskal.adjp <- 1
   ret.df.1 <- subset(ret.df,!is.na(F.pvalue))
   ret.df.1$F.adjp <- p.adjust(ret.df.1[,"F.pvalue"],method = "BH")
   ret.df.2 <- subset(ret.df,is.na(F.pvalue))
   ret.df <- rbind(ret.df.1,ret.df.2)
-  ret.df <- ret.df[order(ret.df$F.adjp,-ret.df$F,ret.df$HSD.padj.min),]
+  ##
+  ret.df.3 <- subset(ret.df,!is.na(Kruskal.pvalue))
+  ret.df.3$Kruskal.adjp <- p.adjust(ret.df.3[,"Kruskal.pvalue"],method="BH")
+  ret.df.4 <- subset(ret.df,is.na(Kruskal.pvalue))
+  ret.df <- rbind(ret.df.3,ret.df.4)
+  ##
+  ret.df <- ret.df[order(ret.df$F.adjp,-ret.df$F,ret.df$PostHoc.padj.min),]
   ### select
-  ret.df.sig <- subset(ret.df,F.adjp<F.FDR.THRESHOLD & HSD.padj.min<HSD.FDR.THRESHOLD & abs(HSD.padj.min.diff)>=HSD.FC.THRESHOLD)
+  if(use.Kruskal){
+      ret.df <- ret.df[order(ret.df$Kruskal.adjp,-ret.df$F,ret.df$PostHoc.padj.min),]
+      ret.df.sig <- subset(ret.df,Kruskal.adjp<F.FDR.THRESHOLD &
+			   PostHoc.padj.min<HSD.FDR.THRESHOLD &
+			   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD)
+  }else{
+      ret.df.sig <- subset(ret.df,F.adjp<F.FDR.THRESHOLD &
+			   PostHoc.padj.min<HSD.FDR.THRESHOLD &
+			   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD)
+  }
   ### output
   if(!is.null(out.prefix)){
     write.table(ret.df.sig,file = sprintf("%s.aov.sig.txt",out.prefix),quote = F,row.names = F,col.names = T,sep = "\t")
@@ -190,7 +260,8 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,mod=NULL,
 #' @param labels character; clusters of the samples belong to
 #' @param use.rank logical; using the expression value itself or convert to rank value. (default: TRUE)
 #' @param geneID character; geneID
-getAUC <- function(gene, labels,use.rank=T,geneID="GeneX")
+#' @param use.medianMax logical; whether use median for gene classification (default: FALSE)
+getAUC <- function(gene, labels,use.rank=T,geneID="GeneX",use.medianMax=F)
 {
     requireNamespace("ROCR")
 
@@ -200,23 +271,23 @@ getAUC <- function(gene, labels,use.rank=T,geneID="GeneX")
         score <- gene
     }
     # Get average score for each cluster
-    ms <- aggregate(score ~ labels, FUN = mean)
+    ms <- aggregate(score ~ labels, FUN = if(use.medianMax) median else mean)
     # Get cluster with highest average score
     posgroup <- ms[ms$score == max(ms$score), ]$labels
     # Return negatives if there is a tie for cluster with highest average score
     # (by definition this is not cluster specific)
     if(length(posgroup) > 1) {
-        return (c(-1,-1,1))
+        return (data.frame("geneID"=geneID,"AUC"=-1,"cluster"=posgroup[1],"score.p.value"=1,stringsAsFactors=F))
     }
     # Create 1/0 vector of truths for predictions, cluster with highest
     # average score vs everything else
     truth <- as.numeric(labels == posgroup)
     #Make predictions & get auc using RCOR package.
-    pred <- prediction(score,truth)
-    val <- unlist(performance(pred,"auc")@y.values)
+    pred <- ROCR::prediction(score,truth)
+    val <- unlist(ROCR::performance(pred,"auc")@y.values)
     pval <- suppressWarnings(wilcox.test(score[truth == 1],
                                          score[truth == 0])$p.value)
-	return(data.frame("geneID"=geneID,"AUC"=val,"cluster"=posgroup,"score.p.value"=pval,stringsAsFactors=F))
+    return(data.frame("geneID"=geneID,"AUC"=val,"cluster"=posgroup,"score.p.value"=pval,stringsAsFactors=F))
     #return(c(val,posgroup,pval))
 }
 
@@ -744,6 +815,8 @@ sscVis::simple.removeBatchEffect
 #' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param T.fdr numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)
 #' @param T.logFC numeric; threshold of the absoute diff (default: 1)
+#' @param T.expr numeric; threshold for binarizing exprs (default: 0.3)
+#' @param T.bin.useZ logical; wheter use the z-score version of assay.namme for binarizing exprs (default: T)
 #' @param verbose integer; verbose (default: 0)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 #' @param group character; group of interest, if NULL the last group will be used (default: NULL)
@@ -762,7 +835,8 @@ sscVis::simple.removeBatchEffect
 #' @importFrom BiocParallel MulticoreParam register multicoreWorkers
 #' @export
 run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsample=NULL,
-                             T.fdr=0.05,T.logFC=1,verbose=0,n.cores=NULL,group=NULL,
+                             T.fdr=0.05,T.logFC=1,T.expr=0.3,T.bin.useZ=T,
+							 verbose=0,n.cores=NULL,group=NULL,
                              gid.mapping=NULL, do.voom=F,rn.seed=9999)
 {
 	#suppressPackageStartupMessages(require("limma"))
@@ -863,7 +937,7 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     .getStatistics <- function(inDat,str.note=NULL,stat="mean"){
         .Grp.stat <- t(apply(inDat,1,function(x){
                                  .mexp <- aggregate(x ~ design.df$xlabel,
-													FUN = if(stat=="mean") mean else if(stat=="sd") sd else if(stat=="length") length)
+													FUN = if(stat=="mean") mean else if(stat=="sd") sd else if(stat=="length") length else if(stat=="freq") function(x){ sum(x>T.expr)/length(x) })
                                  structure(.mexp[,2],names=sprintf("%s.%s",stat,.mexp[,1]))
 								  }))
         if(!is.null(str.note)){
@@ -892,6 +966,12 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 				all.table$SNR <- all.table$logFC/rowSums(all.table[,colName.sd,with=F])
 				.Grp.n.df <- .getStatistics(xdata.rmBE,stat="length")
 				all.table <- merge(all.table,.Grp.n.df)
+				if(T.bin.useZ){
+					.Grp.freq.df <- .getStatistics(xdata.scale,stat="freq")
+				}else{
+					.Grp.freq.df <- .getStatistics(xdata,stat="freq")
+				}
+				all.table <- merge(all.table,.Grp.freq.df)
 			}
         }else{
             .Grp.mean.df <- .getStatistics(xdata)
@@ -908,6 +988,12 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 				all.table$SNR <- all.table$logFC/rowSums(all.table[,colName.sd,with=F])
 				.Grp.n.df <- .getStatistics(xdata,stat="length")
 				all.table <- merge(all.table,.Grp.n.df)
+				if(T.bin.useZ==T){
+					.Grp.freq.df <- .getStatistics(xdata.scale,stat="freq")
+				}else{
+					.Grp.freq.df <- .getStatistics(xdata,stat="freq")
+				}
+				all.table <- merge(all.table,.Grp.freq.df)
 			}
         }
     }
@@ -933,5 +1019,116 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
     return(ret.dat)
 }
 
+#' run DE given an expression matrix
+#' @param xdata data frame or matrix; rows for genes and columns for samples
+#' @param xlabel factor; cluster label of the samples, with length equal to the number of columns in xdata
+#' @param batch factor; covariate. (default: NULL)
+#' @param out.prefix character; if not NULL, write the result to the file(s). (default: NULL)
+#' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
+#' @param T.fdr numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)
+#' @param T.logFC numeric; threshold of the absoute diff (default: 1)
+#' @param verbose integer; verbose (default: 0)
+#' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @param group character; group of interest, if NULL the last group will be used (default: NULL)
+#' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
+#' @param rn.seed integer; random number seed (default: 9999)
+#' @param method character; . (default: "lm")
+#' @details diffeerentially expressed genes dectection using naive methods
+#' @return a matrix with dimention as input ( samples in rows and variables in columns)
+#' @importFrom data.table data.table as.data.table
+#' @importFrom grDevices pdf dev.off
+#' @importFrom stats model.matrix
+#' @importFrom utils write.table
+#' @importFrom matrixStats rowVars
+#' @importFrom RhpcBLASctl omp_set_num_threads
+#' @importFrom BiocParallel MulticoreParam register multicoreWorkers
+#' @export
+run.DE.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsample=NULL,
+			  T.fdr=0.05,T.logFC=1,T.expr=0.3,T.bin.useZ=T,
+			  verbose=0,n.cores=NULL,group=NULL,
+			  gid.mapping=NULL, do.voom=F,rn.seed=9999,method="lm")
+{
+
+    if(ncol(xdata)!=length(xlabel)){
+	warning(sprintf("xdata and xlabel is not consistent!\n"))
+	return(NULL)
+    }
+    names(xlabel) <- colnames(xdata)
+    if(!is.null(ncell.downsample)){
+	set.seed(rn.seed)
+	grp.list <- unique(xlabel)
+	f.cell <- unlist(lapply(grp.list,function(x){
+			     x <- names(xlabel[xlabel==x])
+			     sample(x,min(length(x),ncell.downsample)) }))
+	xlabel <- xlabel[f.cell]
+	if(!is.null(batch)){
+	    names(batch) <- colnames(xdata)
+	    batch <- batch[f.cell]
+	}
+	xdata <- xdata[,f.cell]
+    }
+    xdata <- as.matrix(xdata)
+    f.gene <- rowVars(xdata)>0 & apply(xdata,1,function(x){ !any(is.na(x)) })
+    xdata <- xdata[f.gene,]
+    ####
+    if("_control" %in% xlabel){
+	x.levels <- c("_control",setdiff(unique(sort(xlabel)),"_control"))
+    }else{
+	x.levels <- unique(sort(xlabel))
+    }
+    ### group name for display purpose
+    group.dis <- NULL
+    if(!is.null(group)){
+	tmp.group <- unlist(strsplit(as.character(group),":"))
+	group <- tmp.group[1]
+	if(length(tmp.group)>1){
+	    group.dis <- tmp.group[2]
+	}
+	x.levels <- c(setdiff(x.levels,group),as.character(group))
+    }
+
+    group.label <- x.levels[length(x.levels)]
+
+    RhpcBLASctl::omp_set_num_threads(1)
+    register(MulticoreParam(if(!is.null(n.cores)) n.cores else multicoreWorkers()))
+
+    {
+	all.table <- as.data.table(ldply(rownames(xdata),function(v){
+	    if(is.null(batch)){
+		xdata.v <- data.table(y=xdata[v,],g=xlabel)
+	    }else{
+		xdata.v <- data.table(y=xdata[v,],g=xlabel,b=batch)
+	    }
+	    
+	    {
+		test.out <- wilcox.test(data=xdata.v,y~g)
+		lm.out <- lm(data=xdata.v,y~g)
+		lm.out.s <- summary(lm.out)
+		data.table(geneID=v,
+			   geneSymbol=if(is.null(gid.mapping)) v else gid.mapping[v],
+			   cluster=if(is.null(group.dis)) group.label else group.dis,
+			   logFC=lm.out.s$coefficients[sprintf("g%s",group),"Estimate"],
+			   t=lm.out.s$coefficients[sprintf("g%s",group),"t value"],
+			   p.value=lm.out.s$coefficients[sprintf("g%s",group),"Pr(>|t|)"],
+			   wilcox.p.value=test.out$p.value,
+			   mean._control=mean(xdata.v[g!=group,][["y"]]),
+			   mean._case=mean(xdata.v[g==group,][["y"]]),
+			   sd._control=sd(xdata.v[g!=group,][["y"]]),
+			   sd._case=sd(xdata.v[g==group,][["y"]])
+			   )
+	    }
+	},.parallel=T))
+	all.table$adj.P.Value <- p.adjust(all.table$p.value,method="BH")
+	all.table$wilcox.adj.p.value <- p.adjust(all.table$wilcox.p.value,method="BH")
+	
+	all.table <- all.table[order(adj.P.Value,-t,-logFC),]
+	sig.table <- all.table[adj.P.Value<T.fdr & abs(logFC)>T.logFC,]
+
+    }
+
+    ret.dat <- list(all=all.table,sig=sig.table)
+    return(ret.dat)
+
+}
 
 

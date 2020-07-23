@@ -17,7 +17,11 @@ ssc.clusterMarkerGene(
   F.FDR.THRESHOLD = 0.01,
   pairwise.P.THRESHOLD = 0.01,
   pairwise.FC.THRESHOLD = 1,
-  verbose = F
+  use.Kruskal = F,
+  use.medianMax = F,
+  do.force = F,
+  verbose = F,
+  ...
 )
 }
 \arguments{
@@ -45,7 +49,15 @@ ssc.clusterMarkerGene(
 
 \item{pairwise.FC.THRESHOLD}{numeric; threshold of the absoute diff of HSD-test (default: 1)}
 
+\item{use.Kruskal}{logical; whether use Kruskal test for ranking genes (default: FALSE)}
+
+\item{use.medianMax}{logical; whether use median for gene classification (default: FALSE)}
+
+\item{do.force}{logical; . (default: FALSE)}
+
 \item{verbose}{logical; whether output all genes' result. (default: FALSE)}
+
+\item{...}{parameters passed to findDEGenesByAOV}
 }
 \description{
 identify marker genes of each cluster

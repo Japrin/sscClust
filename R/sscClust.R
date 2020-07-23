@@ -996,7 +996,11 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param F.FDR.THRESHOLD numeric; threshold of the adjusted p value of F-test. (default: 0.01)
 #' @param pairwise.P.THRESHOLD numeric; threshold of the adjusted p value of HSD-test (default: 0.01)
 #' @param pairwise.FC.THRESHOLD numeric; threshold of the absoute diff of HSD-test (default: 1)
+#' @param use.Kruskal logical; whether use Kruskal test for ranking genes (default: FALSE)
+#' @param use.medianMax logical; whether use median for gene classification (default: FALSE)
+#' @param do.force logical; . (default: FALSE)
 #' @param verbose logical; whether output all genes' result. (default: FALSE)
+#' @param ... parameters passed to findDEGenesByAOV
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom doParallel registerDoParallel
 #' @importFrom plyr ldply
@@ -1009,7 +1013,8 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
                                   group.var="majorCluster",batch=NULL,
                                   assay.bin=NULL, out.prefix=NULL,n.cores=NULL, do.plot=T,
                                   F.FDR.THRESHOLD=0.01,pairwise.P.THRESHOLD=0.01,pairwise.FC.THRESHOLD=1,
-                                  verbose=F)
+				  use.Kruskal=F,use.medianMax=F,
+				  do.force=F, verbose=F,...)
 {
 #    requireNamespace("doParallel")
     requireNamespace("plyr")
@@ -1031,7 +1036,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
     if(!is.null(batch)){
         batchV <- colData(obj)[,batch]
     }
-    if(length(unique(clust))<2 || is.null(obj) || !all(table(clust) > 1)){
+    if(!do.force && (length(unique(clust))<2 || is.null(obj) || !all(table(clust) > 1))){
         cat("WARN: clusters<2 or no obj provided or not all clusters have more than 1 samples\n")
         return(NULL)
     }
@@ -1063,7 +1068,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
     }
     ### AUC
     .gene.table <- plyr::ldply(rownames(dat.to.test),function(x){
-        getAUC(dat.to.test[x,],clust,use.rank = F,geneID=x)
+	getAUC(dat.to.test[x,],clust,use.rank = F, use.medianMax=use.medianMax,geneID=x)
     },.progress = "none",.parallel=T)
     #if(is.character(.gene.table$AUC)){ .gene.table$AUC <- as.numeric(.gene.table$AUC) }
     #if(is.character(.gene.table$score.p.value)){ .gene.table$score.p.value <- as.numeric(.gene.table$score.p.value) }
@@ -1077,11 +1082,12 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
     .aov.res <- findDEGenesByAOV(xdata = dat.to.test,
                                  xlabel =if(is.numeric(clust)) sprintf("C%s",clust) else clust,
                                  batch=batchV,
-                                 out.prefix=out.prefix,mod=NULL,
+                                 out.prefix=out.prefix,
                                  F.FDR.THRESHOLD=F.FDR.THRESHOLD,
                                  HSD.FDR.THRESHOLD=pairwise.P.THRESHOLD,
                                  HSD.FC.THRESHOLD=pairwise.FC.THRESHOLD,
-                                 verbose=verbose,n.cores=n.cores, gid.mapping=gid.mapping)
+				 use.Kruskal=use.Kruskal,
+                                 verbose=verbose,n.cores=n.cores, gid.mapping=gid.mapping,...)
     if(verbose){
         .gene.table <- dplyr::inner_join(x = .gene.table,y = .aov.res$aov.out)
     }else{
@@ -1152,7 +1158,11 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @param do.plot logical; whether plot. (default: TRUE)
 #' @param T.fdr numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)
 #' @param T.logFC numeric; threshold of the absoute diff (default: 1)
+#' @param T.expr numeric; threshold for binarizing exprs (default: 0.3)
+#' @param T.bin.useZ logical; wheter use the z-score version of assay.namme for binarizing exprs (default: T)
 #' @param verbose integer; verbose level. (default: 0)
+#' @param do.force logical; . (default: FALSE)
+#' @param method character; . (default: "limma")
 #' @importFrom SummarizedExperiment rowData colData `rowData<-` `colData<-`
 #' @importFrom utils write.table
 #' @importFrom RhpcBLASctl omp_set_num_threads
@@ -1164,8 +1174,8 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                                   group.var="majorCluster",group.list=NULL,group.mode="multi",batch=NULL,
                                   out.prefix=NULL,n.cores=NULL, do.plot=T,
-                                  T.fdr=0.01,T.logFC=1,
-                                  verbose=0)
+                                  T.fdr=0.01,T.logFC=1,T.expr=0.3,T.bin.useZ=T,
+                                  verbose=0,do.force=F,method="limma")
 {
 #    requireNamespace("doParallel")
     requireNamespace("plyr")
@@ -1186,7 +1196,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
         cat("WARN: clusters<2 or no obj provided or not all clusters have more than 1 samples\n")
         return(NULL)
     }
-    if(!all(stat.clust[group.list]>=2)){
+    if(!do.force && !all(stat.clust[group.list]>=2)){
         cat("WARN: not all clusters specified have more than 2 samples\n")
         return(NULL)
     }
@@ -1199,50 +1209,68 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     doParallel::registerDoParallel(cores = n.cores)
     out <- llply(group.list,function(x){
         xlabel <- clust
-		xgroup <- x
-		if(group.mode=="multiAsTwo"){
-			xlabel <- as.character(xlabel)
-			xlabel[xlabel!=x] <- "_control"
-			xlabel[xlabel==x] <- "_case"
-			xlabel <- factor(xlabel,levels=c("_control","_case"))
-			xgroup <- sprintf("_case:%s",x)
-		}
-        out.limma <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
-                                      out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
-                                      group=xgroup,
-									  rn.seed=9999,
-									  ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
-                                      T.fdr=T.fdr,T.logFC=T.logFC,verbose=verbose,n.cores=1,
-                                      gid.mapping=gid.mapping, do.voom=F)
+	xgroup <- x
+	if(group.mode=="multiAsTwo" || method!="limma"){
+	    xlabel <- as.character(xlabel)
+	    xlabel[xlabel!=x] <- "_control"
+	    xlabel[xlabel==x] <- "_case"
+	    xlabel <- factor(xlabel,levels=c("_control","_case"))
+	    xgroup <- sprintf("_case:%s",x)
+	}
+	if(method=="limma")
+	{
+	    obj.out <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
+					  out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
+					  group=xgroup,
+					  rn.seed=9999,
+					  ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
+					  T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
+					  verbose=verbose,n.cores=1,
+					  gid.mapping=gid.mapping, do.voom=F)
+	}else{
+	    obj.out <- run.DE.matrix(assay(obj,assay.name),xlabel,batch=batchV,
+					  out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
+					  group=xgroup,
+					  rn.seed=9999,
+					  ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
+					  T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
+					  verbose=verbose,n.cores=1,
+					  gid.mapping=gid.mapping, do.voom=F,method=method)
+	}
+	return(obj.out)
 
     },.parallel=T)
     names(out) <- group.list
 
     all.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$all }))
     sig.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$sig }))
-	if(verbose>1){
-		fit.list <- llply(group.list,function(x){ out[[as.character(x)]]$fit })
-		names(fit.list) <- group.list
-	}
 
-	if(verbose>2){
-		res.aov <- findDEGenesByAOV(assay(obj,assay.name),clust,batch=batchV, out.prefix=NULL,
-									n.cores=n.cores, gid.mapping=gid.mapping)
-		res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
-		all.table <- merge(all.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
-		sig.table <- merge(sig.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
-		all.table <- all.table[order(all.table$cluster,adj.P.Val,-t,-logFC),]
-		sig.table <- sig.table[order(sig.table$cluster,adj.P.Val,-t,-logFC),]
-	    if(!is.null(out.prefix))
-		{
-			conn <- gzfile(sprintf("%s.limma.all.txt.gz",out.prefix),"w")
-			write.table(all.table,conn,row.names = F,quote = F,sep = "\t")
-			close(conn)
-			conn <- gzfile(sprintf("%s.limma.sig.txt.gz",out.prefix),"w")
-			write.table(sig.table,conn,row.names = F,quote = F,sep = "\t")
-			close(conn)
-		}
+    fit.list <- NULL
+
+    if(verbose>1 & method=="limma"){
+	fit.list <- llply(group.list,function(x){ out[[as.character(x)]]$fit })
+	names(fit.list) <- group.list
+    }
+
+    if(verbose>2)
+    {
+	res.aov <- findDEGenesByAOV(assay(obj,assay.name),clust,batch=batchV, out.prefix=NULL,
+								n.cores=n.cores, gid.mapping=gid.mapping)
+	res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
+	all.table <- merge(all.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
+	sig.table <- merge(sig.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
+	all.table <- all.table[order(all.table$cluster,adj.P.Val,-t,-logFC),]
+	sig.table <- sig.table[order(sig.table$cluster,adj.P.Val,-t,-logFC),]
+	if(!is.null(out.prefix))
+	{
+	    conn <- gzfile(sprintf("%s.limma.all.txt.gz",out.prefix),"w")
+	    write.table(all.table,conn,row.names = F,quote = F,sep = "\t")
+	    close(conn)
+	    conn <- gzfile(sprintf("%s.limma.sig.txt.gz",out.prefix),"w")
+	    write.table(sig.table,conn,row.names = F,quote = F,sep = "\t")
+	    close(conn)
 	}
+    }
 
     return(list(all=all.table,sig=sig.table,fit=fit.list))
 }

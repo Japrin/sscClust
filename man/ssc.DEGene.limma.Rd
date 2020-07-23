@@ -17,7 +17,11 @@ ssc.DEGene.limma(
   do.plot = T,
   T.fdr = 0.01,
   T.logFC = 1,
-  verbose = 0
+  T.expr = 0.3,
+  T.bin.useZ = T,
+  verbose = 0,
+  do.force = F,
+  method = "limma"
 )
 }
 \arguments{
@@ -45,7 +49,15 @@ ssc.DEGene.limma(
 
 \item{T.logFC}{numeric; threshold of the absoute diff (default: 1)}
 
+\item{T.expr}{numeric; threshold for binarizing exprs (default: 0.3)}
+
+\item{T.bin.useZ}{logical; wheter use the z-score version of assay.namme for binarizing exprs (default: T)}
+
 \item{verbose}{integer; verbose level. (default: 0)}
+
+\item{do.force}{logical; . (default: FALSE)}
+
+\item{method}{character; . (default: "limma")}
 }
 \description{
 identify differential genes of each cluster (comparing the cluster with all others), using limma

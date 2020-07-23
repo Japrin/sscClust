@@ -105,13 +105,13 @@ integrate.by.avg <- function(sce.list,
 	assay(sce.pb,"exprs") <- assay(sce.pb,assay.name)
 	##if(is.avg)
 	{
-		cls.info.df <- ldply(names(sce.avg.list),function(x){
-								 o.df <- cbind(data.frame(rid=colnames(sce.avg.list[[x]])),
-											   as.data.frame(colData(sce.avg.list[[x]])))
-								 o.df
-								})
-		rownames(cls.info.df) <- cls.info.df$rid
-		colData(sce.pb) <- DataFrame(cls.info.df[colnames(sce.pb),])
+	    cls.info.df <- ldply(names(sce.avg.list),function(x){
+							     o.df <- cbind(data.frame(rid=colnames(sce.avg.list[[x]])),
+										       as.data.frame(colData(sce.avg.list[[x]])))
+							     o.df
+							    })
+	    rownames(cls.info.df) <- cls.info.df$rid
+	    colData(sce.pb) <- DataFrame(cls.info.df[colnames(sce.pb),])
 	}
 
     ##Differential expressed genes
@@ -329,96 +329,89 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.
 {
 	#### To do: add diff between this - max_other(not this)
 	gene.desc.top <- as.data.table(ldply(unique(sort(obj[[group]])),function(x){
-											 obj.x <- obj[,obj[[group]]==x]
-
-											 dat.long <- ssc.toLongTable(obj.x,gene.id=NULL,
-																		 assay.name=c("dprime","vardprime",
-																					  "P.Value","adj.P.Val","sig"),
-																		 col.idx=group.2nd)
-
-#											 if(!is.null(group.2nd)){
-#												 dat.long$group.2nd <- dat.long[[group.2nd]]
-#											 }else{
-#												 dat.long[,group.2nd:="GRP"]
-#											 }
-
-											 dat.collapse <- NULL
-
-											 ret.tb <- data.table(geneID=rownames(obj.x),
-														geneSymbol=rowData(obj.x)$display.name,
-														meta.cluster=x,
-														Group=x)
-
-											 ret.tb.ext <- dat.long[,.(N.sig=sum(.SD$sig),
-																	   freq.sig=sum(.SD$sig)/nrow(.SD),
-																	   N.total=.N),
-																	by="geneID"]
-
-											 if("dprime" %in% assayNames(obj.x))
-											 {
-												 ret.tb.ext.a <- dat.long[,.(dprime.max=max(dprime),
-																	  dprime.max.P.Value=P.Value[which.max(dprime)],
-																	  dprime.max.adj.P.Val=adj.P.Val[which.max(dprime)]),
-																	by="geneID"]
-												
-												 if(!is.null(group.2nd)){
-													 dat.collapse <- collapseEffectSizeLong(dat.long,mode.collapse=mode.collapse,
-																			group.2nd=group.2nd,
-																			th.adj.P=th.adj.P,th.dprime=th.dprime)
-												 }
-
-												 if(!is.null(dat.collapse)){
-													ret.tb.ext.b <- dat.collapse[,.(N.sig.group.2nd=sum(.SD$sig),
-																			   freq.sig.group.2nd=sum(.SD$sig)/nrow(.SD),
-																			   N.total.group.2nd=.N,
-																			   dprime.max.group.2nd=max(dprime),
-																			   dprime.max.P.Value.group.2nd=P.Value[which.max(dprime)],
-																			   dprime.max.adj.P.group.2nd=adj.P.Val[which.max(dprime)]),
-																			by="geneID"]
-													ret.tb.ext.a <- merge(ret.tb.ext.a,ret.tb.ext.b,by="geneID")
-												 }
-												 ret.tb.ext <- merge(ret.tb.ext,ret.tb.ext.a,by="geneID")
-											 }
-
-											 ret.tb <- merge(ret.tb,ret.tb.ext,by="geneID")
-
-											 ###anames <- intersect(assayNames(obj.x),c("logFC","t","SNR","meanExp","meanScale"))
-											 anames <- intersect(assayNames(obj.x),c("logFC","meanScale"))
-											 ret.m <- cbind(data.table(geneID=rownames(obj.x)),
-															as.data.table(llply(anames,
-																				function(aa){ rowMedians(assay(obj.x,aa)) }))
-															)
-											 colnames(ret.m)[-1] <- sprintf("median.%s",anames)
-											 ret.m[["median.rank"]] <- rowMedians(apply(assay(obj.x,"t"),2,
-																					 function(x){ rank(-x)/length(x)}))
-											 ret.tb <- merge(ret.tb,ret.m,by="geneID")
-											 setkey(ret.tb,"geneID")
-											 ret.tb <- ret.tb[rownames(obj.x),]
-											 all(ret.tb$geneID==rownames(obj.x))
-
-											 if("zp" %in% assayNames(obj.x)){
-												 w <- sqrt(obj.x$nCellsStudy/sum(obj.x$nCellsStudy))
-												 if(!is.null(weight.adj)){
-													w <- w * obj.x[[weight.adj]]
-												 }
-												 zsum <- (assay(obj.x,"zp") %*% w)[,1]
-												 ### two-sided p value
-												 #ret.tb[["p.comb.Stouffer.z"]] <- zsum
-												 ret.tb[["p.comb.Stouffer"]] <- 2*(pnorm(-abs(zsum)))
-												 ret.tb[["p.comb.Stouffer.adj"]] <- p.adjust(ret.tb[["p.comb.Stouffer"]],"BH")
-											 }
-
-											 if("dprime" %in% assayNames(obj.x)){
-												es.combi <- directEScombi(assay(obj.x,"dprime"), assay(obj.x,"vardprime"))
-												es.combi <- es.combi[ret.tb$geneID, ]
-												if(!all(ret.tb$geneID==rownames(es.combi))){
-													stop(sprintf("strange thing: !all(ret.tb$geneID==rownames(es.combi)) (%s)\n",
-																 x))
-												}
-												ret.tb <- cbind(ret.tb,es.combi)
-											 }
-
-											 return(ret.tb)
+			     obj.x <- obj[,obj[[group]]==x]
+			     dat.long <- ssc.toLongTable(obj.x,gene.id=NULL,
+							 assay.name=c("dprime","vardprime",
+								      "P.Value","adj.P.Val",
+								      "sig","freq._case"),
+							 col.idx=group.2nd)
+			     dat.collapse <- NULL
+			     ret.tb <- data.table(geneID=rownames(obj.x),
+						  geneSymbol=rowData(obj.x)$display.name,
+						  meta.cluster=x, Group=x)
+			     
+			     ret.tb.ext <- dat.long[,.(N.sig=sum(.SD$sig),
+						       freq.sig=sum(.SD$sig)/nrow(.SD),
+						       N.total=.N), by="geneID"]
+			     
+			     if("dprime" %in% assayNames(obj.x))
+			     {
+				 ret.tb.ext.a <- dat.long[,.(dprime.max=max(dprime),
+							     dprime.max.P.Value=P.Value[which.max(dprime)],
+							     dprime.max.adj.P.Val=adj.P.Val[which.max(dprime)]),
+							    by="geneID"]
+				 
+				 if(!is.null(group.2nd)){
+				     dat.collapse <- collapseEffectSizeLong(dat.long,mode.collapse=mode.collapse,
+									    group.2nd=group.2nd,
+									    th.adj.P=th.adj.P,
+									    th.dprime=th.dprime)
+				 }
+				 
+				 if(!is.null(dat.collapse)){
+				     ret.tb.ext.b <- dat.collapse[,.(N.sig.group.2nd=sum(.SD$sig),
+								     freq.sig.group.2nd=sum(.SD$sig)/nrow(.SD),
+								     N.total.group.2nd=.N,
+								     dprime.max.group.2nd=max(dprime),
+								     dprime.max.P.Value.group.2nd=P.Value[which.max(dprime)],
+								     dprime.max.adj.P.group.2nd=adj.P.Val[which.max(dprime)]),
+								    by="geneID"]
+				     
+				     ret.tb.ext.a <- merge(ret.tb.ext.a,ret.tb.ext.b,by="geneID")
+				 }
+				 ret.tb.ext <- merge(ret.tb.ext,ret.tb.ext.a,by="geneID")
+			     }
+			     ret.tb <- merge(ret.tb,ret.tb.ext,by="geneID")
+			     anames <- intersect(assayNames(obj.x),c("logFC","meanScale"))
+			     ret.m <- cbind(data.table(geneID=rownames(obj.x)),
+					    as.data.table(llply(anames,function(aa){ rowMedians(assay(obj.x,aa),na.rm=T) })))
+			     colnames(ret.m)[-1] <- sprintf("median.%s",anames)
+			     ret.m[["median.rank"]] <- rowMedians(apply(assay(obj.x,"t"),2, function(x){
+								rank(-x)/length(x)
+								      }),na.rm=T)
+			     ret.tb <- merge(ret.tb,ret.m,by="geneID")
+			     setkey(ret.tb,"geneID")
+			     ret.tb <- ret.tb[rownames(obj.x),]
+			     all(ret.tb$geneID==rownames(obj.x))
+			     
+			     if("zp" %in% assayNames(obj.x)){
+				 w <- sqrt(obj.x$nCellsStudy/sum(obj.x$nCellsStudy))
+				 if(!is.null(weight.adj)){
+				     w <- w * obj.x[[weight.adj]]
+				 }
+				 zsum <- (assay(obj.x,"zp") %*% w)[,1]
+				 ### two-sided p value
+				 ret.tb[["p.comb.Stouffer"]] <- 2*(pnorm(-abs(zsum)))
+				 ret.tb[["p.comb.Stouffer.adj"]] <- p.adjust(ret.tb[["p.comb.Stouffer"]],"BH")
+			     }
+			     
+			     if("dprime" %in% assayNames(obj.x)){
+				 es.combi <- directEScombi(assay(obj.x,"dprime"), assay(obj.x,"vardprime"))
+				 es.combi <- es.combi[ret.tb$geneID, ]
+				 
+				 if(!all(ret.tb$geneID==rownames(es.combi))){
+				     stop(sprintf("strange thing: !all(ret.tb$geneID==rownames(es.combi)) (%s)\n", x))
+				 }
+				 ret.tb <- cbind(ret.tb,es.combi)
+			     }
+			     
+			     if("freq._case" %in% assayNames(obj.x))
+			     {
+				 ret.tb[["bin.freq.comb"]] <- ((assay(obj.x,"freq._case") %*% obj.x$nCellsCluster)[,1])/sum(obj.x$nCellsCluster)
+				 ret.tb[["bin.freq.median"]] <- rowMeans(assay(obj.x,"freq._case"),na.rm=T)
+				 ret.tb[["bin.freq.mean"]] <- rowMedians(assay(obj.x,"freq._case"),na.rm=T)
+			     }
+			     return(ret.tb)
 							   }))
 	gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,gene.desc.top[[sort.by]]), ]
 	###gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,median.rank), ]

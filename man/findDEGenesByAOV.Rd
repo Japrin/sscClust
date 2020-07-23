@@ -9,10 +9,11 @@ findDEGenesByAOV(
   xlabel,
   batch = NULL,
   out.prefix = NULL,
-  mod = NULL,
+  pmod = NULL,
   F.FDR.THRESHOLD = 0.01,
   HSD.FDR.THRESHOLD = 0.01,
   HSD.FC.THRESHOLD = 1,
+  use.Kruskal = F,
   verbose = F,
   n.cores = NULL,
   gid.mapping = NULL
@@ -27,13 +28,15 @@ findDEGenesByAOV(
 
 \item{out.prefix}{character; if not NULL, write the result to the file(s). (default: NULL)}
 
-\item{mod}{character;}
+\item{pmod}{character;}
 
 \item{F.FDR.THRESHOLD}{numeric; threshold of the adjusted p value of F-test. (default: 0.01)}
 
 \item{HSD.FDR.THRESHOLD}{numeric; threshold of the adjusted p value of HSD-test (default: 0.01)}
 
 \item{HSD.FC.THRESHOLD}{numeric; threshold of the absoute diff of HSD-test (default: 1)}
+
+\item{use.Kruskal}{logical; whether use Kruskal test for ranking genes (default: FALSE)}
 
 \item{verbose}{logical; whether output all genes' result. (default: F)}
 
