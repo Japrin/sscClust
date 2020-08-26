@@ -97,9 +97,10 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
   ## avoid conflict between threaded BLAs and foreach
   RhpcBLASctl::omp_set_num_threads(1)
   registerDoParallel(cores = n.cores)
-  ret <- ldply(rownames(xdata),function(v){
+  ret <- as.data.table(ldply(rownames(xdata),function(v){
 
     xdata.v <- data.table(y=xdata[v,],g=xlabel,b=batch)
+    xdata.v[,y.rnk:=rank(y)]
     t.res.kruskal <- kruskal.test(y ~ g,data=xdata.v)
     t.res.kruskal.p <- t.res.kruskal$p.value
     if(is.null(batch)){
@@ -130,6 +131,12 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
 	t.res.posthoc.minP <- cmp.tb$pvalue[1]
 	t.res.posthoc.minPDiff <- cmp.tb$Difference[1]
 	t.res.posthoc.minPCmp <- cmp.tb$cmp[1]
+	xdata.grp.mean <- xdata.v[,.(rnk.mean=mean(y.rnk)),by="g"][order(-rnk.mean),]
+	cmp.minDiff <- cmp.tb[grepl(xdata.grp.mean$g[1],cmp,perl=T) &
+			      grepl(xdata.grp.mean$g[2],cmp,perl=T) ,]
+	t.res.posthoc.minDiff.P <- cmp.minDiff$pvalue[1]
+	t.res.posthoc.minDiff <- cmp.minDiff$Difference[1]
+	t.res.posthoc.minDiff.cmp <- cmp.minDiff$cmp[1]
     }else{
 	aov.out.hsd <- TukeyHSD(aov.out)
 	posthoc.pc.name <- rownames(aov.out.hsd$g)
@@ -142,6 +149,12 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
 	t.res.posthoc.minP <- cmp.tb$p.adj[1]
 	t.res.posthoc.minPDiff <- cmp.tb$diff[1]
 	t.res.posthoc.minPCmp <- cmp.tb$cmp[1]
+	xdata.grp.mean <- xdata.v[,.(mean=mean(y)),by="g"][order(-mean),]
+	cmp.minDiff <- cmp.tb[grepl(xdata.grp.mean$g[1],cmp,perl=T) &
+			      grepl(xdata.grp.mean$g[2],cmp,perl=T) ,]
+	t.res.posthoc.minDiff.P <- cmp.minDiff$p.adj[1]
+	t.res.posthoc.minDiff <- cmp.minDiff$diff[1]
+	t.res.posthoc.minDiff.cmp <- cmp.minDiff$cmp[1]
     }
     {
 	## whether cluster specific ?
@@ -173,25 +186,26 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
       t.res.spe.lable <- "NA"
       t.res.spe.direction <- "NA"
     }
+
     dat.ret <- NULL
+    dat.ret <- data.table("geneID"=v,"F"=t.res.f[1],"F.pvalue"=t.res.f[2],"Kruskal.pvalue"=t.res.kruskal.p)
+    dat.ret <- cbind(dat.ret, t(data.frame(structure(t.res.posthoc,names=c(paste0("PostHoc.diff.",posthoc.pc.name),
+							     paste0("PostHoc.padj.",posthoc.pc.name))))))
+    dat.ret <- cbind(dat.ret,data.table("PostHoc.padj.min"=t.res.posthoc.minP,
+					"PostHoc.padj.min.diff"=t.res.posthoc.minPDiff,
+					"PostHoc.padj.min.cmp"=t.res.posthoc.minPCmp,
+					"PostHoc.minDiff.padj"=t.res.posthoc.minDiff.P,
+					"PostHoc.minDiff"=t.res.posthoc.minDiff,
+					"PostHoc.minDiff.cmp"=t.res.posthoc.minDiff.cmp))
     if(!is.null(pmod) && pmod=="cluster.specific") {
-      dat.ret <- structure(c(v,t.res.f,t.res.kruskal.p,
-			     t.res.posthoc,t.res.posthoc.minP,t.res.posthoc.minPDiff,t.res.posthoc.minPCmp,
-                             t.res.spe,is.clusterSpecific,t.res.spe.lable,t.res.spe.direction),
-                           names=c("geneID","F","F.pvalue","Kruskal.pvalue",
-				   paste0("PostHoc.diff.",posthoc.pc.name),paste0("PostHoc.padj.",posthoc.pc.name),
-                                   "PostHoc.padj.min","PostHoc.padj.min.diff","PostHoc.padj.min.cmp",
-                                   paste0("cluster.specific.",clustNames),
-				   "is.clusterSpecific","cluster.lable","cluster.direction"))
-    }else{
-      dat.ret <- structure(c(v,t.res.f,t.res.kruskal.p,
-			     t.res.posthoc,t.res.posthoc.minP,t.res.posthoc.minPDiff,t.res.posthoc.minPCmp),
-                           names=c("geneID","F","F.pvalue","Kruskal.pvalue",
-				   paste0("PostHoc.diff.",posthoc.pc.name),paste0("PostHoc.padj.",posthoc.pc.name),
-                                   "PostHoc.padj.min","PostHoc.padj.min.diff","PostHoc.padj.min.cmp"))
+	dat.ret <- cbind(dat.ret,t(data.frame(structure(t.res.spe,names=paste0("cluster.specific.",clustNames)))))
+	dat.ret <- cbind(dat.ret,data.table("is.clusterSpecific"=is.clusterSpecific,
+					    "cluster.lable"=t.res.spe.lable,
+					    "cluster.direction"=t.res.spe.direction))
     }
+    
     return(dat.ret)
-  },.progress = "none",.parallel=T)
+  },.progress = "none",.parallel=T))
   #print(str(ret))
 
   if(!is.null(gid.mapping)){
@@ -201,46 +215,34 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
   }
   f.cnames.na <- which(is.na(cnames))
   cnames[f.cnames.na] <- rownames(xdata)[f.cnames.na]
-  ret.df <- data.frame(geneID=rownames(xdata),geneSymbol=cnames,stringsAsFactors=F)
-  ret.df <- merge(ret.df,ret,on="geneID")
-  rownames(ret.df) <- ret.df$geneID
-  ##ret.df <- cbind(ret.df,ret)
-  #rownames(ret.df) <- rownames(xdata)
-  #print(str(ret.df))
-  ## type conversion
-  if(is.null(pmod)){
-    i <- 3:(ncol(ret.df)-1)
-    ret.df[i]<-lapply(ret.df[i],as.numeric)
-  }else{
-    i <- 3:(ncol(ret.df)-(4+length(clustNames)))
-    ret.df[i]<-lapply(ret.df[i],as.numeric)
-    i <- (ncol(ret.df)-(length(clustNames)+2)):(ncol(ret.df)-2)
-    ret.df[i]<-lapply(ret.df[i],as.logical)
-  }
+  
+  ret.df <- data.table(geneID=rownames(xdata),geneSymbol=cnames)
+  ret.df <- merge(ret.df,ret,by="geneID")
+  
   ## adjust F test's p value
   ret.df$F.adjp <- 1
   ret.df$Kruskal.adjp <- 1
-  ret.df.1 <- subset(ret.df,!is.na(F.pvalue))
-  ret.df.1$F.adjp <- p.adjust(ret.df.1[,"F.pvalue"],method = "BH")
-  ret.df.2 <- subset(ret.df,is.na(F.pvalue))
+  ret.df.1 <- ret.df[!is.na(F.pvalue),]
+  ret.df.1$F.adjp <- p.adjust(ret.df.1$F.pvalue,method = "BH")
+  ret.df.2 <- ret.df[is.na(F.pvalue),]
   ret.df <- rbind(ret.df.1,ret.df.2)
   ##
-  ret.df.3 <- subset(ret.df,!is.na(Kruskal.pvalue))
-  ret.df.3$Kruskal.adjp <- p.adjust(ret.df.3[,"Kruskal.pvalue"],method="BH")
-  ret.df.4 <- subset(ret.df,is.na(Kruskal.pvalue))
+  ret.df.3 <- ret.df[!is.na(Kruskal.pvalue),]
+  ret.df.3$Kruskal.adjp <- p.adjust(ret.df.3$Kruskal.pvalue,method="BH")
+  ret.df.4 <- ret.df[is.na(Kruskal.pvalue),]
   ret.df <- rbind(ret.df.3,ret.df.4)
   ##
-  ret.df <- ret.df[order(ret.df$F.adjp,-ret.df$F,ret.df$PostHoc.padj.min),]
+  ret.df <- ret.df[order(F.adjp,-F,PostHoc.padj.min),]
   ### select
   if(use.Kruskal){
-      ret.df <- ret.df[order(ret.df$Kruskal.adjp,-ret.df$F,ret.df$PostHoc.padj.min),]
-      ret.df.sig <- subset(ret.df,Kruskal.adjp<F.FDR.THRESHOLD &
+      ret.df <- ret.df[order(Kruskal.adjp,-F,PostHoc.padj.min),]
+      ret.df.sig <- ret.df[Kruskal.adjp<F.FDR.THRESHOLD &
 			   PostHoc.padj.min<HSD.FDR.THRESHOLD &
-			   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD)
+			   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD,]
   }else{
-      ret.df.sig <- subset(ret.df,F.adjp<F.FDR.THRESHOLD &
+      ret.df.sig <- ret.df[F.adjp<F.FDR.THRESHOLD &
 			   PostHoc.padj.min<HSD.FDR.THRESHOLD &
-			   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD)
+			   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD,]
   }
   ### output
   if(!is.null(out.prefix)){
@@ -260,8 +262,8 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
 #' @param labels character; clusters of the samples belong to
 #' @param use.rank logical; using the expression value itself or convert to rank value. (default: TRUE)
 #' @param geneID character; geneID
-#' @param use.medianMax logical; whether use median for gene classification (default: FALSE)
-getAUC <- function(gene, labels,use.rank=T,geneID="GeneX",use.medianMax=F)
+#' @param method.Max character; method to find highest group, one of "mean", "median", "rank.mean" (default: mean)
+getAUC <- function(gene, labels,use.rank=T,geneID="GeneX",method.Max="mean")
 {
     requireNamespace("ROCR")
 
@@ -271,7 +273,12 @@ getAUC <- function(gene, labels,use.rank=T,geneID="GeneX",use.medianMax=F)
         score <- gene
     }
     # Get average score for each cluster
-    ms <- aggregate(score ~ labels, FUN = if(use.medianMax) median else mean)
+    if(method.Max=="rank.mean"){
+	score.rnk <- rank(gene)
+	ms <- aggregate(score.rnk ~ labels, FUN = mean)
+    }else{
+	ms <- aggregate(score ~ labels, FUN = if(method.Max=="median") median else mean)
+    }
     # Get cluster with highest average score
     posgroup <- ms[ms$score == max(ms$score), ]$labels
     # Return negatives if there is a tie for cluster with highest average score

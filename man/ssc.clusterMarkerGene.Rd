@@ -18,7 +18,7 @@ ssc.clusterMarkerGene(
   pairwise.P.THRESHOLD = 0.01,
   pairwise.FC.THRESHOLD = 1,
   use.Kruskal = F,
-  use.medianMax = F,
+  method.Max = "mean",
   do.force = F,
   verbose = F,
   ...
@@ -51,7 +51,7 @@ ssc.clusterMarkerGene(
 
 \item{use.Kruskal}{logical; whether use Kruskal test for ranking genes (default: FALSE)}
 
-\item{use.medianMax}{logical; whether use median for gene classification (default: FALSE)}
+\item{method.Max}{character; method to find highest group, one of "mean", "median", "rank.mean" (default: mean)}
 
 \item{do.force}{logical; . (default: FALSE)}
 

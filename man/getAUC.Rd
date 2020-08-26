@@ -4,7 +4,7 @@
 \alias{getAUC}
 \title{calculate the AUC of one gene, using it as a classifier. code from SC3}
 \usage{
-getAUC(gene, labels, use.rank = T, geneID = "GeneX", use.medianMax = F)
+getAUC(gene, labels, use.rank = T, geneID = "GeneX", method.Max = "mean")
 }
 \arguments{
 \item{gene}{numeric; expression profile of one gene across samples}
@@ -15,7 +15,7 @@ getAUC(gene, labels, use.rank = T, geneID = "GeneX", use.medianMax = F)
 
 \item{geneID}{character; geneID}
 
-\item{use.medianMax}{logical; whether use median for gene classification (default: FALSE)}
+\item{method.Max}{character; method to find highest group, one of "mean", "median", "rank.mean" (default: mean)}
 }
 \description{
 calculate the AUC of one gene, using it as a classifier. code from SC3

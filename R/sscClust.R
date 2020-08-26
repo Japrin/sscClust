@@ -997,7 +997,7 @@ ssc.run <- function(obj, assay.name="exprs",
 #' @param pairwise.P.THRESHOLD numeric; threshold of the adjusted p value of HSD-test (default: 0.01)
 #' @param pairwise.FC.THRESHOLD numeric; threshold of the absoute diff of HSD-test (default: 1)
 #' @param use.Kruskal logical; whether use Kruskal test for ranking genes (default: FALSE)
-#' @param use.medianMax logical; whether use median for gene classification (default: FALSE)
+#' @param method.Max character; method to find highest group, one of "mean", "median", "rank.mean" (default: mean)
 #' @param do.force logical; . (default: FALSE)
 #' @param verbose logical; whether output all genes' result. (default: FALSE)
 #' @param ... parameters passed to findDEGenesByAOV
@@ -1013,7 +1013,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
                                   group.var="majorCluster",batch=NULL,
                                   assay.bin=NULL, out.prefix=NULL,n.cores=NULL, do.plot=T,
                                   F.FDR.THRESHOLD=0.01,pairwise.P.THRESHOLD=0.01,pairwise.FC.THRESHOLD=1,
-				  use.Kruskal=F,use.medianMax=F,
+				  use.Kruskal=F,method.Max="mean",
 				  do.force=F, verbose=F,...)
 {
 #    requireNamespace("doParallel")
@@ -1068,7 +1068,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
     }
     ### AUC
     .gene.table <- plyr::ldply(rownames(dat.to.test),function(x){
-	getAUC(dat.to.test[x,],clust,use.rank = F, use.medianMax=use.medianMax,geneID=x)
+	sscClust:::getAUC(dat.to.test[x,],clust,use.rank = (method.Max=="rank.mean"), method.Max=method.Max,geneID=x)
     },.progress = "none",.parallel=T)
     #if(is.character(.gene.table$AUC)){ .gene.table$AUC <- as.numeric(.gene.table$AUC) }
     #if(is.character(.gene.table$score.p.value)){ .gene.table$score.p.value <- as.numeric(.gene.table$score.p.value) }
@@ -1122,7 +1122,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
                     row.names = F,quote = F,sep = "\t")
     }
     ### final .gene.table always contain only thoase show significant differential expression
-    f.isSig <- intersect(rownames(.aov.res$aov.out.sig),rownames(.gene.table))
+    f.isSig <- intersect(.aov.res$aov.out.sig$geneID,rownames(.gene.table))
     .gene.table <- .gene.table[f.isSig,]
     .gene.table$score.q.value <- p.adjust(.gene.table$score.p.value,method = "BH")
     order.gene <- order(.gene.table$cluster,-.gene.table$AUC)
