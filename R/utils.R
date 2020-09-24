@@ -866,11 +866,11 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
             names(batch) <- colnames(xdata)
             batch <- batch[f.cell]
         }
-        xdata <- xdata[,f.cell]
+        xdata <- xdata[,f.cell,drop=F]
     }
     xdata <- as.matrix(xdata)
     f.gene <- rowVars(xdata)>0 & apply(xdata,1,function(x){ !any(is.na(x)) })
-    xdata <- xdata[f.gene,]
+    xdata <- xdata[f.gene,,drop=F]
     ####
 	if("_control" %in% xlabel){
 		x.levels <- c("_control",setdiff(unique(sort(xlabel)),"_control"))
@@ -1072,11 +1072,11 @@ run.DE.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsamp
 	    names(batch) <- colnames(xdata)
 	    batch <- batch[f.cell]
 	}
-	xdata <- xdata[,f.cell]
+	xdata <- xdata[,f.cell,drop=F]
     }
     xdata <- as.matrix(xdata)
     f.gene <- rowVars(xdata)>0 & apply(xdata,1,function(x){ !any(is.na(x)) })
-    xdata <- xdata[f.gene,]
+    xdata <- xdata[f.gene,,drop=F]
     ####
     if("_control" %in% xlabel){
 	x.levels <- c("_control",setdiff(unique(sort(xlabel)),"_control"))

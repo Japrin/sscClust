@@ -1254,7 +1254,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 
     if(verbose>2)
     {
-	res.aov <- findDEGenesByAOV(assay(obj,assay.name),clust,batch=batchV, out.prefix=NULL,
+	res.aov <- findDEGenesByAOV(as.matrix(assay(obj,assay.name)),clust,batch=batchV, out.prefix=NULL,
 								n.cores=n.cores, gid.mapping=gid.mapping)
 	res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
 	all.table <- merge(all.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
