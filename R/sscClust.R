@@ -1169,6 +1169,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @importFrom limma lmFit eBayes topTable
 #' @importFrom doParallel registerDoParallel
 #' @importFrom plyr ldply llply
+#' @importFrom sscVis loginfo
 #' @details identify differential genes using limma
 #' @export
 ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
@@ -1211,15 +1212,14 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     ### verbose==0, F test only
     {
 
-        ##tic("findDEGenesByAOV")
+        loginfo("begin findDEGenesByAOV ...")
         res.aov <- findDEGenesByAOV(xdata=as.matrix(assay(obj,assay.name)),
                                                xlabel=clust,
                                                batch=batchV, out.prefix=NULL,
                                                F.only=T,
                                                n.cores=n.cores, gid.mapping=gid.mapping,ncell.downsample=ncell.downsample)
-        ##toc()
-
         res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
+        loginfo("end findDEGenesByAOV.")
         #return(list(res.aov=res.aov))
     }
 
@@ -1238,6 +1238,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
             }
             if(method=="limma")
             {
+                loginfo("begin run.limma.matrix ...")
                 obj.out <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
                               out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
                               group=xgroup,
@@ -1246,7 +1247,9 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                               T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
                               verbose=verbose,n.cores=1,
                               gid.mapping=gid.mapping, do.voom=F)
+                loginfo("end run.limma.matrix .")
             }else{
+                loginfo("begin run.DE.matrix ...")
                 obj.out <- run.DE.matrix(assay(obj,assay.name),xlabel,batch=batchV,
                               out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
                               group=xgroup,
@@ -1255,6 +1258,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                               T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
                               verbose=verbose,n.cores=1,
                               gid.mapping=gid.mapping, do.voom=F,method=method)
+                loginfo("end run.DE.matrix ...")
             }
             return(obj.out)
 

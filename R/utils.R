@@ -272,7 +272,7 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
                    abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD,]
       }
   }else{
-      ret.df <- ret.df[order(F.adjP,-F),]
+      ret.df <- ret.df[order(F.adjp,-F),]
       ret.df.sig <- ret.df[F.adjp < F.FDR.THRESHOLD,]
   }
   ### output
