@@ -65,6 +65,7 @@ findKneePoint <- function(pcs)
 #' @param use.Kruskal logical; whether use Kruskal test for ranking genes (default: FALSE)
 #' @param verbose logical; whether output all genes' result. (default: F)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
+#' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
 #' @return List with the following elements:
 #' \item{aov.out}{data.frame, test result of all genes (rownames of xdata)}
@@ -73,10 +74,23 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
                              F.FDR.THRESHOLD=0.01,
                              HSD.FDR.THRESHOLD=0.01,
                              HSD.FC.THRESHOLD=1,
-			     use.Kruskal=F,
+                             use.Kruskal=F,
                              verbose=F,n.cores=NULL,
+                             ncell.downsample=NULL,
                              gid.mapping=NULL)
 {
+
+  if(is.null(names(xlabel))) { names(xlabel) <- colnames(xdata) }
+  #### downsample
+  if(!is.null(ncell.downsample)){
+    grp.list <- unique(as.character(xlabel))
+    f.cell <- unname(unlist(sapply(grp.list, function(x) {
+                x <- names(xlabel[xlabel == x])
+                sample(x, min(length(x), ncell.downsample))
+            })))
+    xdata <- xdata[,f.cell,drop=F]
+    xlabel <- xlabel[f.cell]
+  }  
   ####
   f.rm <- rowSds(xdata)==0
   xdata <- xdata[!f.rm,,drop=F]

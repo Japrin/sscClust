@@ -1160,7 +1160,7 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @param T.logFC numeric; threshold of the absoute diff (default: 1)
 #' @param T.expr numeric; threshold for binarizing exprs (default: 0.3)
 #' @param T.bin.useZ logical; wheter use the z-score version of assay.namme for binarizing exprs (default: T)
-#' @param verbose integer; verbose level. (default: 0)
+#' @param verbose integer; verbose level. (default: 1)
 #' @param do.force logical; . (default: FALSE)
 #' @param method character; . (default: "limma")
 #' @importFrom SummarizedExperiment rowData colData `rowData<-` `colData<-`
@@ -1175,7 +1175,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                                   group.var="majorCluster",group.list=NULL,group.mode="multi",batch=NULL,
                                   out.prefix=NULL,n.cores=NULL, do.plot=T,
                                   T.fdr=0.01,T.logFC=1,T.expr=0.3,T.bin.useZ=T,
-                                  verbose=0,do.force=F,method="limma")
+                                  verbose=1,do.force=F,method="limma")
 {
 #    requireNamespace("doParallel")
     requireNamespace("plyr")
@@ -1207,69 +1207,86 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 
     RhpcBLASctl::omp_set_num_threads(1)
     doParallel::registerDoParallel(cores = n.cores)
-    out <- llply(group.list,function(x){
-        xlabel <- clust
-	xgroup <- x
-	if(group.mode=="multiAsTwo" || method!="limma"){
-	    xlabel <- as.character(xlabel)
-	    xlabel[xlabel!=x] <- "_control"
-	    xlabel[xlabel==x] <- "_case"
-	    xlabel <- factor(xlabel,levels=c("_control","_case"))
-	    xgroup <- sprintf("_case:%s",x)
-	}
-	if(method=="limma")
-	{
-	    obj.out <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
-					  out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
-					  group=xgroup,
-					  rn.seed=9999,
-					  ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
-					  T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
-					  verbose=verbose,n.cores=1,
-					  gid.mapping=gid.mapping, do.voom=F)
-	}else{
-	    obj.out <- run.DE.matrix(assay(obj,assay.name),xlabel,batch=batchV,
-					  out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
-					  group=xgroup,
-					  rn.seed=9999,
-					  ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
-					  T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
-					  verbose=verbose,n.cores=1,
-					  gid.mapping=gid.mapping, do.voom=F,method=method)
-	}
-	return(obj.out)
 
-    },.parallel=T)
-    names(out) <- group.list
+    ### verbose==0, F test only
+    {
 
-    all.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$all }))
-    sig.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$sig }))
+        ##tic("findDEGenesByAOV")
+        res.aov <- findDEGenesByAOV(xdata=as.matrix(assay(obj,assay.name)),
+                                               xlabel=clust,
+                                               batch=batchV, out.prefix=NULL,
+                                               n.cores=n.cores, gid.mapping=gid.mapping,ncell.downsample=ncell.downsample)
+        ##toc()
 
-    fit.list <- NULL
-
-    if(verbose>1 & method=="limma"){
-	fit.list <- llply(group.list,function(x){ out[[as.character(x)]]$fit })
-	names(fit.list) <- group.list
+        res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
+        #return(list(res.aov=res.aov))
     }
 
-    if(verbose>2)
+    ### verbose==1
+    ##if(verbose > 0)
     {
-	res.aov <- findDEGenesByAOV(as.matrix(assay(obj,assay.name)),clust,batch=batchV, out.prefix=NULL,
-								n.cores=n.cores, gid.mapping=gid.mapping)
-	res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
-	all.table <- merge(all.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
-	sig.table <- merge(sig.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
-	all.table <- all.table[order(all.table$cluster,adj.P.Val,-t,-logFC),]
-	sig.table <- sig.table[order(sig.table$cluster,adj.P.Val,-t,-logFC),]
-	if(!is.null(out.prefix))
-	{
-	    conn <- gzfile(sprintf("%s.limma.all.txt.gz",out.prefix),"w")
-	    write.table(all.table,conn,row.names = F,quote = F,sep = "\t")
-	    close(conn)
-	    conn <- gzfile(sprintf("%s.limma.sig.txt.gz",out.prefix),"w")
-	    write.table(sig.table,conn,row.names = F,quote = F,sep = "\t")
-	    close(conn)
-	}
+        out <- llply(group.list,function(x){
+            xlabel <- clust
+            xgroup <- x
+            if(group.mode=="multiAsTwo" || method!="limma"){
+                xlabel <- as.character(xlabel)
+                xlabel[xlabel!=x] <- "_control"
+                xlabel[xlabel==x] <- "_case"
+                xlabel <- factor(xlabel,levels=c("_control","_case"))
+                xgroup <- sprintf("_case:%s",x)
+            }
+            if(method=="limma")
+            {
+                obj.out <- run.limma.matrix(assay(obj,assay.name),xlabel,batch=batchV,
+                              out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
+                              group=xgroup,
+                              rn.seed=9999,
+                              ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
+                              T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
+                              verbose=verbose,n.cores=1,
+                              gid.mapping=gid.mapping, do.voom=F)
+            }else{
+                obj.out <- run.DE.matrix(assay(obj,assay.name),xlabel,batch=batchV,
+                              out.prefix=if(is.null(out.prefix)) NULL else sprintf("%s.%s",out.prefix,x),
+                              group=xgroup,
+                              rn.seed=9999,
+                              ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
+                              T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
+                              verbose=verbose,n.cores=1,
+                              gid.mapping=gid.mapping, do.voom=F,method=method)
+            }
+            return(obj.out)
+
+        },.parallel=T)
+        names(out) <- group.list
+
+        all.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$all }))
+        sig.table <- data.table(ldply(group.list,function(x){ out[[as.character(x)]]$sig }))
+
+        #res.aov <- findDEGenesByAOV(as.matrix(assay(obj,assay.name)),clust,batch=batchV, out.prefix=NULL,
+        #                            n.cores=n.cores, gid.mapping=gid.mapping)
+        #res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
+        all.table <- merge(all.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
+        sig.table <- merge(sig.table,res.aov$aov.out[,c("geneID","F","F.pvalue","F.adjp","F.rank")],by="geneID")
+        all.table <- all.table[order(all.table$cluster,adj.P.Val,-t,-logFC),]
+        sig.table <- sig.table[order(sig.table$cluster,adj.P.Val,-t,-logFC),]
+    }
+
+    fit.list <- NULL
+    ### verbose 2 or 3
+    if(verbose>1 & method=="limma"){
+        fit.list <- llply(group.list,function(x){ out[[as.character(x)]]$fit })
+        names(fit.list) <- group.list
+    }
+
+    if(!is.null(out.prefix))
+    {
+        conn <- gzfile(sprintf("%s.limma.all.txt.gz",out.prefix),"w")
+        write.table(all.table,conn,row.names = F,quote = F,sep = "\t")
+        close(conn)
+        conn <- gzfile(sprintf("%s.limma.sig.txt.gz",out.prefix),"w")
+        write.table(sig.table,conn,row.names = F,quote = F,sep = "\t")
+        close(conn)
     }
 
     return(list(all=all.table,sig=sig.table,fit=fit.list))
