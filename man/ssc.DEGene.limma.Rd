@@ -19,7 +19,7 @@ ssc.DEGene.limma(
   T.logFC = 1,
   T.expr = 0.3,
   T.bin.useZ = T,
-  verbose = 0,
+  verbose = 1,
   do.force = F,
   method = "limma"
 )
@@ -53,7 +53,7 @@ ssc.DEGene.limma(
 
 \item{T.bin.useZ}{logical; wheter use the z-score version of assay.namme for binarizing exprs (default: T)}
 
-\item{verbose}{integer; verbose level. (default: 0)}
+\item{verbose}{integer; verbose level. (default: 1)}
 
 \item{do.force}{logical; . (default: FALSE)}
 

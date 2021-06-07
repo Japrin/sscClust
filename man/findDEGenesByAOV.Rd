@@ -16,6 +16,7 @@ findDEGenesByAOV(
   use.Kruskal = F,
   verbose = F,
   n.cores = NULL,
+  ncell.downsample = NULL,
   gid.mapping = NULL
 )
 }
@@ -41,6 +42,8 @@ findDEGenesByAOV(
 \item{verbose}{logical; whether output all genes' result. (default: F)}
 
 \item{n.cores}{integer; number of cores used, if NULL it will be determined automatically (default: NULL)}
+
+\item{ncell.downsample}{integer; for each group, number of cells downsample to. (default: NULL)}
 
 \item{gid.mapping}{named character; gene id to gene symbol mapping. (default: NULL)}
 }
