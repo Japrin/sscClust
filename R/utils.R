@@ -63,6 +63,7 @@ findKneePoint <- function(pcs)
 #' @param HSD.FDR.THRESHOLD numeric; threshold of the adjusted p value of HSD-test (default: 0.01)
 #' @param HSD.FC.THRESHOLD numeric; threshold of the absoute diff of HSD-test (default: 1)
 #' @param use.Kruskal logical; whether use Kruskal test for ranking genes (default: FALSE)
+#' @param F.only logical; only perform F-test (default: FALSE)
 #' @param verbose logical; whether output all genes' result. (default: F)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 #' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
@@ -75,6 +76,7 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
                              HSD.FDR.THRESHOLD=0.01,
                              HSD.FC.THRESHOLD=1,
                              use.Kruskal=F,
+                             F.only=F,
                              verbose=F,n.cores=NULL,
                              ncell.downsample=NULL,
                              gid.mapping=NULL)
@@ -115,8 +117,10 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
 
     xdata.v <- data.table(y=xdata[v,],g=xlabel,b=batch)
     xdata.v[,y.rnk:=rank(y)]
+
     t.res.kruskal <- kruskal.test(y ~ g,data=xdata.v)
     t.res.kruskal.p <- t.res.kruskal$p.value
+
     if(is.null(batch)){
         aov.out <- aov(y ~ g,data=xdata.v)
     }else{
@@ -125,64 +129,72 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
     aov.out.s <- summary(aov.out)
     t.res.f <- unlist(aov.out.s[[1]]["g",c("F value","Pr(>F)")])
 
+    dat.ret <- NULL
+    dat.ret <- data.table("geneID"=v,"F"=t.res.f[1],"F.pvalue"=t.res.f[2],"Kruskal.pvalue"=t.res.kruskal.p)
+    if(F.only){ return(dat.ret) }
+
     pairwise.cmp.tb <- NULL
     posthoc.pc.name <- NULL
     if(use.Kruskal){
-	###t.res.kruskalmc <- pgirmess::kruskalmc(y~g, data=data.frame(y=xdata[v,],g=xlabel),
-	###				       probs = 0.05, cont=NULL)
-	#t.res.kruskal <- with(xdata.v,agricolae::kruskal(y,g,alpha=0.01,p.adj="BH",group=F))
-	#t.res.kruskal.p <- t.res.kruskal$statistics$p.chisq
-	t.res.posthoc.raw <- with(xdata.v,agricolae::kruskal(y,g,alpha=HSD.FDR.THRESHOLD,p.adj="BH",group=F))
-	posthoc.pc.name <- gsub(" ","",rownames(t.res.posthoc.raw$comparison))
-	cmp.tb <- as.data.table(t.res.posthoc.raw$comparison)
-	cmp.tb$cmp <- posthoc.pc.name
-	cmp.tb <- cmp.tb[order(pvalue,-abs(Difference)),]
-	pairwise.cmp.tb <- cmp.tb
-	pairwise.cmp.tb$diff <- pairwise.cmp.tb$Difference
-	pairwise.cmp.tb$p.adj <- pairwise.cmp.tb$pvalue
-	### pvalue actually is adjusted p value
-	t.res.posthoc <- c(t.res.posthoc.raw$comparison[,"Difference"],t.res.posthoc.raw$comparison[,"pvalue"])
-	t.res.posthoc.minP <- cmp.tb$pvalue[1]
-	t.res.posthoc.minPDiff <- cmp.tb$Difference[1]
-	t.res.posthoc.minPCmp <- cmp.tb$cmp[1]
-	xdata.grp.mean <- xdata.v[,.(rnk.mean=mean(y.rnk)),by="g"][order(-rnk.mean),]
-	cmp.minDiff <- cmp.tb[grepl(xdata.grp.mean$g[1],cmp,perl=T) &
-			      grepl(xdata.grp.mean$g[2],cmp,perl=T) ,]
-	t.res.posthoc.minDiff.P <- cmp.minDiff$pvalue[1]
-	t.res.posthoc.minDiff <- cmp.minDiff$Difference[1]
-	t.res.posthoc.minDiff.cmp <- cmp.minDiff$cmp[1]
+        ###t.res.kruskalmc <- pgirmess::kruskalmc(y~g, data=data.frame(y=xdata[v,],g=xlabel),
+        ###				       probs = 0.05, cont=NULL)
+        #t.res.kruskal <- with(xdata.v,agricolae::kruskal(y,g,alpha=0.01,p.adj="BH",group=F))
+        #t.res.kruskal.p <- t.res.kruskal$statistics$p.chisq
+
+        #t.res.kruskal <- kruskal.test(y ~ g,data=xdata.v)
+        #t.res.kruskal.p <- t.res.kruskal$p.value
+
+        t.res.posthoc.raw <- with(xdata.v,agricolae::kruskal(y,g,alpha=HSD.FDR.THRESHOLD,p.adj="BH",group=F))
+        posthoc.pc.name <- gsub(" ","",rownames(t.res.posthoc.raw$comparison))
+        cmp.tb <- as.data.table(t.res.posthoc.raw$comparison)
+        cmp.tb$cmp <- posthoc.pc.name
+        cmp.tb <- cmp.tb[order(pvalue,-abs(Difference)),]
+        pairwise.cmp.tb <- cmp.tb
+        pairwise.cmp.tb$diff <- pairwise.cmp.tb$Difference
+        pairwise.cmp.tb$p.adj <- pairwise.cmp.tb$pvalue
+        ### pvalue actually is adjusted p value
+        t.res.posthoc <- c(t.res.posthoc.raw$comparison[,"Difference"],t.res.posthoc.raw$comparison[,"pvalue"])
+        t.res.posthoc.minP <- cmp.tb$pvalue[1]
+        t.res.posthoc.minPDiff <- cmp.tb$Difference[1]
+        t.res.posthoc.minPCmp <- cmp.tb$cmp[1]
+        xdata.grp.mean <- xdata.v[,.(rnk.mean=mean(y.rnk)),by="g"][order(-rnk.mean),]
+        cmp.minDiff <- cmp.tb[grepl(xdata.grp.mean$g[1],cmp,perl=T) &
+                      grepl(xdata.grp.mean$g[2],cmp,perl=T) ,]
+        t.res.posthoc.minDiff.P <- cmp.minDiff$pvalue[1]
+        t.res.posthoc.minDiff <- cmp.minDiff$Difference[1]
+        t.res.posthoc.minDiff.cmp <- cmp.minDiff$cmp[1]
     }else{
-	aov.out.hsd <- TukeyHSD(aov.out)
-	posthoc.pc.name <- rownames(aov.out.hsd$g)
-	cmp.tb <- as.data.table(aov.out.hsd$g)
-	cmp.tb$cmp <- posthoc.pc.name
-	colnames(cmp.tb) <- make.names(colnames(cmp.tb))
-	cmp.tb <- cmp.tb[order(p.adj,-abs(diff)),]
-	pairwise.cmp.tb <- cmp.tb
-	t.res.posthoc <- c(aov.out.hsd$g[,"diff"],aov.out.hsd$g[,"p adj"])
-	t.res.posthoc.minP <- cmp.tb$p.adj[1]
-	t.res.posthoc.minPDiff <- cmp.tb$diff[1]
-	t.res.posthoc.minPCmp <- cmp.tb$cmp[1]
-	xdata.grp.mean <- xdata.v[,.(mean=mean(y)),by="g"][order(-mean),]
-	cmp.minDiff <- cmp.tb[grepl(xdata.grp.mean$g[1],cmp,perl=T) &
-			      grepl(xdata.grp.mean$g[2],cmp,perl=T) ,]
-	t.res.posthoc.minDiff.P <- cmp.minDiff$p.adj[1]
-	t.res.posthoc.minDiff <- cmp.minDiff$diff[1]
-	t.res.posthoc.minDiff.cmp <- cmp.minDiff$cmp[1]
+        aov.out.hsd <- TukeyHSD(aov.out)
+        posthoc.pc.name <- rownames(aov.out.hsd$g)
+        cmp.tb <- as.data.table(aov.out.hsd$g)
+        cmp.tb$cmp <- posthoc.pc.name
+        colnames(cmp.tb) <- make.names(colnames(cmp.tb))
+        cmp.tb <- cmp.tb[order(p.adj,-abs(diff)),]
+        pairwise.cmp.tb <- cmp.tb
+        t.res.posthoc <- c(aov.out.hsd$g[,"diff"],aov.out.hsd$g[,"p adj"])
+        t.res.posthoc.minP <- cmp.tb$p.adj[1]
+        t.res.posthoc.minPDiff <- cmp.tb$diff[1]
+        t.res.posthoc.minPCmp <- cmp.tb$cmp[1]
+        xdata.grp.mean <- xdata.v[,.(mean=mean(y)),by="g"][order(-mean),]
+        cmp.minDiff <- cmp.tb[grepl(xdata.grp.mean$g[1],cmp,perl=T) &
+                      grepl(xdata.grp.mean$g[2],cmp,perl=T) ,]
+        t.res.posthoc.minDiff.P <- cmp.minDiff$p.adj[1]
+        t.res.posthoc.minDiff <- cmp.minDiff$diff[1]
+        t.res.posthoc.minDiff.cmp <- cmp.minDiff$cmp[1]
     }
     {
-	## whether cluster specific ?
-	t.res.spe  <-  sapply(clustNames,function(v){
-				  all(pairwise.cmp.tb[grepl(v,cmp,perl=T),][["p.adj"]] < HSD.FDR.THRESHOLD) })
-				  ##all( aov.out.hsd$g[grepl(v,hsd.name,perl=T),"p adj"] < HSD.FDR.THRESHOLD )
-	## wheter up across all comparison ?
-	is.up <- sapply(clustNames,function(v){
-			    all(pairwise.cmp.tb[grepl(paste0(v,"-"),posthoc.pc.name),][["diff"]] > 0) &
-			    all(pairwise.cmp.tb[grepl(paste0("-",v),posthoc.pc.name),][["diff"]] < 0) })
+        ## whether cluster specific ?
+        t.res.spe  <-  sapply(clustNames,function(v){
+                      all(pairwise.cmp.tb[grepl(v,cmp,perl=T),][["p.adj"]] < HSD.FDR.THRESHOLD) })
+                      ##all( aov.out.hsd$g[grepl(v,hsd.name,perl=T),"p adj"] < HSD.FDR.THRESHOLD )
+        ## wheter up across all comparison ?
+        is.up <- sapply(clustNames,function(v){
+                    all(pairwise.cmp.tb[grepl(paste0(v,"-"),posthoc.pc.name),][["diff"]] > 0) &
+                    all(pairwise.cmp.tb[grepl(paste0("-",v),posthoc.pc.name),][["diff"]] < 0) })
 
-	is.down <- sapply(clustNames,function(v){
-			    all(pairwise.cmp.tb[grepl(paste0(v,"-"),posthoc.pc.name),][["diff"]] < 0) &
-			    all(pairwise.cmp.tb[grepl(paste0("-",v),posthoc.pc.name),][["diff"]] > 0) })
+        is.down <- sapply(clustNames,function(v){
+                    all(pairwise.cmp.tb[grepl(paste0(v,"-"),posthoc.pc.name),][["diff"]] < 0) &
+                    all(pairwise.cmp.tb[grepl(paste0("-",v),posthoc.pc.name),][["diff"]] > 0) })
 			    
     }
 
@@ -201,8 +213,8 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
       t.res.spe.direction <- "NA"
     }
 
-    dat.ret <- NULL
-    dat.ret <- data.table("geneID"=v,"F"=t.res.f[1],"F.pvalue"=t.res.f[2],"Kruskal.pvalue"=t.res.kruskal.p)
+    #dat.ret <- NULL
+    #dat.ret <- data.table("geneID"=v,"F"=t.res.f[1],"F.pvalue"=t.res.f[2],"Kruskal.pvalue"=t.res.kruskal.p)
     dat.ret <- cbind(dat.ret, t(data.frame(structure(t.res.posthoc,names=c(paste0("PostHoc.diff.",posthoc.pc.name),
 							     paste0("PostHoc.padj.",posthoc.pc.name))))))
     dat.ret <- cbind(dat.ret,data.table("PostHoc.padj.min"=t.res.posthoc.minP,
@@ -212,10 +224,10 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
 					"PostHoc.minDiff"=t.res.posthoc.minDiff,
 					"PostHoc.minDiff.cmp"=t.res.posthoc.minDiff.cmp))
     if(!is.null(pmod) && pmod=="cluster.specific") {
-	dat.ret <- cbind(dat.ret,t(data.frame(structure(t.res.spe,names=paste0("cluster.specific.",clustNames)))))
-	dat.ret <- cbind(dat.ret,data.table("is.clusterSpecific"=is.clusterSpecific,
-					    "cluster.lable"=t.res.spe.lable,
-					    "cluster.direction"=t.res.spe.direction))
+        dat.ret <- cbind(dat.ret,t(data.frame(structure(t.res.spe,names=paste0("cluster.specific.",clustNames)))))
+        dat.ret <- cbind(dat.ret,data.table("is.clusterSpecific"=is.clusterSpecific,
+                            "cluster.lable"=t.res.spe.lable,
+                            "cluster.direction"=t.res.spe.direction))
     }
     
     return(dat.ret)
@@ -246,17 +258,22 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
   ret.df.4 <- ret.df[is.na(Kruskal.pvalue),]
   ret.df <- rbind(ret.df.3,ret.df.4)
   ##
-  ret.df <- ret.df[order(F.adjp,-F,PostHoc.padj.min),]
-  ### select
-  if(use.Kruskal){
-      ret.df <- ret.df[order(Kruskal.adjp,-F,PostHoc.padj.min),]
-      ret.df.sig <- ret.df[Kruskal.adjp<F.FDR.THRESHOLD &
-			   PostHoc.padj.min<HSD.FDR.THRESHOLD &
-			   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD,]
+  if(!F.only){
+      ret.df <- ret.df[order(F.adjp,-F,PostHoc.padj.min),]
+      ### select
+      if(use.Kruskal){
+          ret.df <- ret.df[order(Kruskal.adjp,-F,PostHoc.padj.min),]
+          ret.df.sig <- ret.df[Kruskal.adjp<F.FDR.THRESHOLD &
+                   PostHoc.padj.min<HSD.FDR.THRESHOLD &
+                   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD,]
+      }else{
+          ret.df.sig <- ret.df[F.adjp<F.FDR.THRESHOLD &
+                   PostHoc.padj.min<HSD.FDR.THRESHOLD &
+                   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD,]
+      }
   }else{
-      ret.df.sig <- ret.df[F.adjp<F.FDR.THRESHOLD &
-			   PostHoc.padj.min<HSD.FDR.THRESHOLD &
-			   abs(PostHoc.padj.min.diff)>=HSD.FC.THRESHOLD,]
+      ret.df <- ret.df[order(F.adjP,-F),]
+      ret.df.sig <- ret.df[F.adjp < F.FDR.THRESHOLD,]
   }
   ### output
   if(!is.null(out.prefix)){

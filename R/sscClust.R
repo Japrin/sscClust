@@ -1215,6 +1215,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
         res.aov <- findDEGenesByAOV(xdata=as.matrix(assay(obj,assay.name)),
                                                xlabel=clust,
                                                batch=batchV, out.prefix=NULL,
+                                               F.only=T,
                                                n.cores=n.cores, gid.mapping=gid.mapping,ncell.downsample=ncell.downsample)
         ##toc()
 

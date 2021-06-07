@@ -14,6 +14,7 @@ findDEGenesByAOV(
   HSD.FDR.THRESHOLD = 0.01,
   HSD.FC.THRESHOLD = 1,
   use.Kruskal = F,
+  F.only = F,
   verbose = F,
   n.cores = NULL,
   ncell.downsample = NULL,
@@ -38,6 +39,8 @@ findDEGenesByAOV(
 \item{HSD.FC.THRESHOLD}{numeric; threshold of the absoute diff of HSD-test (default: 1)}
 
 \item{use.Kruskal}{logical; whether use Kruskal test for ranking genes (default: FALSE)}
+
+\item{F.only}{logical; only perform F-test (default: FALSE)}
 
 \item{verbose}{logical; whether output all genes' result. (default: F)}
 
