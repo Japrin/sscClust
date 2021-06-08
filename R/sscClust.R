@@ -1279,7 +1279,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
 
     fit.list <- NULL
     ### verbose 2 or 3
-    if(verbose>1 & method=="limma"){
+    if(verbose>1 && method=="limma"){
         fit.list <- llply(group.list,function(x){ out[[as.character(x)]]$fit })
         names(fit.list) <- group.list
     }

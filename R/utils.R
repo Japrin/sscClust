@@ -82,6 +82,7 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
                              gid.mapping=NULL)
 {
 
+  set.seed(9999)
   if(is.null(names(xlabel))) { names(xlabel) <- colnames(xdata) }
   #### downsample
   if(!is.null(ncell.downsample)){
