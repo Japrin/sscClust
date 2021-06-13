@@ -54,6 +54,8 @@ findKneePoint <- function(pcs)
 #' @importFrom RhpcBLASctl omp_set_num_threads
 #' @importFrom doParallel registerDoParallel
 #' @importFrom utils write.table
+#' @importFrom sscVis loginfo
+#' @importFrom Matrix rowSums
 #' @param xdata data frame or matrix; rows for genes and columns for samples
 #' @param xlabel factor; cluster label of the samples, with length equal to the number of columns in xdata
 #' @param batch factor; covariate. (default: NULL)
@@ -84,6 +86,10 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
 
   set.seed(9999)
   if(is.null(names(xlabel))) { names(xlabel) <- colnames(xdata) }
+  if(!is.null(batch) && is.null(names(batch))) { names(batch) <- colnames(batch) }
+
+  loginfo(sprintf("dim of xdata (input for findDEGenesByAOV): %d x %d",nrow(xdata),ncol(xdata)))
+
   #### downsample
   if(!is.null(ncell.downsample)){
     grp.list <- unique(as.character(xlabel))
@@ -93,21 +99,25 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
             })))
     xdata <- xdata[,f.cell,drop=F]
     xlabel <- xlabel[f.cell]
+    batch <- batch[f.cell]
+    loginfo(sprintf("dim of xdata (downsampled): %d x %d",nrow(xdata),ncol(xdata)))
   }  
-  ####
-  f.rm <- rowSds(xdata)==0
+  #### if xdata is dgCMatrix (from Matrix), Matrix::rowSums is required
+  f.rm <- rowSums(xdata==0)==ncol(xdata)
+  ####f.rm <- rowSds(xdata)==0
   xdata <- xdata[!f.rm,,drop=F]
+  loginfo(sprintf("dim of xdata (remove all-zeros genes): %d x %d",nrow(xdata),ncol(xdata)))
 
   ####  
   clustNames <- unique(as.character(xlabel))
-  xdata <- as.matrix(xdata)
+  ###### if xdata is data.frame, xdata[v,] will not be a vector
+  if(is.data.frame(xdata)){ xdata <- as.matrix(xdata) }
   ### check rownames and colnames
   if(is.null(rownames(xdata))){
     stop("the xdata does not have rownames!!!")
   }
   if(length(table(xlabel))<2){
     return(NULL)
-    #return(list(aov.out=ret.df,aov.out.sig=ret.df.sig))
   }
   if(!is.null(gid.mapping) && is.null(names(gid.mapping))) { names(gid.mapping)=gid.mapping }
   ###

@@ -1213,11 +1213,11 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
     {
 
         loginfo("begin findDEGenesByAOV ...")
-        res.aov <- findDEGenesByAOV(xdata=as.matrix(assay(obj,assay.name)),
-                                               xlabel=clust,
-                                               batch=batchV, out.prefix=NULL,
-                                               F.only=T,
-                                               n.cores=n.cores, gid.mapping=gid.mapping,ncell.downsample=ncell.downsample)
+        res.aov <- findDEGenesByAOV(xdata=assay(obj,assay.name),
+                                    xlabel=clust,
+                                    batch=batchV, out.prefix=NULL,
+                                    F.only=T,
+                                    n.cores=n.cores, gid.mapping=gid.mapping,ncell.downsample=ncell.downsample)
         res.aov$aov.out$F.rank <- rank(-res.aov$aov.out$F)/nrow(res.aov$aov.out)
         loginfo("end findDEGenesByAOV.")
         #return(list(res.aov=res.aov))
