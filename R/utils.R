@@ -96,7 +96,9 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
     f.cell <- unname(unlist(sapply(grp.list, function(x) {
                 x <- names(xlabel[xlabel == x])
                 sample(x, min(length(x), ncell.downsample))
-            })))
+            },simplify=F)))
+    print("str(f.cell):")
+    print(str(f.cell))
     xdata <- xdata[,f.cell,drop=F]
     xlabel <- xlabel[f.cell]
     batch <- batch[f.cell]
