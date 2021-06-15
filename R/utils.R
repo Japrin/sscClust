@@ -86,7 +86,7 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
 
   set.seed(9999)
   if(is.null(names(xlabel))) { names(xlabel) <- colnames(xdata) }
-  if(!is.null(batch) && is.null(names(batch))) { names(batch) <- colnames(batch) }
+  if(!is.null(batch) && is.null(names(batch))) { names(batch) <- colnames(xdata) }
 
   loginfo(sprintf("dim of xdata (input for findDEGenesByAOV): %d x %d",nrow(xdata),ncol(xdata)))
 
