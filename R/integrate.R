@@ -189,7 +189,7 @@ integrate.by.avg <- function(sce.list,
 	}else{
 		gene.de.common <- gene.common
 	}
-	loginfo(sprintf("total number %d genes will be used ",length(gene.de.common)))
+	loginfo(sprintf("total number %d common DEGs",length(gene.de.common)))
 
 	rowData(sce.pb)$gene.de.common <- rownames(sce.pb) %in% gene.de.common
 
