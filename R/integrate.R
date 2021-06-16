@@ -43,7 +43,7 @@ integrate.by.avg <- function(sce.list,
 							 par.clust=list(method="SNN",SNN.k=3,SNN.method="leiden",resolution_parameter=2.2),
                              topGene.lo=-1.5,topGene.hi=1.5,topGene.step=1,myseed=9997,verbose=F,
                              method.avg="zscore",...)
-  {
+{
     #require("plyr")
     if(use.deg && is.null(gene.de.list) && is.avg){
         cat(sprintf("sce.list contain average expression, gene.de.list must be not NULL!\n"))
@@ -325,6 +325,7 @@ integrate.by.avg <- function(sce.list,
 #' @importFrom sscVis collapseEffectSizeLong ssc.toLongTable directEScombi
 #' @details rank genes
 #' @return a gene table
+#' @export
 rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.adj=NULL,
 						 group.2nd=NULL,mode.collapse="comb",th.adj.P=0.01,th.dprime=0.15)
 {
