@@ -322,6 +322,7 @@ integrate.by.avg <- function(sce.list,
 #' @importFrom SummarizedExperiment assayNames
 #' @importFrom stats pnorm p.adjust
 #' @importFrom matrixStats rowMedians
+#' @importFrom sscVis collapseEffectSizeLong ssc.toLongTable directEScombi
 #' @details rank genes
 #' @return a gene table
 rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.adj=NULL,
