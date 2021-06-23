@@ -317,25 +317,32 @@ integrate.by.avg <- function(sce.list,
 #' @param mode.collapse character; collapse method. one of "min", "comb" [default: "comb"]
 #' @param th.adj.P double; threshold [default: 0.01]
 #' @param th.dprime double; threshold [default: 0.15]
+#' @param ncores integer; number of CPU cores to use. (default: 8)
 #' @importFrom data.table as.data.table data.table setkey
 #' @importFrom plyr ldply
 #' @importFrom SummarizedExperiment assayNames
-#' @importFrom stats pnorm p.adjust
+#' @importFrom stats pnorm p.adjust fisher.test
 #' @importFrom matrixStats rowMedians
 #' @importFrom sscVis collapseEffectSizeLong ssc.toLongTable directEScombi
+#' @importFrom doParallel registerDoParallel
+#' @importFrom RhpcBLASctl omp_set_num_threads
 #' @details rank genes
 #' @return a gene table
 #' @export
 rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.adj=NULL,
-						 group.2nd=NULL,mode.collapse="comb",th.adj.P=0.01,th.dprime=0.15)
+						 group.2nd=NULL,mode.collapse="comb",th.adj.P=0.01,th.dprime=0.15,ncores=8)
 {
 	#### To do: add diff between this - max_other(not this)
+    RhpcBLASctl::omp_set_num_threads(1)
+    registerDoParallel(cores = ncores)
+
 	gene.desc.top <- as.data.table(ldply(unique(sort(obj[[group]])),function(x){
 			     obj.x <- obj[,obj[[group]]==x]
 			     dat.long <- ssc.toLongTable(obj.x,gene.id=NULL,
 							 assay.name=c("dprime","vardprime",
 								      "P.Value","adj.P.Val",
-								      "sig","freq._case"),
+								      "sig","freq._case",
+                                      "OR","OR.p.value","OR.adj.pvalue"),
 							 col.idx=group.2nd)
 			     dat.collapse <- NULL
 			     ret.tb <- data.table(geneID=rownames(obj.x),
@@ -348,30 +355,30 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.
 			     
 			     if("dprime" %in% assayNames(obj.x))
 			     {
-				 ret.tb.ext.a <- dat.long[,.(dprime.max=max(dprime),
-							     dprime.max.P.Value=P.Value[which.max(dprime)],
-							     dprime.max.adj.P.Val=adj.P.Val[which.max(dprime)]),
-							    by="geneID"]
-				 
-				 if(!is.null(group.2nd)){
-				     dat.collapse <- collapseEffectSizeLong(dat.long,mode.collapse=mode.collapse,
-									    group.2nd=group.2nd,
-									    th.adj.P=th.adj.P,
-									    th.dprime=th.dprime)
-				 }
-				 
-				 if(!is.null(dat.collapse)){
-				     ret.tb.ext.b <- dat.collapse[,.(N.sig.group.2nd=sum(.SD$sig),
-								     freq.sig.group.2nd=sum(.SD$sig)/nrow(.SD),
-								     N.total.group.2nd=.N,
-								     dprime.max.group.2nd=max(dprime),
-								     dprime.max.P.Value.group.2nd=P.Value[which.max(dprime)],
-								     dprime.max.adj.P.group.2nd=adj.P.Val[which.max(dprime)]),
-								    by="geneID"]
-				     
-				     ret.tb.ext.a <- merge(ret.tb.ext.a,ret.tb.ext.b,by="geneID")
-				 }
-				 ret.tb.ext <- merge(ret.tb.ext,ret.tb.ext.a,by="geneID")
+                     ret.tb.ext.a <- dat.long[,.(dprime.max=max(dprime),
+                                     dprime.max.P.Value=P.Value[which.max(dprime)],
+                                     dprime.max.adj.P.Val=adj.P.Val[which.max(dprime)]),
+                                    by="geneID"]
+                     
+                     if(!is.null(group.2nd)){
+                         dat.collapse <- collapseEffectSizeLong(dat.long,mode.collapse=mode.collapse,
+                                            group.2nd=group.2nd,
+                                            th.adj.P=th.adj.P,
+                                            th.dprime=th.dprime)
+                     }
+                     
+                     if(!is.null(dat.collapse)){
+                         ret.tb.ext.b <- dat.collapse[,.(N.sig.group.2nd=sum(.SD$sig),
+                                         freq.sig.group.2nd=sum(.SD$sig)/nrow(.SD),
+                                         N.total.group.2nd=.N,
+                                         dprime.max.group.2nd=max(dprime),
+                                         dprime.max.P.Value.group.2nd=P.Value[which.max(dprime)],
+                                         dprime.max.adj.P.group.2nd=adj.P.Val[which.max(dprime)]),
+                                        by="geneID"]
+                         
+                         ret.tb.ext.a <- merge(ret.tb.ext.a,ret.tb.ext.b,by="geneID")
+                     }
+                     ret.tb.ext <- merge(ret.tb.ext,ret.tb.ext.a,by="geneID")
 			     }
 			     ret.tb <- merge(ret.tb,ret.tb.ext,by="geneID")
 			     anames <- intersect(assayNames(obj.x),c("logFC","meanScale"))
@@ -387,37 +394,90 @@ rank.de.gene <- function(obj,group="pca.SNN.kauto",sort.by="median.rank",weight.
 			     all(ret.tb$geneID==rownames(obj.x))
 			     
 			     if("zp" %in% assayNames(obj.x)){
-				 w <- sqrt(obj.x$nCellsStudy/sum(obj.x$nCellsStudy))
-				 if(!is.null(weight.adj)){
-				     w <- w * obj.x[[weight.adj]]
-				 }
-				 zsum <- (assay(obj.x,"zp") %*% w)[,1]
-				 ### two-sided p value
-				 ret.tb[["p.comb.Stouffer"]] <- 2*(pnorm(-abs(zsum)))
-				 ret.tb[["p.comb.Stouffer.adj"]] <- p.adjust(ret.tb[["p.comb.Stouffer"]],"BH")
+                     w <- sqrt(obj.x$nCellsStudy/sum(obj.x$nCellsStudy))
+                     if(!is.null(weight.adj)){
+                         w <- w * obj.x[[weight.adj]]
+                     }
+                     zsum <- (assay(obj.x,"zp") %*% w)[,1]
+                     ### two-sided p value
+                     ret.tb[["p.comb.Stouffer"]] <- 2*(pnorm(-abs(zsum)))
+                     ret.tb[["p.comb.Stouffer.adj"]] <- p.adjust(ret.tb[["p.comb.Stouffer"]],"BH")
 			     }
 			     
 			     if("dprime" %in% assayNames(obj.x)){
-				 es.combi <- directEScombi(assay(obj.x,"dprime"), assay(obj.x,"vardprime"))
-				 es.combi <- es.combi[ret.tb$geneID, ]
-				 
-				 if(!all(ret.tb$geneID==rownames(es.combi))){
-				     stop(sprintf("strange thing: !all(ret.tb$geneID==rownames(es.combi)) (%s)\n", x))
-				 }
-				 ret.tb <- cbind(ret.tb,es.combi)
+                     es.combi <- directEScombi(assay(obj.x,"dprime"), assay(obj.x,"vardprime"))
+                     es.combi <- es.combi[ret.tb$geneID, ]
+                     if(!all(ret.tb$geneID==rownames(es.combi))){
+                         stop(sprintf("strange thing: !all(ret.tb$geneID==rownames(es.combi)) (%s)\n", x))
+                     }
+                     ret.tb <- cbind(ret.tb,es.combi)
 			     }
 			     
 			     if("freq._case" %in% assayNames(obj.x))
 			     {
-				 ret.tb[["bin.freq.comb"]] <- ((assay(obj.x,"freq._case") %*% obj.x$nCellsCluster)[,1])/sum(obj.x$nCellsCluster)
-				 ret.tb[["bin.freq.median"]] <- rowMeans(assay(obj.x,"freq._case"),na.rm=T)
-				 ret.tb[["bin.freq.mean"]] <- rowMedians(assay(obj.x,"freq._case"),na.rm=T)
+                     ret.tb[["bin.freq.comb"]] <- ((assay(obj.x,"freq._case") %*% obj.x$nCellsCluster)[,1])/sum(obj.x$nCellsCluster)
+                     ret.tb[["bin.freq.median"]] <- rowMedians(assay(obj.x,"freq._case"),na.rm=T)
+                     ret.tb[["bin.freq.mean"]] <- rowMeans(assay(obj.x,"freq._case"),na.rm=T)
+                     n.pos.x <- (assay(obj.x,"freq._case") %*% obj.x$nCellsCluster)
+                     n.neg.x <- ( (1-assay(obj.x,"freq._case")) %*% obj.x$nCellsCluster)
+                     n.pos.o <- (assay(obj.x,"freq._control") %*% obj.x$nCellsOther )
+                     n.neg.o <- ( (1-assay(obj.x,"freq._control")) %*% obj.x$nCellsOther )
+                     n.mtx <- cbind(n.pos.x,n.neg.x,n.pos.o,n.neg.o)
+
+                     n.fisher.tb <- as.data.table(ldply(seq_len(nrow(n.mtx)),function(i){
+                                                        mat.i <- matrix(n.mtx[i,], nrow=2)
+                                                        if(any(is.na(mat.i))){
+                                                            return(data.table(OR=NA,OR.p.value=1))
+                                                        }
+                                                        ret.i <- fisher.test(mat.i)
+                                                        return(data.table(OR=ret.i$estimate,OR.p.value=ret.i$p.value))
+                                                }))
+
+                     n.fisher.tb[,OR.adj.pvalue:=1]
+                     n.fisher.tb[!is.na(OR),OR.adj.pvalue:=p.adjust(OR.p.value,"BH")]
+                     n.fisher.tb[is.na(OR),OR:=1]
+                     ret.tb[["OR.comb"]] <- n.fisher.tb[["OR"]]
+                     ret.tb[["OR.comb.pvalue"]] <- n.fisher.tb[["OR.p.value"]]
+                     ret.tb[["OR.comb.adj.pvalue"]] <- n.fisher.tb[["OR.adj.pvalue"]]
+
 			     }
+                 if("OR" %in% assayNames(obj.x))
+                 {
+                     ret.tb[["OR.median"]] <- rowMedians(assay(obj.x,"OR"),na.rm=T)
+                     ret.tb[["OR.mean"]] <- rowMeans(assay(obj.x,"OR"),na.rm=T)
+                     ret.tb[["OR.pvalue.Fisher"]] <- comb.pvalue(assay(obj.x,"OR.p.value"))
+                     ret.tb[["OR.pvalue.Fisher.adj"]] <- p.adjust(ret.tb[["OR.pvalue.Fisher"]],"BH")
+                 }
 			     return(ret.tb)
-							   }))
+							   },.parallel=T))
 	gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,gene.desc.top[[sort.by]]), ]
 	###gene.desc.top <- gene.desc.top[ order(gene.desc.top$meta.cluster,median.rank), ]
 	return(gene.desc.top)
+}
+
+
+#' combine p values 
+#' @param p.mtx matrix; rows for genes, columns for studies.
+#' @param method character; which method to use (default: "Fisher")
+#' @importFrom Matrix rowSums
+#' @importFrom stats pchisq
+#' @details combine p values. Available method: Fisher's method
+#' @export
+comb.pvalue <- function(p.mtx,method="Fisher")
+{
+    if(is.null(rownames(p.mtx))) { rownames(p.mtx) <- sprintf("G%06d",seq_len(nrow(p.mtx))) }
+    rn <- rownames(p.mtx)
+    ### not-NA matrix
+    nna.mtx <- !is.na(p.mtx)
+    f.nna.1 <- rowSums(nna.mtx)==1
+    p.nna.1 <- apply(p.mtx[f.nna.1,,drop=F],1,function(x){ x[!is.na(x)] })
+    f.nna.0 <- rowSums(nna.mtx)==0
+    p.nna.0 <- structure(rep(1,sum(f.nna.0)),names=names(f.nna.0)[f.nna.0])
+    f.nna.lt1 <- rowSums(nna.mtx) > 1
+    chisq <- (-2) * rowSums(log(p.mtx[f.nna.lt1,]))
+    p.nna.lt1 <- pchisq(chisq,2*ncol(p.mtx),lower.tail=F)
+    p.ret <- c(p.nna.0,p.nna.1,p.nna.lt1)[rn]
+
 }
 
 

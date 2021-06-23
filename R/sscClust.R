@@ -1169,6 +1169,8 @@ ssc.clusterMarkerGene <- function(obj, assay.name="exprs", ncell.downsample=NULL
 #' @importFrom limma lmFit eBayes topTable
 #' @importFrom doParallel registerDoParallel
 #' @importFrom plyr ldply llply
+#' @importFrom stats fisher.test p.adjust
+#' @importFrom data.table data.table as.data.table
 #' @importFrom sscVis loginfo
 #' @details identify differential genes using limma
 #' @export
@@ -1260,6 +1262,34 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                               gid.mapping=gid.mapping, do.voom=F,method=method)
                 loginfo("end run.DE.matrix ...")
             }
+            ### add OR ###
+            if(group.mode=="multiAsTwo")
+            {
+
+                res.fisher <- as.data.table(ldply(seq_len(nrow(obj.out$all)),function(i){
+                                                        data.i <- obj.out$all[i,]
+                                                        n._case.pos <- data.i[,as.integer(length._case*freq._case)]
+                                                        n._case.neg <- data.i[["length._case"]] - n._case.pos
+                                                        n._control.pos <- data.i[,as.integer(length._control*freq._control)]
+                                                        n._control.neg <- data.i[["length._control"]] - n._control.pos
+                                                        mat.i <- matrix(c(n._case.pos, n._case.neg,
+                                                                          n._control.pos, n._control.neg),
+                                                                        nrow=2)
+                                                        ret.i <- fisher.test(mat.i)
+                                                        data.table(geneID=data.i[["geneID"]],
+                                                                   geneSymbol=data.i[["geneSymbol"]],
+                                                                   cluster=data.i[["cluster"]],
+                                                                   OR=ret.i$estimate,OR.p.value=ret.i$p.value)
+                                                }))
+                res.fisher[,OR.adj.pvalue:=p.adjust(OR.p.value,"BH")]
+
+                obj.out$all <- merge(obj.out$all,res.fisher,by=c("geneID","geneSymbol","cluster"))
+                obj.out$all <- obj.out$all[order(adj.P.Val, -t, -logFC), ]
+                obj.out$sig <- merge(obj.out$sig,res.fisher,by=c("geneID","geneSymbol","cluster"))
+                obj.out$sig <- obj.out$sig[order(adj.P.Val, -t, -logFC), ]
+
+            }
+            ##############
             return(obj.out)
 
         },.parallel=T)

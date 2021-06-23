@@ -12,7 +12,8 @@ rank.de.gene(
   group.2nd = NULL,
   mode.collapse = "comb",
   th.adj.P = 0.01,
-  th.dprime = 0.15
+  th.dprime = 0.15,
+  ncores = 8
 )
 }
 \arguments{
@@ -31,6 +32,8 @@ rank.de.gene(
 \item{th.adj.P}{double; threshold [default: 0.01]}
 
 \item{th.dprime}{double; threshold [default: 0.15]}
+
+\item{ncores}{integer; number of CPU cores to use. (default: 8)}
 }
 \value{
 a gene table
