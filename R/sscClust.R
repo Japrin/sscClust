@@ -1263,7 +1263,7 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                 loginfo("end run.DE.matrix ...")
             }
             ### add OR ###
-            if(group.mode=="multiAsTwo" & verbose>0)
+            if(group.mode=="multiAsTwo" && verbose>0)
             {
 
                 res.fisher <- as.data.table(ldply(seq_len(nrow(obj.out$all)),function(i){

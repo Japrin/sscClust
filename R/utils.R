@@ -1033,7 +1033,8 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
             all.table <- merge(all.table,.Grp.mean.scale.df)
 			all.table$meanExp <- all.table[[sprintf("mean.%s",group.label)]]
 			all.table$meanScale <- all.table[[sprintf("mean.%s.scale",group.label)]]
-			if(verbose>1){
+			##if(verbose>1)
+            {
 				.Grp.sd.df <- .getStatistics(xdata,stat="sd")
 				all.table <- merge(all.table,.Grp.sd.df)
 				colName.sd <- grep("^sd.",colnames(all.table),value=T)
