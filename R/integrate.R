@@ -469,12 +469,15 @@ comb.pvalue <- function(p.mtx,method="Fisher")
     rn <- rownames(p.mtx)
     ### not-NA matrix
     nna.mtx <- !is.na(p.mtx)
+    ## genes with non-NA values in only 1 study
     f.nna.1 <- rowSums(nna.mtx)==1
     p.nna.1 <- apply(p.mtx[f.nna.1,,drop=F],1,function(x){ x[!is.na(x)] })
+    ## genes with non-NA values in 0 study
     f.nna.0 <- rowSums(nna.mtx)==0
     p.nna.0 <- structure(rep(1,sum(f.nna.0)),names=names(f.nna.0)[f.nna.0])
+    ## genes with non-NA values in > 1 study
     f.nna.lt1 <- rowSums(nna.mtx) > 1
-    chisq <- (-2) * rowSums(log(p.mtx[f.nna.lt1,]))
+    chisq <- (-2) * rowSums(log(p.mtx[f.nna.lt1,,drop=F]))
     p.nna.lt1 <- pchisq(chisq,2*ncol(p.mtx),lower.tail=F)
     p.ret <- c(p.nna.0,p.nna.1,p.nna.lt1)[rn]
 
