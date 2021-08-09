@@ -105,7 +105,10 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
     loginfo(sprintf("dim of xdata (downsampled): %d x %d",nrow(xdata),ncol(xdata)))
   }  
   #### if xdata is dgCMatrix (from Matrix), Matrix::rowSums is required
-  #### It is weird! rowSums(xdata==0) cause segfault, 'memory not mapped'
+  #### Note: xdata == 0 will give you a dense logical matrix object (lgeMatrix),
+  #### while X > 0 will give you a sparse logical matrix object (lgCMatrix).
+  #### The Matrix cannot process too large dense logical matrix, and will cause
+  #### segfault 'memory not mapped'
   ###f.rm <- rowSums(xdata==0)==ncol(xdata)
   x.ncell <- rowSums(xdata>0)
   f.rm <- x.ncell==0
