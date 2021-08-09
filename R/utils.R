@@ -105,7 +105,10 @@ findDEGenesByAOV <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,pmod=NULL,
     loginfo(sprintf("dim of xdata (downsampled): %d x %d",nrow(xdata),ncol(xdata)))
   }  
   #### if xdata is dgCMatrix (from Matrix), Matrix::rowSums is required
-  f.rm <- rowSums(xdata==0)==ncol(xdata)
+  #### It is weird! rowSums(xdata==0) cause segfault, 'memory not mapped'
+  ###f.rm <- rowSums(xdata==0)==ncol(xdata)
+  x.ncell <- rowSums(xdata>0)
+  f.rm <- x.ncell==0
   ####f.rm <- rowSds(xdata)==0
   xdata <- xdata[!f.rm,,drop=F]
   loginfo(sprintf("dim of xdata (remove all-zeros genes): %d x %d",nrow(xdata),ncol(xdata)))
