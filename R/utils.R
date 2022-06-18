@@ -953,6 +953,17 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
                                 xlabel=xlabel,
                                 stringsAsFactors=F)
 	    design <- model.matrix(~batch+group,data=design.df)
+        design.df.sum <- as.data.table(design.df)[,.N,by=c("group","batch")][order(group,batch),]
+        ### in case group "II" is exactly equal to one level of batch
+        ## degenerate to only estimate the coefficients of batches
+        if(nrow(design.df.sum[group=="II",])==1){
+            .II.batch <- design.df.sum[group=="II",][["batch"]][1]
+            if(nrow(design.df.sum[batch==.II.batch,])==1){
+                .idx.design.rm <- which(colnames(design)==sprintf("batch%s",.II.batch))
+                design <- design[,-.idx.design.rm,drop=F]
+                cat(sprintf("group II is exactly the same with batch %s, the design matrix is degenerated\n",.II.batch))
+            }
+        }
     }
     group.label <- x.levels[length(x.levels)]
 	colnames(design)[ncol(design)]<-"II"
