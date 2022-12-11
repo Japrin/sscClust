@@ -1097,7 +1097,6 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 #' @param ncell.downsample integer; for each group, number of cells downsample to. (default: NULL)
 #' @param T.fdr numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)
 #' @param T.logFC numeric; threshold of the absoute diff (default: 1)
-#' @param verbose integer; verbose (default: 0)
 #' @param n.cores integer; number of cores used, if NULL it will be determined automatically (default: NULL)
 #' @param group character; group of interest, if NULL the last group will be used (default: NULL)
 #' @param gid.mapping named character; gene id to gene symbol mapping. (default: NULL)
@@ -1114,9 +1113,10 @@ run.limma.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downs
 #' @importFrom BiocParallel MulticoreParam register multicoreWorkers
 #' @export
 run.DE.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsample=NULL,
-			  T.fdr=0.05,T.logFC=1,T.expr=0.3,T.bin.useZ=T,
-			  verbose=0,n.cores=NULL,group=NULL,
-			  gid.mapping=NULL, do.voom=F,rn.seed=9999,method="lm")
+			  T.fdr=0.05,T.logFC=1,
+              #T.expr=0.3, T.bin.useZ=T, verbose=0, do.voom=F,
+              n.cores=NULL,group=NULL,
+			  gid.mapping=NULL,rn.seed=9999,method="lm")
 {
 
     if(ncol(xdata)!=length(xlabel)){

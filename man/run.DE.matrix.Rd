@@ -12,13 +12,9 @@ run.DE.matrix(
   ncell.downsample = NULL,
   T.fdr = 0.05,
   T.logFC = 1,
-  T.expr = 0.3,
-  T.bin.useZ = T,
-  verbose = 0,
   n.cores = NULL,
   group = NULL,
   gid.mapping = NULL,
-  do.voom = F,
   rn.seed = 9999,
   method = "lm"
 )
@@ -37,8 +33,6 @@ run.DE.matrix(
 \item{T.fdr}{numeric; threshold of the adjusted p value of moderated t-test (default: 0.05)}
 
 \item{T.logFC}{numeric; threshold of the absoute diff (default: 1)}
-
-\item{verbose}{integer; verbose (default: 0)}
 
 \item{n.cores}{integer; number of cores used, if NULL it will be determined automatically (default: NULL)}
 
