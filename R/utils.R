@@ -1149,12 +1149,12 @@ run.DE.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsamp
     ### group name for display purpose
     group.dis <- NULL
     if(!is.null(group)){
-	tmp.group <- unlist(strsplit(as.character(group),":"))
-	group <- tmp.group[1]
-	if(length(tmp.group)>1){
-	    group.dis <- tmp.group[2]
-	}
-	x.levels <- c(setdiff(x.levels,group),as.character(group))
+        tmp.group <- unlist(strsplit(as.character(group),":"))
+        group <- tmp.group[1]
+        if(length(tmp.group)>1){
+            group.dis <- tmp.group[2]
+        }
+        x.levels <- c(setdiff(x.levels,group),as.character(group))
     }
 
     group.label <- x.levels[length(x.levels)]
@@ -1188,11 +1188,11 @@ run.DE.matrix <- function(xdata,xlabel,batch=NULL,out.prefix=NULL,ncell.downsamp
 			   )
 	    }
 	},.parallel=T))
-	all.table$adj.P.Value <- p.adjust(all.table$p.value,method="BH")
+	all.table$adj.P.Val <- p.adjust(all.table$p.value,method="BH")
 	all.table$wilcox.adj.p.value <- p.adjust(all.table$wilcox.p.value,method="BH")
 	
-	all.table <- all.table[order(adj.P.Value,-t,-logFC),]
-	sig.table <- all.table[adj.P.Value<T.fdr & abs(logFC)>T.logFC,]
+	all.table <- all.table[order(adj.P.Val,-t,-logFC),]
+	sig.table <- all.table[adj.P.Val<T.fdr & abs(logFC)>T.logFC,]
 
     }
 

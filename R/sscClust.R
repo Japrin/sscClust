@@ -1257,9 +1257,11 @@ ssc.DEGene.limma <- function(obj, assay.name="exprs", ncell.downsample=NULL,
                               group=xgroup,
                               rn.seed=9999,
                               ncell.downsample=if(group.mode=="multi") NULL else ncell.downsample,
-                              T.fdr=T.fdr,T.logFC=T.logFC,T.expr=T.expr,T.bin.useZ=T.bin.useZ,
-                              verbose=verbose,n.cores=1,
-                              gid.mapping=gid.mapping, do.voom=F,method=method)
+                              T.fdr=T.fdr,T.logFC=T.logFC,
+                              #T.expr=T.expr,T.bin.useZ=T.bin.useZ,
+                              #verbose=verbose, do.voom=F,
+                              n.cores=1,
+                              gid.mapping=gid.mapping,method=method)
                 loginfo("end run.DE.matrix ...")
             }
             ### add OR ###
