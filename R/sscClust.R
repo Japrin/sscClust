@@ -290,7 +290,10 @@ ssc.reduceDim <- function(obj,assay.name="exprs",
       proj_data <- run.tSNE(BiocGenerics::t(assay(obj[vgene,],assay.name)),tSNE.usePCA,tSNE.perplexity,
                             out.prefix=out.prefix,n.cores=ncore,method=method.tsne,...)
     }else if(method=="umap"){
-        proj_data <- umap(BiocGenerics::t(assay(obj[vgene,],assay.name)), init = "spca",pca=50,n_threads = ncore)
+        proj_data <- umap(BiocGenerics::t(assay(obj[vgene,],assay.name)), init = "spca",
+                          #pca=50,
+                          pca=if(is.null(pca.npc)) 50 else pca.npc,
+                          n_threads = ncore)
     }else if(method=="iCor"){
       proj_data <- as.matrix(assay(obj[vgene,],assay.name))
       while(iCor.niter>0){
