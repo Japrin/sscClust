@@ -482,6 +482,8 @@ ssc.clust <- function(obj, assay.name="exprs", method.reduction="iCor",
     }else if(SNN.method=="betweenness"){
       clust.res <- igraph::cluster_edge_betweenness(snn.gr)
     }else if(SNN.method=="leiden"){
+      #### leiden 0.3.9 works fine ! leiden 0.4.3 may not work !
+      ###  Error ...  NAs introduced by coercion to integer range ...
       clust.res <- leiden::leiden((snn.gr),seed=myseed,...)
 	  clust.res <- list(membership=clust.res)
 	}
